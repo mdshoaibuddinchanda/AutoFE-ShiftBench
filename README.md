@@ -127,6 +127,9 @@ Every unified runner execution writes:
 - `reports/figures/degradation_curve.pdf`
 - `reports/figures/average_performance.pdf`
 
+Note: generated benchmark artifacts are intentionally gitignored in this project.
+Run the pipeline commands to regenerate them locally.
+
 Figure generation defaults are publication-oriented:
 
 - PNG and TIFF at 600 DPI
@@ -202,10 +205,15 @@ python src/pipeline_runner.py --no-tiff-figures
 ## Project Structure
 
 - `config/`: runtime configuration files
-- `data/raw/`: downloaded dataset CSV files
-- `data/processed/`: preprocessing, engineered, and selected artifacts
-- `data/shifted/`: shifted test-set variations
+- `data/raw/`: generated downloaded dataset CSV files (gitignored)
+- `data/processed/`: generated preprocessing/feature artifacts (gitignored)
+- `data/shifted/`: generated shifted test-set variations (gitignored)
 - `src/`: core pipeline modules
-- `reports/figures/`: paper figures
-- `reports/tables/`: unified CSV outputs and paper tables
+- `reports/figures/`: generated paper figures (gitignored)
+- `reports/tables/`: generated CSV outputs and paper tables (gitignored)
 - `notebooks/`: exploratory and visualization notebooks
+
+## Version Control Hygiene
+
+- `progress.md` is local-only and intentionally excluded from git.
+- `.vscode/` workspace settings are excluded from git.
