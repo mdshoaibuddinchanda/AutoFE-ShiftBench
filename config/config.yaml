@@ -1,0 +1,23 @@
+seeds: 20
+folds: 5
+
+shift:
+  types:
+    - random
+    - important
+  severity:
+    - 0.2
+    - 0.4
+    - 0.6
+    - 0.8
+    - 1.0
+
+feature_engineering:
+  dfs_depth: 2
+  max_features: 100
+
+model:
+  type: xgboost
+  params:
+    n_estimators: 100
+    max_depth: 6

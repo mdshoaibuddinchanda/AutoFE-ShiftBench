@@ -1,0 +1,13 @@
+datasets:
+  - credit-g
+  - phoneme
+  - diabetes
+  - bank-marketing
+  - blood-transfusion
+  - ilpd
+  - kc1
+  - pc1
+  - adult
+  - jungle_chess
+  - churn
+  - credit-approval
