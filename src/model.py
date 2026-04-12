@@ -1,4 +1,4 @@
-"""XGBoost model training for raw and AutoFE pipelines."""
+"""Model training utilities for raw and AutoFE pipelines."""
 
 from __future__ import annotations
 
@@ -20,10 +20,11 @@ from src.evaluation import evaluate_predictions
 
 @dataclass(slots=True)
 class ModelConfig:
-    """Configuration for XGBoost training and evaluation."""
+    """Configuration for model training and evaluation."""
 
     task: str | None = None
     random_state: int = 42
+    model_type: str = "xgboost"
     params: dict[str, Any] | None = None
 
 
@@ -77,6 +78,47 @@ def build_xgboost_model(
             eval_metric="rmse",
         )
     raise ValueError("Task must be 'classification' or 'regression'")
+
+
+def build_random_forest_model(
+    task: str = "classification",
+    params: dict[str, Any] | None = None,
+    random_state: int = 42,
+) -> BaseEstimator:
+    """Build a Random Forest estimator for classification or regression."""
+    from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+    default_params: dict[str, Any] = {
+        "n_estimators": 300,
+        "max_depth": None,
+        "min_samples_leaf": 1,
+        "random_state": random_state,
+        "n_jobs": -1,
+    }
+    if params:
+        default_params.update(params)
+
+    normalized_task = task.strip().lower()
+    if normalized_task == "classification":
+        return RandomForestClassifier(**default_params)
+    if normalized_task == "regression":
+        return RandomForestRegressor(**default_params)
+    raise ValueError("Task must be 'classification' or 'regression'")
+
+
+def build_model(
+    task: str = "classification",
+    model_type: str = "xgboost",
+    params: dict[str, Any] | None = None,
+    random_state: int = 42,
+) -> BaseEstimator:
+    """Build a supported model for classification or regression."""
+    normalized_model = model_type.strip().lower()
+    if normalized_model == "xgboost":
+        return build_xgboost_model(task=task, params=params, random_state=random_state)
+    if normalized_model == "random_forest":
+        return build_random_forest_model(task=task, params=params, random_state=random_state)
+    raise ValueError("model_type must be 'xgboost' or 'random_forest'")
 
 
 def _extract_feature_matrices(payload: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -200,7 +242,31 @@ def train_xgboost_pipeline(
     random_state: int = 42,
 ) -> dict[str, Any]:
     """Train one XGBoost pipeline and return model bundle for inference."""
-    model = build_xgboost_model(task=task, params=params, random_state=random_state)
+    return train_model_pipeline(
+        x_train=x_train,
+        y_train=y_train,
+        task=task,
+        model_type="xgboost",
+        params=params,
+        random_state=random_state,
+    )
+
+
+def train_model_pipeline(
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    task: str,
+    model_type: str,
+    params: dict[str, Any] | None = None,
+    random_state: int = 42,
+) -> dict[str, Any]:
+    """Train one model pipeline and return model bundle for inference."""
+    model = build_model(
+        task=task,
+        model_type=model_type,
+        params=params,
+        random_state=random_state,
+    )
     x_train_clean, _x_dummy, feature_names = _sanitize_features(x_train, x_train)
 
     label_encoder: LabelEncoder | None = None
@@ -215,6 +281,7 @@ def train_xgboost_pipeline(
         "label_encoder": label_encoder,
         "feature_names": feature_names,
         "task": task,
+        "model_type": model_type,
     }
 
 

@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 
-SHIFT_TYPES = {"random", "important"}
+SHIFT_TYPES = {"random", "important", "missing"}
 
 
 @dataclass(slots=True)
@@ -21,7 +21,7 @@ class ShiftConfig:
     """Configuration for dataset shift generation."""
 
     severities: tuple[float, ...] = (0.2, 0.4, 0.6, 0.8, 1.0)
-    shift_types: tuple[str, ...] = ("random", "important")
+    shift_types: tuple[str, ...] = ("random", "important", "missing")
     random_state: int = 42
 
 
@@ -120,9 +120,24 @@ def _apply_categorical_corruption(
     return corrupted
 
 
+def _apply_missing_corruption(
+    series: pd.Series,
+    severity: float,
+    rng: np.random.Generator,
+) -> pd.Series:
+    """Apply missing-value corruption to one feature."""
+    corrupted = series.copy()
+    mask = rng.random(len(series)) < severity
+    if not mask.any():
+        return corrupted
+    corrupted.loc[mask] = np.nan
+    return corrupted
+
+
 def _apply_shift_to_test_only(
     x_test: pd.DataFrame,
     features_to_shift: list[str],
+    shift_type: str,
     severity: float,
     rng: np.random.Generator,
 ) -> pd.DataFrame:
@@ -133,6 +148,10 @@ def _apply_shift_to_test_only(
             continue
 
         series = shifted[feature]
+        if shift_type == "missing":
+            shifted[feature] = _apply_missing_corruption(series, severity, rng)
+            continue
+
         if pd.api.types.is_numeric_dtype(series):
             shifted[feature] = _apply_numeric_noise(series, severity, rng)
         else:
@@ -163,10 +182,15 @@ def build_shifted_test_frame(
         x_test,
         payload_for_importance or {},
     )
-    seed = random_state + int(severity_value * 100) + (0 if shift_type == "random" else 1000)
+    shift_offset = {
+        "random": 0,
+        "important": 1000,
+        "missing": 2000,
+    }[shift_type]
+    seed = random_state + int(severity_value * 100) + shift_offset
     rng = np.random.default_rng(seed)
 
-    if shift_type == "random":
+    if shift_type in {"random", "missing"}:
         selected_features = rng.choice(all_features, size=n_features, replace=False).tolist()
     else:
         selected_features = ranked_features[:n_features]
@@ -174,6 +198,7 @@ def build_shifted_test_frame(
     shifted = _apply_shift_to_test_only(
         x_test=x_test,
         features_to_shift=selected_features,
+        shift_type=shift_type,
         severity=severity_value,
         rng=rng,
     )
@@ -215,10 +240,15 @@ def generate_shifts_for_dataset(
             severity_value = float(severity)
             n_features = max(1, min(len(all_features), math.ceil(len(all_features) * severity_value)))
 
-            seed = cfg.random_state + int(severity_value * 100) + (0 if shift_type == "random" else 1000)
+            shift_offset = {
+                "random": 0,
+                "important": 1000,
+                "missing": 2000,
+            }[shift_type]
+            seed = cfg.random_state + int(severity_value * 100) + shift_offset
             rng = np.random.default_rng(seed)
 
-            if shift_type == "random":
+            if shift_type in {"random", "missing"}:
                 selected_features = rng.choice(all_features, size=n_features, replace=False).tolist()
             else:
                 selected_features = ranked_features[:n_features]
@@ -226,6 +256,7 @@ def generate_shifts_for_dataset(
             x_test_shifted = _apply_shift_to_test_only(
                 x_test=x_test,
                 features_to_shift=selected_features,
+                shift_type=shift_type,
                 severity=severity_value,
                 rng=rng,
             )
@@ -285,7 +316,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate test-only shifted datasets")
     parser.add_argument("--input-dir", default="data/processed")
     parser.add_argument("--output-root", default="data/shifted")
-    parser.add_argument("--shift-types", default="random,important")
+    parser.add_argument("--shift-types", default="random,important,missing")
     parser.add_argument("--severities", default="0.2,0.4,0.6,0.8,1.0")
     parser.add_argument("--random-state", type=int, default=42)
     return parser.parse_args()

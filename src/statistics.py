@@ -65,8 +65,25 @@ def run_wilcoxon_analysis(
     if missing_cols:
         raise KeyError(f"Missing required columns in final results: {sorted(missing_cols)}")
 
+    results = results.dropna(subset=["roc_auc"]).copy()
+    if results.empty:
+        raise ValueError("No valid roc_auc rows available for statistical analysis")
+
+    optional_group_cols = [
+        column
+        for column in ["model_type", "feature_count", "feature_count_used"]
+        if column in results.columns
+    ]
+    group_cols = ["dataset", *optional_group_cols]
+
     dataset_rows: list[dict[str, object]] = []
-    for dataset, group in results.groupby("dataset"):
+    for group_key, group in results.groupby(group_cols):
+        if isinstance(group_key, tuple):
+            group_values = list(group_key)
+        else:
+            group_values = [group_key]
+        group_record = dict(zip(group_cols, group_values, strict=True))
+
         per_seed = (
             group.groupby(["seed", "pipeline"], as_index=False)
             .agg(mean_roc_auc=("roc_auc", "mean"))
@@ -102,7 +119,7 @@ def run_wilcoxon_analysis(
 
         dataset_rows.append(
             {
-                "dataset": dataset,
+                **group_record,
                 "n_seeds": int(len(scores_a)),
                 "pipeline_a_mean": mean_a,
                 "pipeline_b_mean": mean_b,
@@ -114,7 +131,23 @@ def run_wilcoxon_analysis(
             }
         )
 
-    stats_df = pd.DataFrame(dataset_rows).sort_values("dataset")
+    stats_df = pd.DataFrame(dataset_rows)
+    if stats_df.empty:
+        stats_df = pd.DataFrame(
+            columns=[
+                *group_cols,
+                "n_seeds",
+                "pipeline_a_mean",
+                "pipeline_b_mean",
+                "pipeline_a_std",
+                "pipeline_b_std",
+                "p_value",
+                "significant",
+                "winner",
+            ]
+        )
+    else:
+        stats_df = stats_df.sort_values(group_cols)
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     stats_df.to_csv(out_path, index=False)
@@ -146,16 +179,22 @@ def build_main_results_table(
 
     table = stats_df.copy()
     table["std_deviation"] = (table["pipeline_a_std"] + table["pipeline_b_std"]) / 2.0
+    optional_cols = [
+        column
+        for column in ["model_type", "feature_count", "feature_count_used"]
+        if column in table.columns
+    ]
     table = table[
         [
             "dataset",
+            *optional_cols,
             "pipeline_a_mean",
             "pipeline_b_mean",
             "std_deviation",
             "p_value",
             "winner",
         ]
-    ].sort_values("dataset")
+    ].sort_values(["dataset", *optional_cols])
 
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

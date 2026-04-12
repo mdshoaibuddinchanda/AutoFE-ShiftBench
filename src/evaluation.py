@@ -16,6 +16,14 @@ from sklearn.metrics import (
 )
 
 
+def _safe_std(series: pd.Series) -> float:
+    """Return sample std when possible, else 0.0 for singleton groups."""
+    values = series.to_numpy(dtype=float)
+    if values.size <= 1:
+        return 0.0
+    return float(np.std(values, ddof=1))
+
+
 def evaluate_predictions(y_true, y_pred, task: str = "classification") -> dict[str, float]:
     """Evaluate predictions with task-specific metrics."""
     normalized_task = task.strip().lower()
@@ -70,37 +78,49 @@ def aggregate_final_results(
     if missing_cols:
         raise KeyError(f"Missing required columns in final results: {sorted(missing_cols)}")
 
+    results = results.dropna(subset=["roc_auc"]).copy()
+    if results.empty:
+        raise ValueError("No valid roc_auc rows available for aggregation")
+
+    optional_group_cols = [
+        column
+        for column in ["model_type", "feature_count", "feature_count_used"]
+        if column in results.columns
+    ]
+    severity_group_cols = ["dataset", *optional_group_cols, "pipeline", "severity"]
+    dataset_group_cols = ["dataset", *optional_group_cols, "pipeline"]
+
     severity_stats = (
-        results.groupby(["dataset", "pipeline", "severity"], as_index=False)
+        results.groupby(severity_group_cols, as_index=False)
         .agg(
             mean_roc_auc=("roc_auc", "mean"),
-            std_roc_auc=("roc_auc", "std"),
+            std_roc_auc=("roc_auc", _safe_std),
         )
-        .sort_values(["dataset", "pipeline", "severity"])
+        .sort_values(["dataset", *optional_group_cols, "pipeline", "severity"])
     )
 
     dataset_stats = (
-        results.groupby(["dataset", "pipeline"], as_index=False)
+        results.groupby(dataset_group_cols, as_index=False)
         .agg(
             dataset_mean_roc_auc=("roc_auc", "mean"),
-            dataset_std_roc_auc=("roc_auc", "std"),
+            dataset_std_roc_auc=("roc_auc", _safe_std),
         )
     )
 
     baseline = (
         severity_stats.sort_values("severity")
-        .groupby(["dataset", "pipeline"], as_index=False)
-        .first()[["dataset", "pipeline", "mean_roc_auc"]]
+        .groupby(dataset_group_cols, as_index=False)
+        .first()[[*dataset_group_cols, "mean_roc_auc"]]
         .rename(columns={"mean_roc_auc": "baseline_roc_auc_s020"})
     )
 
     aggregated = severity_stats.merge(
         dataset_stats,
-        on=["dataset", "pipeline"],
+        on=dataset_group_cols,
         how="left",
     ).merge(
         baseline,
-        on=["dataset", "pipeline"],
+        on=dataset_group_cols,
         how="left",
     )
     aggregated["avg_degradation_from_s020"] = (

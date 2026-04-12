@@ -19,13 +19,13 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.evaluation import aggregate_final_results, compute_roc_auc
-from src.model import prepare_inference_features, train_xgboost_pipeline
+from src.model import prepare_inference_features, train_model_pipeline
 from src.shift_generator import build_shifted_test_frame
 from src.statistics import build_main_results_table, run_wilcoxon_analysis
 
 
 SHIFT_FILE_PATTERN = re.compile(
-    r"^(?P<shift_type>random|important)_severity_(?P<severity>\d{3})(?:__run\d{3})?\.pkl$"
+    r"^(?P<shift_type>random|important|missing)_severity_(?P<severity>\d{3})(?:__run\d{3})?\.pkl$"
 )
 
 
@@ -45,6 +45,8 @@ class ExperimentConfig:
     task: str = "classification"
     random_state_base: int = 0
     model_params: dict[str, Any] | None = None
+    model_types: list[str] | None = None
+    feature_counts: list[int] | None = None
     max_datasets: int | None = None
     max_seeds: int | None = None
     checkpoint_path: str = "reports/tables/final_results.partial.csv"
@@ -99,6 +101,150 @@ def _expand_seeds(seed_config: Any, random_state_base: int = 0) -> list[int]:
         return [int(seed) for seed in seed_config]
 
     raise ValueError("Unsupported seeds config; expected int or non-empty list")
+
+
+def _resolve_model_types(model_cfg: dict[str, Any]) -> list[str]:
+    """Resolve model types from config with validation and stable ordering."""
+    supported = {"xgboost", "random_forest"}
+    configured = model_cfg.get("types")
+    if configured is None:
+        configured = [model_cfg.get("type", "xgboost")]
+
+    if isinstance(configured, str):
+        configured_values = [configured]
+    elif isinstance(configured, list):
+        configured_values = [str(value) for value in configured]
+    else:
+        raise ValueError("model.types must be a list or model.type must be a string")
+
+    resolved: list[str] = []
+    for value in configured_values:
+        normalized = value.strip().lower()
+        if not normalized:
+            continue
+        if normalized not in supported:
+            raise ValueError(
+                f"Unsupported model type '{normalized}'. Supported: {sorted(supported)}"
+            )
+        if normalized not in resolved:
+            resolved.append(normalized)
+
+    if not resolved:
+        raise ValueError("At least one model type must be configured")
+    return resolved
+
+
+def _resolve_feature_counts(global_cfg: dict[str, Any]) -> list[int]:
+    """Resolve requested feature-count grid for sensitivity analysis."""
+    candidates: Any = global_cfg.get("feature_counts")
+
+    if candidates is None:
+        fs_cfg = global_cfg.get("feature_selection", {})
+        if isinstance(fs_cfg, dict):
+            candidates = fs_cfg.get("sensitivity_counts")
+
+    if candidates is None:
+        fe_cfg = global_cfg.get("feature_engineering", {})
+        if isinstance(fe_cfg, dict):
+            candidates = fe_cfg.get("sensitivity_counts")
+
+    if candidates is None:
+        fe_cfg = global_cfg.get("feature_engineering", {})
+        default_count = 100
+        if isinstance(fe_cfg, dict):
+            default_count = int(fe_cfg.get("max_features", 100))
+        candidates = [default_count]
+
+    if isinstance(candidates, int):
+        values = [candidates]
+    elif isinstance(candidates, list):
+        values = candidates
+    else:
+        raise ValueError("feature-count configuration must be an int or list[int]")
+
+    resolved: list[int] = []
+    for value in values:
+        count = int(value)
+        if count <= 0:
+            raise ValueError("All feature counts must be > 0")
+        if count not in resolved:
+            resolved.append(count)
+
+    if not resolved:
+        raise ValueError("At least one feature count is required")
+    return resolved
+
+
+def _resolve_ranked_features(payload: dict[str, Any], available: list[str]) -> list[str]:
+    """Resolve deterministic feature ranking from payload metadata."""
+    candidates: list[str] = []
+
+    selected_feature_names = payload.get("selected_feature_names")
+    if isinstance(selected_feature_names, list):
+        candidates.extend([str(feature) for feature in selected_feature_names])
+
+    feature_selection = payload.get("feature_selection")
+    if isinstance(feature_selection, dict):
+        metadata = feature_selection.get("metadata")
+        if isinstance(metadata, dict):
+            selected_features = metadata.get("selected_features")
+            if isinstance(selected_features, list):
+                candidates.extend([str(feature) for feature in selected_features])
+
+    feature_engineering = payload.get("feature_engineering")
+    if isinstance(feature_engineering, dict):
+        metadata = feature_engineering.get("metadata")
+        if isinstance(metadata, dict):
+            selected_features = metadata.get("selected_features")
+            if isinstance(selected_features, list):
+                candidates.extend([str(feature) for feature in selected_features])
+
+    available_set = set(available)
+    ranked: list[str] = []
+    for feature in candidates:
+        if feature in available_set and feature not in ranked:
+            ranked.append(feature)
+
+    for feature in available:
+        if feature not in ranked:
+            ranked.append(feature)
+
+    return ranked
+
+
+def _build_pipeline_b_feature_sets(
+    selected_payload: dict[str, Any],
+    feature_counts: list[int],
+) -> dict[int, dict[str, Any]]:
+    """Build Pipeline-B train/test matrices for each requested feature count."""
+    if "x_train_fe" in selected_payload and "x_test_fe" in selected_payload:
+        x_train_base = selected_payload["x_train_fe"]
+        x_test_base = selected_payload["x_test_fe"]
+    elif "x_train_selected" in selected_payload and "x_test_selected" in selected_payload:
+        x_train_base = selected_payload["x_train_selected"]
+        x_test_base = selected_payload["x_test_selected"]
+    else:
+        x_train_base, x_test_base = _get_pipeline_b_matrices(selected_payload)
+
+    if not isinstance(x_train_base, pd.DataFrame) or not isinstance(x_test_base, pd.DataFrame):
+        raise TypeError("Pipeline-B feature matrices must be pandas DataFrames")
+
+    available_features = list(x_train_base.columns)
+    ranked_features = _resolve_ranked_features(selected_payload, available_features)
+
+    feature_sets: dict[int, dict[str, Any]] = {}
+    for requested_count in feature_counts:
+        used_count = min(requested_count, len(ranked_features))
+        selected_features = ranked_features[:used_count]
+        feature_sets[requested_count] = {
+            "requested_count": requested_count,
+            "used_count": used_count,
+            "feature_names": selected_features,
+            "x_train": x_train_base[selected_features].copy(),
+            "x_test": x_test_base[selected_features].copy(),
+        }
+
+    return feature_sets
 
 
 def _load_artifact(path: Path) -> dict[str, Any]:
@@ -164,6 +310,37 @@ def _resolve_shift_variations(dataset_shift_dir: Path) -> list[dict[str, Any]]:
     return resolved
 
 
+def _materialize_shifted_variations(
+    x_test: pd.DataFrame,
+    variations: list[dict[str, Any]],
+    random_state: int,
+    ranked_features: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Build shifted test matrices for all shift-type/severity variations."""
+    payload_for_importance: dict[str, Any] = {}
+    if ranked_features:
+        payload_for_importance["ranked_features"] = ranked_features
+
+    prepared: list[dict[str, Any]] = []
+    for variation in variations:
+        shifted, _ = build_shifted_test_frame(
+            x_test=x_test,
+            shift_type=variation["shift_type"],
+            severity=variation["severity"],
+            random_state=random_state,
+            payload_for_importance=payload_for_importance,
+        )
+        prepared.append(
+            {
+                "shift_type": variation["shift_type"],
+                "severity": variation["severity"],
+                "shifted": shifted,
+            }
+        )
+
+    return prepared
+
+
 def _encode_labels_for_model(y_true: pd.Series, bundle: dict[str, Any]) -> np.ndarray:
     """Encode labels using pipeline label encoder when available."""
     encoder = bundle.get("label_encoder")
@@ -183,9 +360,10 @@ def _evaluate_roc_auc(
     feature_names = bundle["feature_names"]
     if x_prepared is None:
         x_infer = prepare_inference_features(x_shifted, feature_names)
-        x_infer = x_infer.to_numpy(dtype=np.float32, copy=False)
-    else:
+    elif isinstance(x_prepared, pd.DataFrame):
         x_infer = x_prepared
+    else:
+        x_infer = pd.DataFrame(x_prepared, columns=feature_names)
 
     if not hasattr(model, "predict_proba"):
         return float("nan")
@@ -237,18 +415,37 @@ def _generate_figures_from_final_results(
         }
     )
 
+    figure_df = results_df.copy()
+    figure_subtitle = ""
+    if {"model_type", "feature_count"}.issubset(figure_df.columns):
+        model_values = [str(value) for value in figure_df["model_type"].dropna().unique().tolist()]
+        feature_counts = sorted(int(value) for value in figure_df["feature_count"].dropna().unique())
+        if model_values and feature_counts:
+            preferred_model = "xgboost" if "xgboost" in model_values else sorted(model_values)[0]
+            preferred_feature_count = feature_counts[-1]
+            scoped = figure_df[
+                (figure_df["model_type"] == preferred_model)
+                & (figure_df["feature_count"] == preferred_feature_count)
+            ]
+            if not scoped.empty:
+                figure_df = scoped
+                figure_subtitle = (
+                    f" ({preferred_model.replace('_', ' ').title()}, "
+                    f"{preferred_feature_count} features)"
+                )
+
     pipeline_color = {
         "A": "#1f77b4",
         "B": "#d55e00",
     }
 
     pipeline_name = {
-        "A": "Baseline (XGBoost)",
+        "A": "Baseline Pipeline",
         "B": "AutoFE Pipeline",
     }
 
     curve_df = (
-        results_df.groupby(["severity", "pipeline"], as_index=False)
+        figure_df.groupby(["severity", "pipeline"], as_index=False)
         .agg(mean_roc_auc=("roc_auc", "mean"))
         .sort_values(by=["pipeline", "severity"])
     )
@@ -264,7 +461,7 @@ def _generate_figures_from_final_results(
         )
     plt.xlabel("Corruption Severity (%)")
     plt.ylabel("Mean ROC-AUC")
-    plt.title("Performance Degradation Under Increasing Feature Corruption")
+    plt.title("Performance Degradation Under Increasing Feature Corruption" + figure_subtitle)
     plt.grid(alpha=0.25)
     plt.legend()
     plt.tight_layout()
@@ -279,7 +476,7 @@ def _generate_figures_from_final_results(
     plt.close()
 
     avg_df = (
-        results_df.groupby("pipeline", as_index=False)
+        figure_df.groupby("pipeline", as_index=False)
         .agg(mean_roc_auc=("roc_auc", "mean"), std_roc_auc=("roc_auc", "std"))
         .sort_values(by="pipeline")
     )
@@ -295,7 +492,10 @@ def _generate_figures_from_final_results(
     )
     plt.xlabel("Pipeline")
     plt.ylabel("ROC-AUC (mean ± std)")
-    plt.title("Mean ROC-AUC Comparison of Baseline and AutoFE Pipelines Under Feature Shift")
+    plt.title(
+        "Mean ROC-AUC Comparison of Baseline and AutoFE Pipelines Under Feature Shift"
+        + figure_subtitle
+    )
     plt.ylim(0.0, 1.0)
     plt.grid(axis="y", alpha=0.25)
     plt.tight_layout()
@@ -352,7 +552,14 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
     if config.max_seeds is not None:
         seeds = seeds[: config.max_seeds]
 
-    model_params = config.model_params or global_cfg.get("model", {}).get("params", {})
+    model_cfg = global_cfg.get("model", {})
+    if not isinstance(model_cfg, dict):
+        raise ValueError("model config must be a mapping")
+
+    model_params = config.model_params or model_cfg.get("params", {})
+    model_types = config.model_types or _resolve_model_types(model_cfg)
+    feature_counts = config.feature_counts or _resolve_feature_counts(global_cfg)
+
     rows: list[dict[str, Any]] = []
     start_ts = time.perf_counter()
     total_datasets = len(datasets)
@@ -363,155 +570,198 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
     for dataset_index, dataset in enumerate(datasets, start=1):
         print(f"[dataset {dataset_index}/{total_datasets}] {dataset}: loading artifacts")
         raw_artifact_path = Path(config.processed_dir) / f"{dataset}.pkl"
+        feature_artifact_path = Path(config.processed_dir) / f"{dataset}_features.pkl"
         selected_artifact_path = Path(config.processed_dir) / f"{dataset}_selected.pkl"
 
         raw_payload = _load_artifact(raw_artifact_path)
         selected_payload = _load_artifact(selected_artifact_path)
+        feature_payload = _load_artifact(feature_artifact_path)
 
         x_train_a = raw_payload["x_train"]
         x_test_a_base = raw_payload["x_test"]
         y_train = raw_payload["y_train"].reset_index(drop=True)
         y_test = raw_payload["y_test"].reset_index(drop=True)
 
-        x_train_b, x_test_b_base = _get_pipeline_b_matrices(selected_payload)
+        pipeline_b_payload = dict(selected_payload)
+        x_train_fe = feature_payload.get("x_train_fe")
+        x_test_fe = feature_payload.get("x_test_fe")
+        if isinstance(x_train_fe, pd.DataFrame) and isinstance(x_test_fe, pd.DataFrame):
+            pipeline_b_payload["x_train_fe"] = x_train_fe
+            pipeline_b_payload["x_test_fe"] = x_test_fe
+            if "feature_engineering" in feature_payload:
+                pipeline_b_payload["feature_engineering"] = feature_payload["feature_engineering"]
+
+        pipeline_b_feature_sets = _build_pipeline_b_feature_sets(
+            selected_payload=pipeline_b_payload,
+            feature_counts=feature_counts,
+        )
         shift_variations = _resolve_shift_variations(Path(config.shifted_dir) / dataset)
         if not shift_variations:
             print(f"  no shift files found for {dataset}, skipping")
             continue
 
-        prepared_variations: list[dict[str, Any]] = []
-        for variation in shift_variations:
-            shift_payload = _load_artifact(variation["path"])
-            shift_type = variation["shift_type"]
-            severity = variation["severity"]
+        prepared_variations_a = _materialize_shifted_variations(
+            x_test=x_test_a_base,
+            variations=shift_variations,
+            random_state=42,
+            ranked_features=None,
+        )
 
-            shifted_b = shift_payload.get("x_test_shifted")
-            if not isinstance(shifted_b, pd.DataFrame):
-                shifted_b, _features_b = build_shifted_test_frame(
-                    x_test=x_test_b_base,
-                    shift_type=shift_type,
-                    severity=severity,
-                    random_state=42,
-                    payload_for_importance=shift_payload,
+        prepared_variations_b_by_count: dict[int, list[dict[str, Any]]] = {}
+        for feature_count, feature_set in pipeline_b_feature_sets.items():
+            prepared_variations_b_by_count[feature_count] = _materialize_shifted_variations(
+                x_test=feature_set["x_test"],
+                variations=shift_variations,
+                random_state=42,
+                ranked_features=feature_set["feature_names"],
+            )
+
+        for model_index, model_type in enumerate(model_types, start=1):
+            print(
+                f"  [model {model_index}/{len(model_types)}] "
+                f"model_type={model_type} feature_counts={feature_counts}"
+            )
+
+            cached_a: list[np.ndarray] | None = None
+            signature_a: tuple[str, ...] | None = None
+            cached_b_by_count: dict[int, list[np.ndarray] | None] = {
+                feature_count: None for feature_count in feature_counts
+            }
+            signature_b_by_count: dict[int, tuple[str, ...] | None] = {
+                feature_count: None for feature_count in feature_counts
+            }
+
+            for seed_index, seed in enumerate(seeds, start=1):
+                pipeline_a_bundle = train_model_pipeline(
+                    x_train=x_train_a,
+                    y_train=y_train,
+                    task=config.task,
+                    params=model_params,
+                    random_state=seed,
+                    model_type=model_type,
                 )
 
-            shifted_a_payload = shift_payload.get("x_test_shifted_raw")
-            if isinstance(shifted_a_payload, pd.DataFrame):
-                shifted_a = shifted_a_payload
-            else:
-                shifted_a, _features_a = build_shifted_test_frame(
-                    x_test=x_test_a_base,
-                    shift_type=shift_type,
-                    severity=severity,
-                    random_state=42,
-                    payload_for_importance={},
-                )
+                current_signature_a = tuple(pipeline_a_bundle["feature_names"])
+                if cached_a is None or current_signature_a != signature_a:
+                    cached_a = [
+                        prepare_inference_features(
+                            variation["shifted"],
+                            pipeline_a_bundle["feature_names"],
+                        )
+                        for variation in prepared_variations_a
+                    ]
+                    signature_a = current_signature_a
 
-            prepared_variations.append(
-                {
-                    "shift_type": shift_type,
-                    "severity": severity,
-                    "shifted_a": shifted_a,
-                    "shifted_b": shifted_b,
-                }
-            )
-
-        cached_a: list[np.ndarray] | None = None
-        cached_b: list[np.ndarray] | None = None
-        signature_a: tuple[str, ...] | None = None
-        signature_b: tuple[str, ...] | None = None
-
-        for seed_index, seed in enumerate(seeds, start=1):
-            pipeline_a_bundle = train_xgboost_pipeline(
-                x_train=x_train_a,
-                y_train=y_train,
-                task=config.task,
-                params=model_params,
-                random_state=seed,
-            )
-            pipeline_b_bundle = train_xgboost_pipeline(
-                x_train=x_train_b,
-                y_train=y_train,
-                task=config.task,
-                params=model_params,
-                random_state=seed,
-            )
-
-            current_signature_a = tuple(pipeline_a_bundle["feature_names"])
-            current_signature_b = tuple(pipeline_b_bundle["feature_names"])
-
-            if cached_a is None or current_signature_a != signature_a:
-                cached_a = [
-                    prepare_inference_features(
-                        variation["shifted_a"],
-                        pipeline_a_bundle["feature_names"],
-                    ).to_numpy(dtype=np.float32, copy=False)
-                    for variation in prepared_variations
+                roc_auc_a_values = [
+                    _evaluate_roc_auc(
+                        bundle=pipeline_a_bundle,
+                        x_shifted=variation["shifted"],
+                        y_true=y_test,
+                        x_prepared=cached_a[variation_index],
+                    )
+                    for variation_index, variation in enumerate(prepared_variations_a)
                 ]
-                signature_a = current_signature_a
 
-            if cached_b is None or current_signature_b != signature_b:
-                cached_b = [
-                    prepare_inference_features(
-                        variation["shifted_b"],
-                        pipeline_b_bundle["feature_names"],
-                    ).to_numpy(dtype=np.float32, copy=False)
-                    for variation in prepared_variations
-                ]
-                signature_b = current_signature_b
+                for feature_count in feature_counts:
+                    feature_set = pipeline_b_feature_sets[feature_count]
+                    prepared_variations_b = prepared_variations_b_by_count[feature_count]
 
-            for variation_index, variation in enumerate(prepared_variations):
-                shift_type = variation["shift_type"]
-                severity = variation["severity"]
+                    pipeline_b_bundle = train_model_pipeline(
+                        x_train=feature_set["x_train"],
+                        y_train=y_train,
+                        task=config.task,
+                        params=model_params,
+                        random_state=seed,
+                        model_type=model_type,
+                    )
 
-                roc_auc_a = _evaluate_roc_auc(
-                    bundle=pipeline_a_bundle,
-                    x_shifted=variation["shifted_a"],
-                    y_true=y_test,
-                    x_prepared=cached_a[variation_index],
-                )
-                roc_auc_b = _evaluate_roc_auc(
-                    bundle=pipeline_b_bundle,
-                    x_shifted=variation["shifted_b"],
-                    y_true=y_test,
-                    x_prepared=cached_b[variation_index],
-                )
+                    current_signature_b = tuple(pipeline_b_bundle["feature_names"])
+                    cached_b = cached_b_by_count[feature_count]
+                    signature_b = signature_b_by_count[feature_count]
+                    if cached_b is None or current_signature_b != signature_b:
+                        cached_b = [
+                            prepare_inference_features(
+                                variation["shifted"],
+                                pipeline_b_bundle["feature_names"],
+                            )
+                            for variation in prepared_variations_b
+                        ]
+                        cached_b_by_count[feature_count] = cached_b
+                        signature_b_by_count[feature_count] = current_signature_b
 
-                rows.append(
-                    {
-                        "dataset": dataset,
-                        "seed": seed,
-                        "shift_type": shift_type,
-                        "severity": severity,
-                        "pipeline": "A",
-                        "roc_auc": roc_auc_a,
-                    }
-                )
-                rows.append(
-                    {
-                        "dataset": dataset,
-                        "seed": seed,
-                        "shift_type": shift_type,
-                        "severity": severity,
-                        "pipeline": "B",
-                        "roc_auc": roc_auc_b,
-                    }
-                )
+                    for variation_index, variation in enumerate(prepared_variations_b):
+                        shift_type = variation["shift_type"]
+                        severity = variation["severity"]
+                        roc_auc_a = roc_auc_a_values[variation_index]
+                        roc_auc_b = _evaluate_roc_auc(
+                            bundle=pipeline_b_bundle,
+                            x_shifted=variation["shifted"],
+                            y_true=y_test,
+                            x_prepared=cached_b[variation_index],
+                        )
 
-            if config.progress_every > 0 and (
-                seed_index % config.progress_every == 0 or seed_index == total_seeds
-            ):
-                elapsed_min = (time.perf_counter() - start_ts) / 60.0
-                print(
-                    f"  [seed {seed_index}/{total_seeds}] "
-                    f"seed={seed} rows={len(rows)} elapsed={elapsed_min:.1f}m"
-                )
+                        rows.append(
+                            {
+                                "dataset": dataset,
+                                "seed": seed,
+                                "model_type": model_type,
+                                "feature_count": feature_count,
+                                "feature_count_used": feature_set["used_count"],
+                                "shift_type": shift_type,
+                                "severity": severity,
+                                "pipeline": "A",
+                                "roc_auc": roc_auc_a,
+                            }
+                        )
+                        rows.append(
+                            {
+                                "dataset": dataset,
+                                "seed": seed,
+                                "model_type": model_type,
+                                "feature_count": feature_count,
+                                "feature_count_used": feature_set["used_count"],
+                                "shift_type": shift_type,
+                                "severity": severity,
+                                "pipeline": "B",
+                                "roc_auc": roc_auc_b,
+                            }
+                        )
+
+                if config.progress_every > 0 and (
+                    seed_index % config.progress_every == 0 or seed_index == total_seeds
+                ):
+                    elapsed_min = (time.perf_counter() - start_ts) / 60.0
+                    print(
+                        f"  [seed {seed_index}/{total_seeds}] "
+                        f"model={model_type} seed={seed} rows={len(rows)} "
+                        f"elapsed={elapsed_min:.1f}m"
+                    )
 
         partial_df = pd.DataFrame(rows)
         if not partial_df.empty:
             partial_df = partial_df[
-                ["dataset", "seed", "shift_type", "severity", "pipeline", "roc_auc"]
-            ].sort_values(["dataset", "seed", "shift_type", "severity", "pipeline"])
+                [
+                    "dataset",
+                    "seed",
+                    "model_type",
+                    "feature_count",
+                    "feature_count_used",
+                    "shift_type",
+                    "severity",
+                    "pipeline",
+                    "roc_auc",
+                ]
+            ].sort_values(
+                [
+                    "dataset",
+                    "model_type",
+                    "feature_count",
+                    "seed",
+                    "shift_type",
+                    "severity",
+                    "pipeline",
+                ]
+            )
             partial_df.to_csv(checkpoint_path, index=False)
             print(f"  checkpoint={checkpoint_path} rows={len(partial_df)}")
 
@@ -520,8 +770,28 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
         raise RuntimeError("No experiment rows generated; check artifacts and shift files")
 
     results = results[
-        ["dataset", "seed", "shift_type", "severity", "pipeline", "roc_auc"]
-    ].sort_values(["dataset", "seed", "shift_type", "severity", "pipeline"])
+        [
+            "dataset",
+            "seed",
+            "model_type",
+            "feature_count",
+            "feature_count_used",
+            "shift_type",
+            "severity",
+            "pipeline",
+            "roc_auc",
+        ]
+    ].sort_values(
+        [
+            "dataset",
+            "model_type",
+            "feature_count",
+            "seed",
+            "shift_type",
+            "severity",
+            "pipeline",
+        ]
+    )
 
     final_results_path = Path(config.final_results_path)
     final_results_path.parent.mkdir(parents=True, exist_ok=True)
@@ -571,6 +841,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--random-state-base", type=int, default=0)
     parser.add_argument("--n-estimators", type=int, default=100)
     parser.add_argument("--max-depth", type=int, default=6)
+    parser.add_argument(
+        "--model-types",
+        default=None,
+        help="Comma-separated model types (xgboost,random_forest)",
+    )
+    parser.add_argument(
+        "--feature-counts",
+        default=None,
+        help="Comma-separated feature counts for sensitivity analysis (e.g. 100,200)",
+    )
     parser.add_argument("--max-datasets", type=int, default=None)
     parser.add_argument("--max-seeds", type=int, default=None)
     parser.add_argument(
@@ -585,8 +865,29 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _parse_comma_list(value: str | None) -> list[str] | None:
+    """Parse comma-separated string into non-empty token list."""
+    if value is None:
+        return None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items or None
+
+
+def _parse_comma_ints(value: str | None) -> list[int] | None:
+    """Parse comma-separated string into positive integers."""
+    items = _parse_comma_list(value)
+    if items is None:
+        return None
+    parsed = [int(item) for item in items]
+    if any(item <= 0 for item in parsed):
+        raise ValueError("feature counts must be positive integers")
+    return parsed
+
+
 if __name__ == "__main__":
     args = _parse_args()
+    model_types = _parse_comma_list(args.model_types)
+    feature_counts = _parse_comma_ints(args.feature_counts)
     config = ExperimentConfig(
         config_path=args.config,
         dataset_list_path=args.dataset_list,
@@ -600,6 +901,8 @@ if __name__ == "__main__":
         task=args.task,
         random_state_base=args.random_state_base,
         model_params={"n_estimators": args.n_estimators, "max_depth": args.max_depth},
+        model_types=model_types,
+        feature_counts=feature_counts,
         max_datasets=args.max_datasets,
         max_seeds=args.max_seeds,
         checkpoint_path=args.checkpoint_path,
