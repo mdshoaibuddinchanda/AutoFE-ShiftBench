@@ -1,0 +1,13 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Notebook artifacts
+.ipynb_checkpoints/
+
+# Local/editor/system files
+.DS_Store
+Thumbs.db
+
+# Partial run checkpoints
+reports/tables/final_results.partial.csv
