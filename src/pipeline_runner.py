@@ -21,11 +21,17 @@ if __package__ in {None, ""}:
 from src.evaluation import aggregate_final_results, compute_roc_auc
 from src.model import prepare_inference_features, train_model_pipeline
 from src.shift_generator import build_shifted_test_frame
-from src.statistics import build_main_results_table, run_wilcoxon_analysis
+from src.statistics import (
+    build_main_results_table,
+    build_runtime_comparison_table,
+    run_wilcoxon_analysis,
+)
 
 
 SHIFT_FILE_PATTERN = re.compile(
-    r"^(?P<shift_type>random|important|missing)_severity_(?P<severity>\d{3})(?:__run\d{3})?\.pkl$"
+    r"^(?P<shift_type>random|important|missing)_severity_(?P<severity>\d{3})"
+    r"(?:__(?P<source>x_test|x_test_fe|x_test_selected))?"
+    r"(?:__run\d{3})?\.pkl$"
 )
 
 
@@ -41,6 +47,8 @@ class ExperimentConfig:
     aggregated_results_path: str = "reports/tables/aggregated_results.csv"
     statistical_results_path: str = "reports/tables/statistical_results.csv"
     main_table_path: str = "reports/tables/main_results.csv"
+    runtime_results_path: str = "reports/tables/runtime_results.csv"
+    clean_baseline_results_path: str = "reports/tables/clean_baseline_results.csv"
     figure_dir: str = "reports/figures"
     task: str = "classification"
     random_state_base: int = 0
@@ -220,11 +228,14 @@ def _build_pipeline_b_feature_sets(
     if "x_train_fe" in selected_payload and "x_test_fe" in selected_payload:
         x_train_base = selected_payload["x_train_fe"]
         x_test_base = selected_payload["x_test_fe"]
+        source_test_key = "x_test_fe"
     elif "x_train_selected" in selected_payload and "x_test_selected" in selected_payload:
         x_train_base = selected_payload["x_train_selected"]
         x_test_base = selected_payload["x_test_selected"]
+        source_test_key = "x_test_selected"
     else:
         x_train_base, x_test_base = _get_pipeline_b_matrices(selected_payload)
+        source_test_key = "x_test_selected"
 
     if not isinstance(x_train_base, pd.DataFrame) or not isinstance(x_test_base, pd.DataFrame):
         raise TypeError("Pipeline-B feature matrices must be pandas DataFrames")
@@ -233,6 +244,7 @@ def _build_pipeline_b_feature_sets(
     ranked_features = _resolve_ranked_features(selected_payload, available_features)
 
     feature_sets: dict[int, dict[str, Any]] = {}
+    base_feature_names = list(x_test_base.columns)
     for requested_count in feature_counts:
         used_count = min(requested_count, len(ranked_features))
         selected_features = ranked_features[:used_count]
@@ -242,6 +254,8 @@ def _build_pipeline_b_feature_sets(
             "feature_names": selected_features,
             "x_train": x_train_base[selected_features].copy(),
             "x_test": x_test_base[selected_features].copy(),
+            "source_test_key": source_test_key,
+            "base_feature_names": base_feature_names,
         }
 
     return feature_sets
@@ -275,8 +289,11 @@ def _get_pipeline_b_matrices(payload: dict[str, Any]) -> tuple[pd.DataFrame, pd.
     raise KeyError("Selected artifact missing supported Pipeline-B feature matrices")
 
 
-def _resolve_shift_variations(dataset_shift_dir: Path) -> list[dict[str, Any]]:
-    """Resolve latest unique shift files by (shift_type, severity)."""
+def _resolve_shift_variations(
+    dataset_shift_dir: Path,
+    source_test_key: str | None = None,
+) -> list[dict[str, Any]]:
+    """Resolve latest unique shift files by (shift_type, severity) and source view."""
     if not dataset_shift_dir.exists():
         raise FileNotFoundError(f"Dataset shift directory not found: {dataset_shift_dir}")
 
@@ -288,6 +305,16 @@ def _resolve_shift_variations(dataset_shift_dir: Path) -> list[dict[str, Any]]:
 
         shift_type = match.group("shift_type")
         severity_code = int(match.group("severity"))
+        source_key = match.group("source")
+
+        if source_test_key is not None:
+            if source_key is None:
+                payload = _load_artifact(file_path)
+                payload_source = payload.get("source_test_key")
+                source_key = str(payload_source) if payload_source is not None else None
+            if source_key != source_test_key:
+                continue
+
         key = (shift_type, severity_code)
 
         current = variations.get(key)
@@ -305,9 +332,65 @@ def _resolve_shift_variations(dataset_shift_dir: Path) -> list[dict[str, Any]]:
                 "severity_code": severity_code,
                 "severity": severity_code / 100.0,
                 "path": file_path,
+                "source_test_key": source_key,
             }
         )
+
+    if source_test_key is not None and not resolved:
+        raise FileNotFoundError(
+            "No persisted shift files found for "
+            f"source_test_key='{source_test_key}' in {dataset_shift_dir}. "
+            "Regenerate shifts with src/shift_generator.py before running benchmark."
+        )
+
     return resolved
+
+
+def _load_persisted_shifted_variations(
+    variations: list[dict[str, Any]],
+    expected_columns: list[str],
+) -> list[dict[str, Any]]:
+    """Load fixed shifted test matrices from persisted shift artifacts."""
+    prepared: list[dict[str, Any]] = []
+    for variation in variations:
+        payload = _load_artifact(Path(variation["path"]))
+        shifted = payload.get("x_test_shifted")
+        original = payload.get("x_test_original")
+        if not isinstance(shifted, pd.DataFrame):
+            raise ValueError(
+                "Persisted shift artifact missing DataFrame 'x_test_shifted': "
+                f"{variation['path']}"
+            )
+
+        aligned = shifted.reindex(columns=expected_columns)
+        missing_cols = [
+            column for column in expected_columns if column not in shifted.columns
+        ]
+        if missing_cols and isinstance(original, pd.DataFrame):
+            for column in missing_cols:
+                if column in original.columns:
+                    aligned[column] = original[column]
+
+        original_cols = set(original.columns) if isinstance(original, pd.DataFrame) else set()
+        shifted_cols = set(shifted.columns)
+        unresolved = [
+            column for column in expected_columns if column not in shifted_cols and column not in original_cols
+        ]
+        if unresolved:
+            raise ValueError(
+                "Persisted shift artifact does not match expected feature schema. "
+                f"artifact={variation['path']} unresolved_columns={unresolved[:10]}"
+            )
+
+        prepared.append(
+            {
+                "shift_type": variation["shift_type"],
+                "severity": variation["severity"],
+                "shifted": aligned[expected_columns].copy(),
+            }
+        )
+
+    return prepared
 
 
 def _materialize_shifted_variations(
@@ -315,11 +398,14 @@ def _materialize_shifted_variations(
     variations: list[dict[str, Any]],
     random_state: int,
     ranked_features: list[str] | None = None,
+    train_reference: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     """Build shifted test matrices for all shift-type/severity variations."""
     payload_for_importance: dict[str, Any] = {}
     if ranked_features:
         payload_for_importance["ranked_features"] = ranked_features
+    if isinstance(train_reference, pd.DataFrame):
+        payload_for_importance["x_train_reference"] = train_reference
 
     prepared: list[dict[str, Any]] = []
     for variation in variations:
@@ -339,6 +425,29 @@ def _materialize_shifted_variations(
         )
 
     return prepared
+
+
+def _rank_features_from_training_frame(
+    x_train: pd.DataFrame,
+    available_features: list[str],
+) -> list[str]:
+    """Rank features deterministically using training-set variance when available."""
+    available_set = set(available_features)
+    aligned = x_train.reindex(columns=available_features, fill_value=np.nan)
+    numeric = aligned.select_dtypes(include=["number", "bool"])
+    if numeric.empty:
+        return available_features
+
+    cleaned = numeric.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    ranked = cleaned.var(axis=0, numeric_only=True).fillna(0.0).sort_values(
+        ascending=False
+    )
+    ranked_features = [feature for feature in ranked.index.tolist() if feature in available_set]
+    for feature in available_features:
+        if feature not in ranked_features:
+            ranked_features.append(feature)
+
+    return ranked_features
 
 
 def _encode_labels_for_model(y_true: pd.Series, bundle: dict[str, Any]) -> np.ndarray:
@@ -373,12 +482,169 @@ def _evaluate_roc_auc(
     return compute_roc_auc(pd.Series(y_encoded), y_proba)
 
 
+def generate_clean_baseline_results(
+    config: ExperimentConfig,
+    output_path: str | Path | None = None,
+) -> pd.DataFrame:
+    """Compute true clean (unshifted) ROC-AUC across the full benchmark grid."""
+    global_cfg = _load_yaml(config.config_path)
+    datasets = _load_dataset_names(config.dataset_list_path)
+    seeds = _expand_seeds(
+        global_cfg.get("seeds", 20),
+        random_state_base=config.random_state_base,
+    )
+
+    if config.max_datasets is not None:
+        datasets = datasets[: config.max_datasets]
+    if config.max_seeds is not None:
+        seeds = seeds[: config.max_seeds]
+
+    model_cfg = global_cfg.get("model", {})
+    if not isinstance(model_cfg, dict):
+        raise ValueError("model config must be a mapping")
+
+    model_params = config.model_params or model_cfg.get("params", {})
+    model_types = config.model_types or _resolve_model_types(model_cfg)
+    feature_counts = config.feature_counts or _resolve_feature_counts(global_cfg)
+
+    rows: list[dict[str, Any]] = []
+    total_datasets = len(datasets)
+    total_seeds = len(seeds)
+
+    for dataset_index, dataset in enumerate(datasets, start=1):
+        print(
+            f"[clean-baseline dataset {dataset_index}/{total_datasets}] "
+            f"{dataset}: loading artifacts"
+        )
+        raw_artifact_path = Path(config.processed_dir) / f"{dataset}.pkl"
+        feature_artifact_path = Path(config.processed_dir) / f"{dataset}_features.pkl"
+        selected_artifact_path = Path(config.processed_dir) / f"{dataset}_selected.pkl"
+
+        raw_payload = _load_artifact(raw_artifact_path)
+        selected_payload = _load_artifact(selected_artifact_path)
+        feature_payload = _load_artifact(feature_artifact_path)
+
+        x_train_a = raw_payload["x_train"]
+        x_test_a = raw_payload["x_test"]
+        y_train = raw_payload["y_train"].reset_index(drop=True)
+        y_test = raw_payload["y_test"].reset_index(drop=True)
+
+        pipeline_b_payload = dict(selected_payload)
+        x_train_fe = feature_payload.get("x_train_fe")
+        x_test_fe = feature_payload.get("x_test_fe")
+        if isinstance(x_train_fe, pd.DataFrame) and isinstance(x_test_fe, pd.DataFrame):
+            pipeline_b_payload["x_train_fe"] = x_train_fe
+            pipeline_b_payload["x_test_fe"] = x_test_fe
+            if "feature_engineering" in feature_payload:
+                pipeline_b_payload["feature_engineering"] = feature_payload[
+                    "feature_engineering"
+                ]
+
+        pipeline_b_feature_sets = _build_pipeline_b_feature_sets(
+            selected_payload=pipeline_b_payload,
+            feature_counts=feature_counts,
+        )
+
+        for model_type in model_types:
+            for seed_index, seed in enumerate(seeds, start=1):
+                pipeline_a_bundle = train_model_pipeline(
+                    x_train=x_train_a,
+                    y_train=y_train,
+                    task=config.task,
+                    params=model_params,
+                    random_state=seed,
+                    model_type=model_type,
+                )
+                roc_auc_a = _evaluate_roc_auc(
+                    bundle=pipeline_a_bundle,
+                    x_shifted=x_test_a,
+                    y_true=y_test,
+                )
+
+                for feature_count in feature_counts:
+                    feature_set = pipeline_b_feature_sets[feature_count]
+                    pipeline_b_bundle = train_model_pipeline(
+                        x_train=feature_set["x_train"],
+                        y_train=y_train,
+                        task=config.task,
+                        params=model_params,
+                        random_state=seed,
+                        model_type=model_type,
+                    )
+                    roc_auc_b = _evaluate_roc_auc(
+                        bundle=pipeline_b_bundle,
+                        x_shifted=feature_set["x_test"],
+                        y_true=y_test,
+                    )
+
+                    rows.append(
+                        {
+                            "dataset": dataset,
+                            "seed": seed,
+                            "model_type": model_type,
+                            "feature_count": feature_count,
+                            "feature_count_used": feature_set["used_count"],
+                            "pipeline": "A",
+                            "roc_auc": roc_auc_a,
+                        }
+                    )
+                    rows.append(
+                        {
+                            "dataset": dataset,
+                            "seed": seed,
+                            "model_type": model_type,
+                            "feature_count": feature_count,
+                            "feature_count_used": feature_set["used_count"],
+                            "pipeline": "B",
+                            "roc_auc": roc_auc_b,
+                        }
+                    )
+
+                if config.progress_every > 0 and (
+                    seed_index % config.progress_every == 0 or seed_index == total_seeds
+                ):
+                    print(
+                        f"  [clean-baseline seed {seed_index}/{total_seeds}] "
+                        f"model={model_type} seed={seed} rows={len(rows)}"
+                    )
+
+    clean_df = pd.DataFrame(rows)
+    if clean_df.empty:
+        raise RuntimeError("No clean baseline rows generated")
+
+    clean_df = clean_df[
+        [
+            "dataset",
+            "seed",
+            "model_type",
+            "feature_count",
+            "feature_count_used",
+            "pipeline",
+            "roc_auc",
+        ]
+    ].sort_values(
+        [
+            "dataset",
+            "model_type",
+            "feature_count",
+            "seed",
+            "pipeline",
+        ]
+    )
+
+    out_path = Path(output_path or config.clean_baseline_results_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    clean_df.to_csv(out_path, index=False)
+    return clean_df
+
+
 def _generate_figures_from_final_results(
     final_results_path: str | Path,
     figure_dir: str | Path,
     figure_dpi: int = 600,
     save_pdf_figures: bool = True,
     save_tiff_figures: bool = True,
+    clean_baseline_path: str | Path | None = None,
 ) -> dict[str, Path]:
     """Generate degradation and average-performance figures from final results."""
     import matplotlib.pyplot as plt
@@ -418,21 +684,7 @@ def _generate_figures_from_final_results(
     figure_df = results_df.copy()
     figure_subtitle = ""
     if {"model_type", "feature_count"}.issubset(figure_df.columns):
-        model_values = [str(value) for value in figure_df["model_type"].dropna().unique().tolist()]
-        feature_counts = sorted(int(value) for value in figure_df["feature_count"].dropna().unique())
-        if model_values and feature_counts:
-            preferred_model = "xgboost" if "xgboost" in model_values else sorted(model_values)[0]
-            preferred_feature_count = feature_counts[-1]
-            scoped = figure_df[
-                (figure_df["model_type"] == preferred_model)
-                & (figure_df["feature_count"] == preferred_feature_count)
-            ]
-            if not scoped.empty:
-                figure_df = scoped
-                figure_subtitle = (
-                    f" ({preferred_model.replace('_', ' ').title()}, "
-                    f"{preferred_feature_count} features)"
-                )
+        figure_subtitle = " (All Models, All Feature Counts)"
 
     pipeline_color = {
         "A": "#1f77b4",
@@ -444,95 +696,367 @@ def _generate_figures_from_final_results(
         "B": "AutoFE Pipeline",
     }
 
-    curve_df = (
-        figure_df.groupby(["severity", "pipeline"], as_index=False)
-        .agg(mean_roc_auc=("roc_auc", "mean"))
-        .sort_values(by=["pipeline", "severity"])
-    )
-
-    plt.figure(figsize=(8, 5))
-    for pipeline, group in curve_df.groupby("pipeline"):
-        plt.plot(
-            group["severity"] * 100,
-            group["mean_roc_auc"],
-            marker="o",
-            color=pipeline_color.get(str(pipeline), "#2f2f2f"),
-            label=pipeline_name.get(str(pipeline), str(pipeline)),
+    def _save_figure_pair(
+        scoped_df: pd.DataFrame,
+        subtitle: str,
+        file_suffix: str,
+        output_key_suffix: str,
+    ) -> dict[str, Path]:
+        curve_df = (
+            scoped_df.groupby(["severity", "pipeline"], as_index=False)
+            .agg(mean_roc_auc=("roc_auc", "mean"))
+            .sort_values(by=["pipeline", "severity"])
         )
-    plt.xlabel("Corruption Severity (%)")
-    plt.ylabel("Mean ROC-AUC")
-    plt.title("Performance Degradation Under Increasing Feature Corruption" + figure_subtitle)
-    plt.grid(alpha=0.25)
-    plt.legend()
-    plt.tight_layout()
-    degradation_png_path = out_dir / "degradation_curve.png"
-    plt.savefig(degradation_png_path, dpi=figure_dpi, format="png")
-    degradation_tiff_path = out_dir / "degradation_curve.tiff"
-    if save_tiff_figures:
-        plt.savefig(degradation_tiff_path, dpi=figure_dpi, format="tiff")
-    degradation_pdf_path = out_dir / "degradation_curve.pdf"
-    if save_pdf_figures:
-        plt.savefig(degradation_pdf_path, format="pdf")
-    plt.close()
 
-    avg_df = (
-        figure_df.groupby("pipeline", as_index=False)
-        .agg(mean_roc_auc=("roc_auc", "mean"), std_roc_auc=("roc_auc", "std"))
-        .sort_values(by="pipeline")
-    )
-    avg_df["pipeline_label"] = avg_df["pipeline"].map(pipeline_name).fillna(avg_df["pipeline"])
+        plt.figure(figsize=(8, 5))
+        for pipeline, group in curve_df.groupby("pipeline"):
+            plt.plot(
+                group["severity"] * 100,
+                group["mean_roc_auc"],
+                marker="o",
+                color=pipeline_color.get(str(pipeline), "#2f2f2f"),
+                label=pipeline_name.get(str(pipeline), str(pipeline)),
+            )
+        plt.xlabel("Corruption Severity (%)")
+        plt.ylabel("Mean ROC-AUC")
+        plt.title("Performance Degradation Under Increasing Feature Corruption" + subtitle)
+        plt.grid(alpha=0.25)
+        plt.legend()
+        plt.tight_layout()
+        degradation_png_path = out_dir / f"degradation_curve{file_suffix}.png"
+        plt.savefig(degradation_png_path, dpi=figure_dpi, format="png")
+        degradation_tiff_path = out_dir / f"degradation_curve{file_suffix}.tiff"
+        if save_tiff_figures:
+            plt.savefig(degradation_tiff_path, dpi=figure_dpi, format="tiff")
+        degradation_pdf_path = out_dir / f"degradation_curve{file_suffix}.pdf"
+        if save_pdf_figures:
+            plt.savefig(degradation_pdf_path, format="pdf")
+        plt.close()
 
-    plt.figure(figsize=(7, 5))
-    plt.bar(
-        avg_df["pipeline_label"],
-        avg_df["mean_roc_auc"],
-        yerr=avg_df["std_roc_auc"],
-        color=[pipeline_color.get(p, "#2f2f2f") for p in avg_df["pipeline"]],
-        capsize=6,
-    )
-    plt.xlabel("Pipeline")
-    plt.ylabel("ROC-AUC (mean ± std)")
-    plt.title(
-        "Mean ROC-AUC Comparison of Baseline and AutoFE Pipelines Under Feature Shift"
-        + figure_subtitle
-    )
-    plt.ylim(0.0, 1.0)
-    plt.grid(axis="y", alpha=0.25)
-    plt.tight_layout()
-    average_png_path = out_dir / "average_performance.png"
-    plt.savefig(average_png_path, dpi=figure_dpi, format="png")
-    average_tiff_path = out_dir / "average_performance.tiff"
-    if save_tiff_figures:
-        plt.savefig(average_tiff_path, dpi=figure_dpi, format="tiff")
-    average_pdf_path = out_dir / "average_performance.pdf"
-    if save_pdf_figures:
-        plt.savefig(average_pdf_path, format="pdf")
-    plt.close()
+        avg_df = (
+            scoped_df.groupby("pipeline", as_index=False)
+            .agg(mean_roc_auc=("roc_auc", "mean"), std_roc_auc=("roc_auc", "std"))
+            .sort_values(by="pipeline")
+        )
+        avg_df["pipeline_label"] = avg_df["pipeline"].map(pipeline_name).fillna(avg_df["pipeline"])
 
-    outputs: dict[str, Path] = {
-        "degradation_png": degradation_png_path,
-        "average_png": average_png_path,
-    }
-    if save_tiff_figures:
-        outputs["degradation_tiff"] = degradation_tiff_path
-        outputs["average_tiff"] = average_tiff_path
-    if save_pdf_figures:
-        outputs["degradation_pdf"] = degradation_pdf_path
-        outputs["average_pdf"] = average_pdf_path
+        plt.figure(figsize=(7, 5))
+        plt.bar(
+            avg_df["pipeline_label"],
+            avg_df["mean_roc_auc"],
+            yerr=avg_df["std_roc_auc"],
+            color=[pipeline_color.get(p, "#2f2f2f") for p in avg_df["pipeline"]],
+            capsize=6,
+        )
+        plt.xlabel("Pipeline")
+        plt.ylabel("ROC-AUC (mean ± std)")
+        plt.title(
+            "Mean ROC-AUC Comparison of Baseline and AutoFE Pipelines Under Feature Shift"
+            + subtitle
+        )
+        plt.ylim(0.0, 1.0)
+        plt.grid(axis="y", alpha=0.25)
+        plt.tight_layout()
+        average_png_path = out_dir / f"average_performance{file_suffix}.png"
+        plt.savefig(average_png_path, dpi=figure_dpi, format="png")
+        average_tiff_path = out_dir / f"average_performance{file_suffix}.tiff"
+        if save_tiff_figures:
+            plt.savefig(average_tiff_path, dpi=figure_dpi, format="tiff")
+        average_pdf_path = out_dir / f"average_performance{file_suffix}.pdf"
+        if save_pdf_figures:
+            plt.savefig(average_pdf_path, format="pdf")
+        plt.close()
+
+        scoped_outputs: dict[str, Path] = {
+            f"degradation_png{output_key_suffix}": degradation_png_path,
+            f"average_png{output_key_suffix}": average_png_path,
+        }
+        if save_tiff_figures:
+            scoped_outputs[f"degradation_tiff{output_key_suffix}"] = degradation_tiff_path
+            scoped_outputs[f"average_tiff{output_key_suffix}"] = average_tiff_path
+        if save_pdf_figures:
+            scoped_outputs[f"degradation_pdf{output_key_suffix}"] = degradation_pdf_path
+            scoped_outputs[f"average_pdf{output_key_suffix}"] = average_pdf_path
+        return scoped_outputs
+
+    outputs = _save_figure_pair(
+        scoped_df=figure_df,
+        subtitle=figure_subtitle,
+        file_suffix="",
+        output_key_suffix="",
+    )
+
+    if "model_type" in results_df.columns:
+        model_alias = {
+            "xgboost": "boosting",
+            "random_forest": "bagging",
+        }
+        model_values = sorted(str(value) for value in results_df["model_type"].dropna().unique())
+        for model_value in model_values:
+            model_df = results_df[results_df["model_type"] == model_value]
+            if model_df.empty:
+                continue
+
+            model_subtitle = f" ({model_value.replace('_', ' ').title()}, All Feature Counts)"
+
+            suffix_value = model_alias.get(model_value, model_value)
+            file_suffix = f"_{suffix_value}"
+            output_key_suffix = f"_{suffix_value}"
+            outputs.update(
+                _save_figure_pair(
+                    scoped_df=model_df,
+                    subtitle=model_subtitle,
+                    file_suffix=file_suffix,
+                    output_key_suffix=output_key_suffix,
+                )
+            )
+
+    # Build dataset-level clean-vs-shift correlation. Use true unshifted clean
+    # baseline if available; otherwise fall back to lowest-severity proxy.
+    min_severity = float(figure_df["severity"].min())
+
+    clean_col = "clean_roc_auc"
+    clean_axis_label = f"Clean Performance Proxy ROC-AUC (Severity {min_severity:.1f})"
+    corr_title_suffix = ""
+
+    clean_df = (
+        figure_df[figure_df["severity"] == min_severity]
+        .groupby(["dataset", "pipeline"], as_index=False)
+        .agg(clean_roc_auc=("roc_auc", "mean"))
+    )
+
+    if clean_baseline_path is not None and Path(clean_baseline_path).exists():
+        clean_baseline_df = pd.read_csv(clean_baseline_path)
+        required_clean_cols = {"dataset", "pipeline"}
+        clean_metric = None
+        if required_clean_cols.issubset(clean_baseline_df.columns):
+            if "roc_auc_clean" in clean_baseline_df.columns:
+                clean_metric = "roc_auc_clean"
+            elif "roc_auc" in clean_baseline_df.columns:
+                clean_metric = "roc_auc"
+
+        if clean_metric is not None:
+            clean_df = (
+                clean_baseline_df.groupby(["dataset", "pipeline"], as_index=False)
+                .agg(clean_roc_auc=(clean_metric, "mean"))
+            )
+            clean_axis_label = "Clean Performance ROC-AUC (Unshifted Test Set)"
+            corr_title_suffix = " (True Clean Baseline)"
+
+    shifted_mask = figure_df["severity"] > min_severity
+    if not shifted_mask.any():
+        shifted_mask = figure_df["severity"] >= min_severity
+
+    shifted_df = (
+        figure_df[shifted_mask]
+        .groupby(["dataset", "pipeline"], as_index=False)
+        .agg(shifted_roc_auc=("roc_auc", "mean"))
+    )
+
+    corr_df = clean_df.merge(
+        shifted_df,
+        on=["dataset", "pipeline"],
+        how="inner",
+    )
+
+    if not corr_df.empty:
+        plt.figure(figsize=(8, 6))
+        for pipeline, group in corr_df.groupby("pipeline"):
+            plt.scatter(
+                group[clean_col],
+                group["shifted_roc_auc"],
+                s=52,
+                alpha=0.9,
+                color=pipeline_color.get(str(pipeline), "#2f2f2f"),
+                label=pipeline_name.get(str(pipeline), str(pipeline)),
+            )
+            for _, row in group.iterrows():
+                plt.annotate(
+                    str(row["dataset"]),
+                    (row[clean_col], row["shifted_roc_auc"]),
+                    textcoords="offset points",
+                    xytext=(4, 4),
+                    fontsize=7,
+                    alpha=0.9,
+                )
+
+        lower = float(
+            min(corr_df[clean_col].min(), corr_df["shifted_roc_auc"].min())
+        )
+        upper = float(
+            max(corr_df[clean_col].max(), corr_df["shifted_roc_auc"].max())
+        )
+        margin = max(0.02, (upper - lower) * 0.06)
+        lower_bound = max(0.0, lower - margin)
+        upper_bound = min(1.0, upper + margin)
+
+        plt.plot(
+            [lower_bound, upper_bound],
+            [lower_bound, upper_bound],
+            linestyle="--",
+            color="#2f2f2f",
+            linewidth=1.2,
+            label="Diagonal (y = x)",
+        )
+        plt.xlim(lower_bound, upper_bound)
+        plt.ylim(lower_bound, upper_bound)
+        plt.xlabel(clean_axis_label)
+        plt.ylabel("Shifted Performance ROC-AUC (Higher Severities)")
+        plt.title("Clean-vs-Shifted ROC-AUC Correlation Across Datasets" + corr_title_suffix)
+        plt.grid(alpha=0.25)
+        plt.legend(loc="best")
+        plt.tight_layout()
+
+        corr_png_path = out_dir / "clean_vs_shift_corr.png"
+        plt.savefig(corr_png_path, dpi=figure_dpi, format="png")
+        outputs["clean_vs_shift_corr_png"] = corr_png_path
+
+        corr_pdf_path = out_dir / "clean_vs_shift_corr.pdf"
+        if save_pdf_figures:
+            plt.savefig(corr_pdf_path, format="pdf")
+            outputs["clean_vs_shift_corr_pdf"] = corr_pdf_path
+        plt.close()
     return outputs
 
 
-def _write_figure_captions(figure_dir: str | Path) -> Path:
+def _write_figure_captions(
+    figure_dir: str | Path,
+    final_results_path: str | Path | None = None,
+    clean_baseline_path: str | Path | None = None,
+) -> Path:
     """Write publication-ready figure captions for generated plots."""
     out_dir = Path(figure_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     caption_path = out_dir / "figure_captions.md"
+
+    summary_line = (
+        "Aggregate mean ROC-AUC (with standard deviation bars) across all datasets, "
+        "seeds, model types, feature counts, shift types, and severities."
+    )
+    degradation_line = (
+        "Average performance degradation across severity levels for both pipelines, "
+        "aggregated over all datasets, model types, and feature counts."
+    )
+    corr_line = (
+        "Dataset-level clean-vs-shifted ROC-AUC correlation with a diagonal y=x "
+        "reference; points below the diagonal indicate larger degradation under shift."
+    )
+
+    if final_results_path is not None and Path(final_results_path).exists():
+        final_df = pd.read_csv(final_results_path)
+        if {"pipeline", "roc_auc"}.issubset(final_df.columns):
+            pipeline_stats = final_df.groupby("pipeline", as_index=True)["roc_auc"].agg(["mean", "std"])
+            if {"A", "B"}.issubset(set(pipeline_stats.index.tolist())):
+                summary_line = (
+                    "Aggregate ROC-AUC across all settings: "
+                    f"Pipeline A mean={pipeline_stats.loc['A', 'mean']:.4f}, "
+                    f"std={pipeline_stats.loc['A', 'std']:.4f}; "
+                    f"Pipeline B mean={pipeline_stats.loc['B', 'mean']:.4f}, "
+                    f"std={pipeline_stats.loc['B', 'std']:.4f}."
+                )
+
+        if {"severity", "pipeline", "roc_auc"}.issubset(final_df.columns):
+            severity_curve = (
+                final_df.groupby(["severity", "pipeline"], as_index=False)
+                .agg(mean_roc_auc=("roc_auc", "mean"))
+                .pivot(index="severity", columns="pipeline", values="mean_roc_auc")
+                .sort_index()
+            )
+            if {"A", "B"}.issubset(set(severity_curve.columns.tolist())) and len(severity_curve) >= 2:
+                slope_a = float(np.polyfit(severity_curve.index.to_numpy(), severity_curve["A"].to_numpy(), 1)[0])
+                slope_b = float(np.polyfit(severity_curve.index.to_numpy(), severity_curve["B"].to_numpy(), 1)[0])
+                degradation_line = (
+                    "Mean ROC-AUC versus corruption severity (all settings aggregated): "
+                    f"Pipeline A slope={slope_a:.4f}, Pipeline B slope={slope_b:.4f} "
+                    "(more negative indicates faster degradation)."
+                )
+
+        required_corr_cols = {"dataset", "severity", "pipeline", "roc_auc"}
+        if required_corr_cols.issubset(final_df.columns):
+            min_severity = float(final_df["severity"].min())
+            clean_col = "clean_roc_auc"
+            clean_source_text = f"clean proxy = severity {min_severity:.1f}"
+
+            clean_df = (
+                final_df[final_df["severity"] == min_severity]
+                .groupby(["dataset", "pipeline"], as_index=False)
+                .agg(clean_roc_auc=("roc_auc", "mean"))
+            )
+
+            if clean_baseline_path is not None and Path(clean_baseline_path).exists():
+                clean_baseline_df = pd.read_csv(clean_baseline_path)
+                required_clean_cols = {"dataset", "pipeline"}
+                clean_metric = None
+                if required_clean_cols.issubset(clean_baseline_df.columns):
+                    if "roc_auc_clean" in clean_baseline_df.columns:
+                        clean_metric = "roc_auc_clean"
+                    elif "roc_auc" in clean_baseline_df.columns:
+                        clean_metric = "roc_auc"
+
+                if clean_metric is not None:
+                    clean_df = (
+                        clean_baseline_df.groupby(["dataset", "pipeline"], as_index=False)
+                        .agg(clean_roc_auc=(clean_metric, "mean"))
+                    )
+                    clean_source_text = "true clean baseline (unshifted test set)"
+
+            shifted_mask = final_df["severity"] > min_severity
+            if not shifted_mask.any():
+                shifted_mask = final_df["severity"] >= min_severity
+
+            shifted_df = (
+                final_df[shifted_mask]
+                .groupby(["dataset", "pipeline"], as_index=False)
+                .agg(shifted_roc_auc=("roc_auc", "mean"))
+            )
+
+            corr_df = clean_df.merge(
+                shifted_df,
+                on=["dataset", "pipeline"],
+                how="inner",
+            )
+            if not corr_df.empty:
+                corr_by_pipeline: list[str] = []
+                for pipeline_name_value in ("A", "B"):
+                    scoped = corr_df[corr_df["pipeline"] == pipeline_name_value]
+                    if len(scoped) >= 2:
+                        corr_value = np.corrcoef(
+                            scoped[clean_col],
+                            scoped["shifted_roc_auc"],
+                        )[0, 1]
+                        corr_by_pipeline.append(
+                            f"Pipeline {pipeline_name_value} r={float(corr_value):.3f}"
+                        )
+
+                pipeline_corr_summary = ", ".join(corr_by_pipeline)
+                if pipeline_corr_summary:
+                    corr_line = (
+                        f"Dataset-level clean-vs-shifted correlation ({clean_source_text}) "
+                        "with diagonal y=x reference: "
+                        f"{pipeline_corr_summary}."
+                    )
+                else:
+                    corr_line = (
+                        f"Dataset-level clean-vs-shifted correlation ({clean_source_text}) "
+                        "with diagonal y=x reference."
+                    )
+
     caption_text = (
         "# Figure Captions\n\n"
         "## Figure 1: average_performance.png\n\n"
-        "Across all datasets, the baseline pipeline achieves higher mean ROC-AUC and lower variance than the AutoFE pipeline in aggregate.\n\n"
+        f"{summary_line}\n\n"
         "## Figure 2: degradation_curve.png\n\n"
-        "Both pipelines degrade as corruption severity increases; AutoFE shows a slightly steeper average decline, consistent with a performance-robustness trade-off.\n"
+        f"{degradation_line}\n\n"
+        "## Figure 3: average_performance_boosting.png\n\n"
+        "Boosting-model (XGBoost) comparison between baseline and AutoFE pipelines across all shifts and severities.\n\n"
+        "## Figure 4: degradation_curve_boosting.png\n\n"
+        "Boosting-model degradation curve as corruption severity increases, contrasting baseline and AutoFE pipelines.\n\n"
+        "## Figure 5: average_performance_bagging.png\n\n"
+        "Bagging-model (Random Forest) comparison between baseline and AutoFE pipelines across all shifts and severities.\n\n"
+        "## Figure 6: degradation_curve_bagging.png\n\n"
+        "Bagging-model degradation curve as corruption severity increases, contrasting baseline and AutoFE pipelines.\n\n"
+        "## Figure 7: clean_vs_shift_corr.png\n\n"
+        f"{corr_line}\n"
     )
     caption_path.write_text(caption_text, encoding="utf-8")
     return caption_path
@@ -595,26 +1119,53 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
             selected_payload=pipeline_b_payload,
             feature_counts=feature_counts,
         )
-        shift_variations = _resolve_shift_variations(Path(config.shifted_dir) / dataset)
-        if not shift_variations:
-            print(f"  no shift files found for {dataset}, skipping")
-            continue
-
-        prepared_variations_a = _materialize_shifted_variations(
-            x_test=x_test_a_base,
-            variations=shift_variations,
-            random_state=42,
-            ranked_features=None,
+        shift_dir = Path(config.shifted_dir) / dataset
+        shift_variations_a = _resolve_shift_variations(
+            shift_dir,
+            source_test_key="x_test",
         )
+        prepared_variations_a = _load_persisted_shifted_variations(
+            variations=shift_variations_a,
+            expected_columns=list(x_test_a_base.columns),
+        )
+
+        sample_feature_set = next(iter(pipeline_b_feature_sets.values()))
+        pipeline_b_source_test_key = str(sample_feature_set["source_test_key"])
+        pipeline_b_base_feature_names = list(sample_feature_set["base_feature_names"])
+        shift_variations_b = _resolve_shift_variations(
+            shift_dir,
+            source_test_key=pipeline_b_source_test_key,
+        )
+        prepared_variations_b_base = _load_persisted_shifted_variations(
+            variations=shift_variations_b,
+            expected_columns=pipeline_b_base_feature_names,
+        )
+
+        signature_a = [
+            (variation["shift_type"], variation["severity"])
+            for variation in prepared_variations_a
+        ]
+        signature_b = [
+            (variation["shift_type"], variation["severity"])
+            for variation in prepared_variations_b_base
+        ]
+        if signature_a != signature_b:
+            raise ValueError(
+                "Persisted shift signatures differ between Pipeline A and Pipeline B views: "
+                f"dataset={dataset}"
+            )
 
         prepared_variations_b_by_count: dict[int, list[dict[str, Any]]] = {}
         for feature_count, feature_set in pipeline_b_feature_sets.items():
-            prepared_variations_b_by_count[feature_count] = _materialize_shifted_variations(
-                x_test=feature_set["x_test"],
-                variations=shift_variations,
-                random_state=42,
-                ranked_features=feature_set["feature_names"],
-            )
+            feature_names = list(feature_set["feature_names"])
+            prepared_variations_b_by_count[feature_count] = [
+                {
+                    "shift_type": variation["shift_type"],
+                    "severity": variation["severity"],
+                    "shifted": variation["shifted"].reindex(columns=feature_names),
+                }
+                for variation in prepared_variations_b_base
+            ]
 
         for model_index, model_type in enumerate(model_types, start=1):
             print(
@@ -632,6 +1183,7 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
             }
 
             for seed_index, seed in enumerate(seeds, start=1):
+                pipeline_a_train_start = time.perf_counter()
                 pipeline_a_bundle = train_model_pipeline(
                     x_train=x_train_a,
                     y_train=y_train,
@@ -640,6 +1192,7 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                     random_state=seed,
                     model_type=model_type,
                 )
+                pipeline_a_train_time_s = time.perf_counter() - pipeline_a_train_start
 
                 current_signature_a = tuple(pipeline_a_bundle["feature_names"])
                 if cached_a is None or current_signature_a != signature_a:
@@ -652,6 +1205,7 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                     ]
                     signature_a = current_signature_a
 
+                pipeline_a_inference_start = time.perf_counter()
                 roc_auc_a_values = [
                     _evaluate_roc_auc(
                         bundle=pipeline_a_bundle,
@@ -661,11 +1215,18 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                     )
                     for variation_index, variation in enumerate(prepared_variations_a)
                 ]
+                pipeline_a_inference_time_s = (
+                    time.perf_counter() - pipeline_a_inference_start
+                )
+                pipeline_a_total_time_s = (
+                    pipeline_a_train_time_s + pipeline_a_inference_time_s
+                )
 
                 for feature_count in feature_counts:
                     feature_set = pipeline_b_feature_sets[feature_count]
                     prepared_variations_b = prepared_variations_b_by_count[feature_count]
 
+                    pipeline_b_train_start = time.perf_counter()
                     pipeline_b_bundle = train_model_pipeline(
                         x_train=feature_set["x_train"],
                         y_train=y_train,
@@ -674,6 +1235,7 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                         random_state=seed,
                         model_type=model_type,
                     )
+                    pipeline_b_train_time_s = time.perf_counter() - pipeline_b_train_start
 
                     current_signature_b = tuple(pipeline_b_bundle["feature_names"])
                     cached_b = cached_b_by_count[feature_count]
@@ -689,6 +1251,8 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                         cached_b_by_count[feature_count] = cached_b
                         signature_b_by_count[feature_count] = current_signature_b
 
+                    pipeline_b_inference_start = time.perf_counter()
+                    pipeline_b_row_indices: list[int] = []
                     for variation_index, variation in enumerate(prepared_variations_b):
                         shift_type = variation["shift_type"]
                         severity = variation["severity"]
@@ -711,8 +1275,12 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                                 "severity": severity,
                                 "pipeline": "A",
                                 "roc_auc": roc_auc_a,
+                                "train_time_s": pipeline_a_train_time_s,
+                                "inference_time_s": pipeline_a_inference_time_s,
+                                "total_time_s": pipeline_a_total_time_s,
                             }
                         )
+                        pipeline_b_row_index = len(rows)
                         rows.append(
                             {
                                 "dataset": dataset,
@@ -724,8 +1292,24 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                                 "severity": severity,
                                 "pipeline": "B",
                                 "roc_auc": roc_auc_b,
+                                "train_time_s": pipeline_b_train_time_s,
+                                "inference_time_s": np.nan,
+                                "total_time_s": np.nan,
                             }
                         )
+                        pipeline_b_row_indices.append(pipeline_b_row_index)
+
+                    pipeline_b_inference_time_s = (
+                        time.perf_counter() - pipeline_b_inference_start
+                    )
+                    pipeline_b_total_time_s = (
+                        pipeline_b_train_time_s + pipeline_b_inference_time_s
+                    )
+
+                    if pipeline_b_row_indices:
+                        for row_index in pipeline_b_row_indices:
+                            rows[row_index]["inference_time_s"] = pipeline_b_inference_time_s
+                            rows[row_index]["total_time_s"] = pipeline_b_total_time_s
 
                 if config.progress_every > 0 and (
                     seed_index % config.progress_every == 0 or seed_index == total_seeds
@@ -750,6 +1334,9 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
                     "severity",
                     "pipeline",
                     "roc_auc",
+                    "train_time_s",
+                    "inference_time_s",
+                    "total_time_s",
                 ]
             ].sort_values(
                 [
@@ -780,6 +1367,9 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
             "severity",
             "pipeline",
             "roc_auc",
+            "train_time_s",
+            "inference_time_s",
+            "total_time_s",
         ]
     ].sort_values(
         [
@@ -812,16 +1402,26 @@ def run_full_experiment(config: ExperimentConfig) -> pd.DataFrame:
         statistical_results_path=config.statistical_results_path,
         output_path=config.main_table_path,
     )
+    build_runtime_comparison_table(
+        final_results_path=final_results_path,
+        output_path=config.runtime_results_path,
+    )
 
     if config.generate_figures:
+        clean_baseline_path = Path(config.clean_baseline_results_path)
         _generate_figures_from_final_results(
             final_results_path=final_results_path,
             figure_dir=config.figure_dir,
             figure_dpi=config.figure_dpi,
             save_pdf_figures=config.save_pdf_figures,
             save_tiff_figures=config.save_tiff_figures,
+            clean_baseline_path=clean_baseline_path,
         )
-        _write_figure_captions(config.figure_dir)
+        _write_figure_captions(
+            config.figure_dir,
+            final_results_path=final_results_path,
+            clean_baseline_path=clean_baseline_path,
+        )
     return results
 
 
@@ -836,6 +1436,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--aggregated-results", default="reports/tables/aggregated_results.csv")
     parser.add_argument("--statistical-results", default="reports/tables/statistical_results.csv")
     parser.add_argument("--main-table", default="reports/tables/main_results.csv")
+    parser.add_argument("--runtime-results", default="reports/tables/runtime_results.csv")
     parser.add_argument("--figure-dir", default="reports/figures")
     parser.add_argument("--task", default="classification", choices=["classification", "regression"])
     parser.add_argument("--random-state-base", type=int, default=0)
@@ -884,7 +1485,8 @@ def _parse_comma_ints(value: str | None) -> list[int] | None:
     return parsed
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for full benchmark execution."""
     args = _parse_args()
     model_types = _parse_comma_list(args.model_types)
     feature_counts = _parse_comma_ints(args.feature_counts)
@@ -897,6 +1499,7 @@ if __name__ == "__main__":
         aggregated_results_path=args.aggregated_results,
         statistical_results_path=args.statistical_results,
         main_table_path=args.main_table,
+        runtime_results_path=args.runtime_results,
         figure_dir=args.figure_dir,
         task=args.task,
         random_state_base=args.random_state_base,
@@ -918,13 +1521,46 @@ if __name__ == "__main__":
     print(f"saved={config.aggregated_results_path}")
     print(f"saved={config.statistical_results_path}")
     print(f"saved={config.main_table_path}")
+    print(f"saved={config.runtime_results_path}")
     if config.generate_figures:
         print(f"saved={Path(config.figure_dir) / 'degradation_curve.png'}")
         print(f"saved={Path(config.figure_dir) / 'average_performance.png'}")
+        clean_vs_shift_png = Path(config.figure_dir) / "clean_vs_shift_corr.png"
+        if clean_vs_shift_png.exists():
+            print(f"saved={clean_vs_shift_png}")
+        model_specific_aliases = ("boosting", "bagging")
+        for alias in model_specific_aliases:
+            degradation_specific = Path(config.figure_dir) / f"degradation_curve_{alias}.png"
+            average_specific = Path(config.figure_dir) / f"average_performance_{alias}.png"
+            if degradation_specific.exists():
+                print(f"saved={degradation_specific}")
+            if average_specific.exists():
+                print(f"saved={average_specific}")
         if config.save_tiff_figures:
             print(f"saved={Path(config.figure_dir) / 'degradation_curve.tiff'}")
             print(f"saved={Path(config.figure_dir) / 'average_performance.tiff'}")
+            for alias in model_specific_aliases:
+                degradation_specific = Path(config.figure_dir) / f"degradation_curve_{alias}.tiff"
+                average_specific = Path(config.figure_dir) / f"average_performance_{alias}.tiff"
+                if degradation_specific.exists():
+                    print(f"saved={degradation_specific}")
+                if average_specific.exists():
+                    print(f"saved={average_specific}")
         if config.save_pdf_figures:
             print(f"saved={Path(config.figure_dir) / 'degradation_curve.pdf'}")
             print(f"saved={Path(config.figure_dir) / 'average_performance.pdf'}")
+            clean_vs_shift_pdf = Path(config.figure_dir) / "clean_vs_shift_corr.pdf"
+            if clean_vs_shift_pdf.exists():
+                print(f"saved={clean_vs_shift_pdf}")
+            for alias in model_specific_aliases:
+                degradation_specific = Path(config.figure_dir) / f"degradation_curve_{alias}.pdf"
+                average_specific = Path(config.figure_dir) / f"average_performance_{alias}.pdf"
+                if degradation_specific.exists():
+                    print(f"saved={degradation_specific}")
+                if average_specific.exists():
+                    print(f"saved={average_specific}")
         print(f"saved={Path(config.figure_dir) / 'figure_captions.md'}")
+
+
+if __name__ == "__main__":
+    main()

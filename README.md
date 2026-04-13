@@ -29,16 +29,19 @@ at multiple severities and measuring how quickly performance degrades.
 | AutoFE Feature Counts | 100, 200 |
 | Statistical Test | Wilcoxon signed-rank |
 
-## Empirical Snapshot (Prior XGBoost-Only Configuration)
+## Empirical Reporting Policy
 
-- Baseline (A) wins on 7/12 datasets.
-- AutoFE (B) wins on 5/12 datasets.
-- All per-dataset A-vs-B differences are significant.
-- In aggregate, A has higher mean ROC-AUC and lower variance.
-- Both pipelines degrade under corruption; B degrades slightly faster on average.
+This repository no longer hardcodes fixed headline win-count claims in the README.
+Use generated CSV artifacts for current numbers after each run:
 
-These summary numbers are from the earlier XGBoost-only setup. Re-run the full benchmark
-commands above to refresh tables for the expanded multi-model, multi-feature-count design.
+- reports/tables/final_results.csv
+- reports/tables/statistical_results.csv
+- reports/tables/main_results.csv
+- reports/tables/runtime_results.csv
+
+For quick consistency checks:
+
+- python src/verify_claims.py
 
 Run verification any time with:
 
@@ -69,6 +72,16 @@ Alternative:
 
 ```bash
 pip install -r requirements.txt
+```
+
+### 3) Runner entrypoints (from repository root)
+
+All commands below are supported and call the same benchmark runner:
+
+```bash
+python pipeline_runner.py --help
+python src/pipeline_runner.py --help
+python main.py --help
 ```
 
 ## End-to-End Reproduction
@@ -106,13 +119,13 @@ python src/shift_generator.py --input-dir data/processed --output-root data/shif
 ### Step 6: Full benchmark run
 
 ```bash
-python src/pipeline_runner.py --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200"
+python pipeline_runner.py --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200"
 ```
 
 ### Optional: Fast smoke run
 
 ```bash
-python src/pipeline_runner.py --max-datasets 1 --max-seeds 1 --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200" --skip-figures
+python pipeline_runner.py --max-datasets 1 --max-seeds 1 --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200" --skip-figures
 ```
 
 ## Outputs
@@ -129,6 +142,23 @@ Each full run writes:
 - reports/figures/average_performance.png
 - reports/figures/average_performance.tiff
 - reports/figures/average_performance.pdf
+- reports/figures/degradation_curve_boosting.png
+- reports/figures/degradation_curve_boosting.tiff
+- reports/figures/degradation_curve_boosting.pdf
+- reports/figures/average_performance_boosting.png
+- reports/figures/average_performance_boosting.tiff
+- reports/figures/average_performance_boosting.pdf
+- reports/figures/degradation_curve_bagging.png
+- reports/figures/degradation_curve_bagging.tiff
+- reports/figures/degradation_curve_bagging.pdf
+- reports/figures/average_performance_bagging.png
+- reports/figures/average_performance_bagging.tiff
+- reports/figures/average_performance_bagging.pdf
+- reports/figures/figure_captions.md
+
+Expected full-run row count for current default grid:
+
+- 12 datasets × 20 seeds × 2 models × 2 feature counts × 3 shifts × 5 severities × 2 pipelines = 28,800 rows
 
 Column schema for final_results.csv:
 
@@ -141,6 +171,17 @@ Column schema for final_results.csv:
 - severity
 - pipeline
 - roc_auc
+- train_time_s
+- inference_time_s
+- total_time_s
+
+runtime_results.csv provides a direct AutoFE computational-cost comparison by
+dataset/model/feature-count slice, including:
+
+- Pipeline A vs Pipeline B mean/std train time
+- Pipeline A vs Pipeline B mean/std inference time
+- Pipeline A vs Pipeline B mean/std total time
+- B-over-A runtime ratios and absolute time deltas
 
 ## Figure Export Standard
 
@@ -154,10 +195,10 @@ Default figure generation is publication-oriented:
 Useful flags:
 
 ```bash
-python src/pipeline_runner.py --figure-dpi 300
-python src/pipeline_runner.py --no-pdf-figures
-python src/pipeline_runner.py --no-tiff-figures
-python src/pipeline_runner.py --skip-figures
+python pipeline_runner.py --figure-dpi 300
+python pipeline_runner.py --no-pdf-figures
+python pipeline_runner.py --no-tiff-figures
+python pipeline_runner.py --skip-figures
 ```
 
 ## Optional Notebook Workflow
