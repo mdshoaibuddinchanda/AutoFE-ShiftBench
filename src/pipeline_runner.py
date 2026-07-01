@@ -241,6 +241,22 @@ def main() -> None:
     json_path = Path("reports/tables/results_stream.jsonl")
     json_path.parent.mkdir(parents=True, exist_ok=True)
     
+    completed_tasks = set()
+    if json_path.exists():
+        logger.info("Found existing results_stream.jsonl. Parsing completed tasks for warm-resume...")
+        with json_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                    key = (record.get("dataset"), record.get("seed"), record.get("fold"), record.get("condition"))
+                    if all(k is not None for k in key):
+                        completed_tasks.add(key)
+                except Exception:
+                    pass
+        logger.info(f"Loaded {len(completed_tasks)} completed task signatures. These will be skipped.")
+    
     # 2. Config
     datasets = load_dataset_names("config/dataset_list.yaml")
     if args.max_datasets:
@@ -296,6 +312,10 @@ def main() -> None:
                 if args.max_folds and fold > args.max_folds:
                     break
                 for condition in conditions:
+                    task_key = (dataset, seed, fold, condition)
+                    if task_key in completed_tasks:
+                        continue
+                        
                     tasks.append({
                         "dataset_name": dataset,
                         "seed": seed,
