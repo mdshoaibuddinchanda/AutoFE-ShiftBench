@@ -1,243 +1,137 @@
 # AutoFE-ShiftBench
 
-AutoFE-ShiftBench is a reproducible benchmark for evaluating the trade-off between
-predictive performance and robustness under controlled feature corruption.
+AutoFE-ShiftBench is a reproducible, large-scale benchmark for evaluating the trade-off between predictive performance and robustness under realistic feature corruption. It compares standard, raw-feature models against Automated Feature Engineering (AutoFE) enhanced pipelines across 20 diverse datasets and 10 models.
 
-It compares:
+## Why This Project?
 
-- Pipeline A: raw features + model grid
-- Pipeline B: AutoFE (DFS + selection) + model grid
+Most AutoML and Feature Engineering evaluations optimize only for clean-test accuracy. This project adds a strict **robustness lens** by injecting synthetic perturbations (Gaussian noise, missing values, label noise) into the data. Crucially, the benchmark implements a **Nested Cross-Validation** approach where AutoFE is strictly fit *inside* the fold, ensuring zero data leakage.
 
-on the same datasets, seeds, shifts, and metrics.
+---
 
-## Why This Project
+## Experimental Protocol & Configurations
 
-Most AutoML and feature-engineering evaluations optimize only for clean-test
-accuracy. This project adds a robustness lens by applying synthetic feature shifts
-at multiple severities and measuring how quickly performance degrades.
+| Configuration | Details |
+| :--- | :--- |
+| **Datasets** | 20 OpenML tabular datasets (capped at 100,000 rows max) |
+| **Task** | Classification (Binary & Multiclass) |
+| **Validation Strategy** | Stratified 5-Fold Cross-Validation |
+| **Replications** | 5 Random Seeds |
+| **Models (10)** | Logistic Regression, Random Forest, Extra Trees, XGBoost, LightGBM, CatBoost, SVM, KNN, Gaussian Naive Bayes, MLP Neural Network |
+| **Perturbations (10)** | `clean`, `gaussian_0.01`, `gaussian_0.05`, `gaussian_0.10`, `missing_0.05`, `missing_0.10`, `missing_0.20`, `label_0.05`, `label_0.10`, `label_0.20` |
+| **Metrics** | ROC-AUC, PR-AUC, F1 (Macro), MCC, Balanced Accuracy, Accuracy, Log Loss, Brier Score, Precision, Recall |
+| **Effect Sizes** | Cliff's Delta, Wilcoxon Signed-Rank, Friedman, Nemenyi |
 
-## At a Glance
+---
 
-| Item | Value |
-| --- | --- |
-| Datasets | 12 OpenML tabular datasets |
-| Task | Classification |
-| Seeds | 20 |
-| Shift Types | random, important, missing |
-| Shift Severities | 0.2, 0.4, 0.6, 0.8, 1.0 |
-| Models | XGBoost, Random Forest |
-| AutoFE Feature Counts | 100, 200 |
-| Statistical Test | Wilcoxon signed-rank |
+## Datasets
 
-## Empirical Reporting Policy
+Below are the 20 OpenML datasets included in this benchmark. The pipeline automatically caps datasets exceeding 100K rows (via random downsampling) to keep runtimes feasible on standard hardware.
 
-This repository no longer hardcodes fixed headline win-count claims in the README.
-Use generated CSV artifacts for current numbers after each run:
+| # | Dataset | Domain / Topic | Link |
+| :--- | :--- | :--- | :--- |
+| 1 | **Adult** | Income Prediction | [OpenML Search](https://www.openml.org/search?type=data&q=adult) |
+| 2 | **Bank Marketing** | Marketing | [OpenML Search](https://www.openml.org/search?type=data&q=bank-marketing) |
+| 3 | **APS Failure** | Industrial / Sensor | [OpenML Search](https://www.openml.org/search?type=data&q=aps_failure) |
+| 4 | **Electricity** | Energy | [OpenML Search](https://www.openml.org/search?type=data&q=electricity) |
+| 5 | **Covertype** | Forest Cover | [OpenML Search](https://www.openml.org/search?type=data&q=covertype) |
+| 6 | **Dry Bean** | Agriculture | [OpenML Search](https://www.openml.org/search?type=data&q=dry-bean-dataset) |
+| 7 | **Crop Recommendation** | Agriculture | [OpenML Search](https://www.openml.org/search?type=data&q=crop-recommendation) |
+| 8 | **Breast Cancer Wisconsin** | Medical | [OpenML Search](https://www.openml.org/search?type=data&q=breast-cancer-wisconsin) |
+| 9 | **Heart Disease** | Medical | [OpenML Search](https://www.openml.org/search?type=data&q=heart-disease) |
+| 10 | **Diabetes** | Medical | [OpenML Search](https://www.openml.org/search?type=data&q=diabetes) |
+| 11 | **Haberman Survival** | Medical | [OpenML Search](https://www.openml.org/search?type=data&q=haberman) |
+| 12 | **Ionosphere** | Physics / Radar | [OpenML Search](https://www.openml.org/search?type=data&q=ionosphere) |
+| 13 | **Sonar** | Physics / Sonar | [OpenML Search](https://www.openml.org/search?type=data&q=sonar) |
+| 14 | **Statlog German Credit**| Finance | [OpenML Search](https://www.openml.org/search?type=data&q=credit-g) |
+| 15 | **Credit Default** | Finance | [OpenML Search](https://www.openml.org/search?type=data&q=default-of-credit-card-clients) |
+| 16 | **Mushroom** | Biology | [OpenML Search](https://www.openml.org/search?type=data&q=mushroom) |
+| 17 | **Magic Telescope** | Astronomy | [OpenML Search](https://www.openml.org/search?type=data&q=magic-telescope) |
+| 18 | **Spambase** | NLP / Email | [OpenML Search](https://www.openml.org/search?type=data&q=spambase) |
+| 19 | **Wine Quality (Red)** | Chemistry | [OpenML Search](https://www.openml.org/search?type=data&q=wine-quality-red) |
+| 20 | **Rice (Cammeo/Osmancik)**| Agriculture | [OpenML Search](https://www.openml.org/search?type=data&q=rice-cammeo-and-osmancik) |
 
-- reports/tables/final_results.csv
-- reports/tables/statistical_results.csv
-- reports/tables/main_results.csv
-- reports/tables/runtime_results.csv
+---
 
-For quick consistency checks:
+## Quick Start & Reproduction
 
-- python src/verify_claims.py
+### 1) Environment Setup
 
-Run verification any time with:
-
-```bash
-python src/verify_claims.py
-```
-
-## Quick Start
-
-Run commands from the repository root.
-
-### 1) Create environment
-
-```bash
-conda create -n py312 python=3.12 -y
-conda activate py312
-```
-
-### 2) Install dependencies
-
-Preferred:
+We recommend using `uv` or `pip` to install dependencies in a virtual environment.
 
 ```bash
-uv pip install --system -r requirements.txt
+# Create environment
+uv venv
+# Activate environment (Windows)
+.venv\Scripts\activate
+# Install dependencies
+uv pip install -r requirements.txt
 ```
 
-Alternative:
+### 2) Download & Prepare Datasets
 
-```bash
-pip install -r requirements.txt
-```
-
-### 3) Runner entrypoints (from repository root)
-
-All commands below are supported and call the same benchmark runner:
-
-```bash
-python pipeline_runner.py --help
-python src/pipeline_runner.py --help
-python main.py --help
-```
-
-## End-to-End Reproduction
-
-### Step 1: Download datasets
+This command will download all 20 datasets from OpenML, cap them at 100K rows, compute structural meta-features, and save them in `data/raw`.
 
 ```bash
 python src/data_loader.py
 ```
 
-### Step 2: Preprocess (split before transform)
+### 3) Run the Benchmark
+
+The benchmark uses multiprocessing to parallelize tasks while strictly avoiding thread thrashing (by forcing model algorithms to execute synchronously within the worker process). The `--n-workers` flag dictates how many datasets/folds to process simultaneously.
 
 ```bash
-python src/preprocessing.py --raw-dir data/raw --output-dir data/processed --encoding onehot
+# Run the full benchmark suite
+# (Adjust n-workers based on your CPU. It is recommended to leave 1 core free for IO)
+python -m src.pipeline_runner --n-workers 4
 ```
 
-### Step 3: Feature engineering (DFS)
+Results are streamed sequentially to a JSON Lines file (`reports/tables/results_stream.jsonl`) to ensure nothing is lost during long-running benchmarks.
+
+### Optional: Smoke Testing
+
+If you want to quickly test the pipeline end-to-end on a single dataset, fold, and condition, run:
 
 ```bash
-python src/feature_engineering.py --processed-dir data/processed --output-dir data/processed --depth 2 --max-features 200 --max-base-features 40
+python -m src.pipeline_runner --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 1 --n-workers 1
 ```
 
-### Step 4: Feature selection
+---
 
-```bash
-python src/feature_selection.py --processed-dir data/processed --output-dir data/processed --max-features 200 --l1-strength 0.1 --random-state 42
+## Project Structure
+
+```text
+AutoFE-ShiftBench/
+├── config/
+│   └── dataset_list.yaml       # Defines the 20 benchmark datasets to download and run
+├── data/                       # (Git-ignored) Where artifacts are cached
+│   └── raw/                    # Downloaded CSV datasets and JSON meta-features
+├── reports/                    # (Git-ignored) Where outputs are saved
+│   ├── figures/                # Generated publication plots (PDF, PNG)
+│   ├── tables/
+│   │   ├── results_stream.jsonl  # Streaming pipeline results (1 row per model fit)
+│   │   └── statistical_results.csv # Final effect sizes and significance tests
+│   └── terminal.log            # Running log of the pipeline executions
+├── src/
+│   ├── data_loader.py          # Downloads OpenML datasets and computes meta-features
+│   ├── pipeline_runner.py      # Multiprocessing orchestrator and Nested CV loop
+│   ├── model.py                # Instantiates the 10 core ML algorithms
+│   ├── shift_generator.py      # Injects realistic perturbations (noise, missing, label)
+│   ├── preprocessing.py        # Handles standard scaling and encoding
+│   ├── feature_engineering.py  # Wrapper for automated feature generation (Featuretools)
+│   ├── feature_selection.py    # Filters the generated AutoFE explosion
+│   ├── evaluation.py           # Calculates the 10 core classification metrics
+│   ├── statistics.py           # Computes Cliff's Delta, Wilcoxon, Friedman, Nemenyi
+│   ├── shap_explainer.py       # Computes fast clustered SHAP importances
+│   ├── plotting.py             # Generates the 30-figure Seaborn visual suite
+│   └── verify_claims.py        # (Deprecated) Old claim verifier, superseded by statistics.py
+├── task.md                     # Development tracking checklist
+├── walkthrough.md              # Detailed implementation notes
+├── requirements.txt            # Project dependencies
+└── README.md                   # This documentation
 ```
 
-### Step 5: Shift generation
-
-```bash
-python src/shift_generator.py --input-dir data/processed --output-root data/shifted --shift-types "random,important,missing" --severities "0.2,0.4,0.6,0.8,1.0" --random-state 42
-```
-
-### Step 6: Full benchmark run
-
-```bash
-python pipeline_runner.py --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200"
-```
-
-### Optional: Fast smoke run
-
-```bash
-python pipeline_runner.py --max-datasets 1 --max-seeds 1 --task classification --n-estimators 100 --max-depth 6 --model-types "xgboost,random_forest" --feature-counts "100,200" --skip-figures
-```
-
-## Outputs
-
-Each full run writes:
-
-- reports/tables/final_results.csv
-- reports/tables/aggregated_results.csv
-- reports/tables/statistical_results.csv
-- reports/tables/main_results.csv
-- reports/figures/degradation_curve.png
-- reports/figures/degradation_curve.tiff
-- reports/figures/degradation_curve.pdf
-- reports/figures/average_performance.png
-- reports/figures/average_performance.tiff
-- reports/figures/average_performance.pdf
-- reports/figures/degradation_curve_boosting.png
-- reports/figures/degradation_curve_boosting.tiff
-- reports/figures/degradation_curve_boosting.pdf
-- reports/figures/average_performance_boosting.png
-- reports/figures/average_performance_boosting.tiff
-- reports/figures/average_performance_boosting.pdf
-- reports/figures/degradation_curve_bagging.png
-- reports/figures/degradation_curve_bagging.tiff
-- reports/figures/degradation_curve_bagging.pdf
-- reports/figures/average_performance_bagging.png
-- reports/figures/average_performance_bagging.tiff
-- reports/figures/average_performance_bagging.pdf
-- reports/figures/figure_captions.md
-
-Expected full-run row count for current default grid:
-
-- 12 datasets × 20 seeds × 2 models × 2 feature counts × 3 shifts × 5 severities × 2 pipelines = 28,800 rows
-
-Column schema for final_results.csv:
-
-- dataset
-- seed
-- model_type
-- feature_count
-- feature_count_used
-- shift_type
-- severity
-- pipeline
-- roc_auc
-- train_time_s
-- inference_time_s
-- total_time_s
-
-runtime_results.csv provides a direct AutoFE computational-cost comparison by
-dataset/model/feature-count slice, including:
-
-- Pipeline A vs Pipeline B mean/std train time
-- Pipeline A vs Pipeline B mean/std inference time
-- Pipeline A vs Pipeline B mean/std total time
-- B-over-A runtime ratios and absolute time deltas
-
-## Figure Export Standard
-
-Default figure generation is publication-oriented:
-
-- PNG and TIFF at 600 DPI
-- Vector PDF export
-- colorblind-safe palette
-- consistent font and line styling
-
-Useful flags:
-
-```bash
-python pipeline_runner.py --figure-dpi 300
-python pipeline_runner.py --no-pdf-figures
-python pipeline_runner.py --no-tiff-figures
-python pipeline_runner.py --skip-figures
-```
-
-## Optional Notebook Workflow
-
-Notebook:
-
-- notebooks/visualization.ipynb
-
-Run all cells to regenerate figures and captions.
-
-## Repository Layout
-
-- config/: runtime config files
-- src/: pipeline implementation
-- notebooks/: exploratory and plotting notebooks
-- data/: generated raw/processed/shifted artifacts (gitignored)
-- reports/: generated tables and figures (gitignored)
-
-## Version-Control Policy
-
-This repository intentionally does not track generated benchmark artifacts.
-Generated files are reproducible from the commands above.
-
-Local-only files excluded from git include:
-
-- progress.md
-- .vscode/
-
-## Troubleshooting
-
-- If featuretools import fails, reinstall dependencies from requirements.txt.
-- Liblinear convergence warnings may appear during feature selection and do not
-  necessarily invalidate outputs.
-- Re-run claim checks after reruns:
-
-```bash
-python src/verify_claims.py
-```
+---
 
 ## License
 
-See LICENSE.
+See `LICENSE` file for details.
