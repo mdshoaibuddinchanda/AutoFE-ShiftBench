@@ -9,6 +9,10 @@ import multiprocessing
 import sys
 import time
 import traceback
+import hashlib
+import os
+import uuid
+import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -54,23 +58,86 @@ def setup_logger(log_file: str | Path) -> logging.Logger:
     return logger
 
 
+def _hash_dataframe(df: pd.DataFrame) -> str:
+    """Generate a secure, deterministic hash of a pandas DataFrame including dtypes."""
+    data_hash = pd.util.hash_pandas_object(df, index=True).values.tobytes()
+    col_hash = str(df.columns.tolist()).encode('utf-8')
+    dtype_hash = str([str(dt) for dt in df.dtypes]).encode('utf-8')
+    return hashlib.sha256(data_hash + col_hash + dtype_hash).hexdigest()
+
 def _run_autofe(
     x_train: pd.DataFrame, 
     x_test: pd.DataFrame, 
-    y_train: pd.Series
+    y_train: pd.Series,
+    dataset_name: str,
+    seed: int,
+    fold: int
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Run DFS and Feature Selection inside the worker."""
+    """Run DFS (with caching) and Feature Selection inside the worker."""
     from src.feature_engineering import expand_features_with_dfs, DFSConfig
     from src.feature_selection import select_top_features, FeatureSelectionConfig
+    import featuretools as ft
     
     dfs_cfg = DFSConfig(depth=2, max_features=100, max_base_features=40, monitor_ram=False)
     
-    # 1. Generate
-    t0 = time.time()
-    x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(x_train, x_test, config=dfs_cfg)
-    gen_time = time.time() - t0
+    # --- STAGE 1: FEATURE GENERATION (CACHED) ---
+    cache_dir = Path("data/cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
     
-    # 2. Select
+    train_hash = _hash_dataframe(x_train)
+    test_hash = _hash_dataframe(x_test)
+    config_hash = hashlib.sha256(str(dfs_cfg).encode('utf-8')).hexdigest()
+    
+    cache_key_raw = f"{train_hash}_{test_hash}_{config_hash}_ft{ft.__version__}_v1"
+    cache_key = hashlib.sha256(cache_key_raw.encode('utf-8')).hexdigest()
+    
+    train_cache = cache_dir / f"autofe_dfs_{cache_key}_train.parquet"
+    test_cache = cache_dir / f"autofe_dfs_{cache_key}_test.parquet"
+    meta_cache = cache_dir / f"autofe_dfs_{cache_key}_meta.json"
+    
+    if train_cache.exists() and test_cache.exists() and meta_cache.exists():
+        x_train_fe = pd.read_parquet(train_cache)
+        x_test_fe = pd.read_parquet(test_cache)
+        with open(meta_cache, "r") as f:
+            dfs_meta = json.load(f)
+        gen_time = 0.0
+        cache_hit = True
+    else:
+        t0 = time.time()
+        x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(x_train, x_test, config=dfs_cfg)
+        gen_time = time.time() - t0
+        cache_hit = False
+        
+        temp_id = uuid.uuid4().hex
+        temp_train = cache_dir / f"temp_{temp_id}_train.parquet"
+        temp_test = cache_dir / f"temp_{temp_id}_test.parquet"
+        temp_meta = cache_dir / f"temp_{temp_id}_meta.json"
+        
+        try:
+            x_train_fe.to_parquet(temp_train)
+            x_test_fe.to_parquet(temp_test)
+            
+            dfs_meta.update({
+                "generation_time_s": gen_time,
+                "dataset": dataset_name,
+                "seed": seed,
+                "fold": fold,
+                "featuretools_version": ft.__version__,
+                "creation_date": str(datetime.datetime.now())
+            })
+            with open(temp_meta, "w") as f:
+                json.dump(dfs_meta, f)
+                
+            os.replace(temp_train, train_cache)
+            os.replace(temp_test, test_cache)
+            os.replace(temp_meta, meta_cache)
+        except Exception as e:
+            for tmp in [temp_train, temp_test, temp_meta]:
+                if tmp.exists():
+                    tmp.unlink()
+            raise e
+            
+    # --- STAGE 2: FEATURE SELECTION (NEVER CACHED, USES y_train) ---
     t1 = time.time()
     fs_cfg = FeatureSelectionConfig(max_features=40, l1_strength=0.1, task="classification")
     x_train_sel, x_test_sel, sel_meta = select_top_features(x_train_fe, x_test_fe, y_train, config=fs_cfg)
@@ -81,7 +148,8 @@ def _run_autofe(
         "num_generated": x_train_fe.shape[1],
         "num_selected": x_train_sel.shape[1],
         "generation_time_s": gen_time,
-        "selection_time_s": sel_time
+        "selection_time_s": sel_time,
+        "dfs_cache_hit": cache_hit
     }
     
     return x_train_sel, x_test_sel, meta
@@ -135,7 +203,8 @@ def evaluate_unit(
         # AutoFE
         try:
             x_train_autofe, x_test_autofe, autofe_meta = _run_autofe(
-                x_train_prep, x_test_prep, pd.Series(y_train_enc)
+                x_train_prep, x_test_prep, pd.Series(y_train_enc),
+                dataset_name=dataset_name, seed=seed, fold=fold
             )
         except Exception as e:
             # If AutoFE fails (e.g., all cols zero variance), fallback to raw
@@ -202,6 +271,7 @@ def evaluate_unit(
                         "infer_time_s": infer_time,
                         "autofe_gen_time_s": autofe_meta.get("generation_time_s", 0) if pipeline_name == "AutoFE" else 0,
                         "autofe_sel_time_s": autofe_meta.get("selection_time_s", 0) if pipeline_name == "AutoFE" else 0,
+                        "autofe_cache_hit": autofe_meta.get("dfs_cache_hit", False) if pipeline_name == "AutoFE" else False,
                         **metrics,
                         **shap_results
                     })
