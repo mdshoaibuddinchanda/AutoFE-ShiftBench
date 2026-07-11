@@ -5,24 +5,31 @@ __pycache__/
 # Notebook artifacts
 .ipynb_checkpoints/
 
-# VS Code local settings
+# VS Code / IDE settings
 .vscode/
+
+# Virtual environments
+.venv/
+venv/
 
 # Local/editor/system files
 .DS_Store
 Thumbs.db
 
-# Partial run checkpoints
-reports/tables/final_results.partial.csv
-
-# Local progress notes (not for repo)
-progress.md
-
 # Generated benchmark artifacts (reproducible via scripts)
 data/raw/
 data/processed/
 data/shifted/
+data/cache/
+
+# Reports (reproducible via benchmark run)
 reports/tables/
 reports/figures/
-experiments/
 reports/terminal.log
+reports/worker_logs/
+reports/cache.db
+
+# Old artifacts
+progress.md
+test_out.txt
+scratch/

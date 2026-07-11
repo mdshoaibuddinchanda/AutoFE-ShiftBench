@@ -137,12 +137,26 @@ def run_wilcoxon_analysis(
             "mean_diff": mean_autofe - mean_raw,
             "cliffs_delta": effect_size,
             "p_value": p_value_float,
-            "significant": bool(p_value_float < alpha) if not np.isnan(p_value_float) else False,
             "winner": winner
         })
         
     stats_df = pd.DataFrame(dataset_rows)
     stats_df = stats_df.sort_values("dataset")
+    
+    # Apply Benjamini-Hochberg Multiple Comparison Correction
+    try:
+        from statsmodels.stats.multitest import multipletests
+        valid_mask = stats_df["p_value"].notna()
+        stats_df["corrected_p_value"] = np.nan
+        stats_df["significant"] = False
+        if valid_mask.any():
+            _, corrected_p, _, _ = multipletests(stats_df.loc[valid_mask, "p_value"], alpha=alpha, method="fdr_bh")
+            stats_df.loc[valid_mask, "corrected_p_value"] = corrected_p
+            stats_df.loc[valid_mask, "significant"] = corrected_p < alpha
+    except ImportError:
+        warnings.warn("statsmodels not found. Falling back to uncorrected p-values.")
+        stats_df["corrected_p_value"] = stats_df["p_value"]
+        stats_df["significant"] = stats_df["p_value"] < alpha
     
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

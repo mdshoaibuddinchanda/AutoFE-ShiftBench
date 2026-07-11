@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-import json
+import warnings
 from pathlib import Path
+
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -13,17 +16,17 @@ import yaml
 DEFAULT_TARGET_COLUMN = "target"
 DEFAULT_MAX_ROWS = 100_000
 
-# Candidate names to tolerate naming variants in OpenML.
-OPENML_NAME_CANDIDATES: dict[str, list[str]] = {
+# Candidate names or IDs to tolerate naming variants in OpenML.
+OPENML_NAME_CANDIDATES: dict[str, list[str | int]] = {
     "adult": ["adult", "adult-income"],
     "bank-marketing": ["bank-marketing", "bank_marketing", "Bank_Marketing"],
-    "aps_failure": ["aps_failure", "aps-failure", "aps_failure_training_set"],
+    "aps_failure": [41138, "aps_failure", "aps-failure"],
     "electricity": ["electricity"],
     "covertype": ["covertype", "Covertype"],
-    "dry-bean-dataset": ["dry-bean-dataset", "Dry_Bean_Dataset"],
-    "crop-recommendation": ["crop-recommendation", "Crop_Recommendation", "crop_recommendation"],
+    "dry-bean-dataset": [42585, "dry-bean-dataset", "Dry_Bean_Dataset"],
+    "crop-recommendation": [43491, "crop-recommendation", "Crop_Recommendation"],
     "breast-cancer-wisconsin": ["breast-cancer-wisconsin", "breast_cancer", "wdbc"],
-    "heart-disease": ["heart-disease", "heart_disease", "heart-statlog", "heart"],
+    "heart-disease": [43398, "heart-disease", "heart-statlog", 53],
     "diabetes": ["diabetes"],
     "haberman": ["haberman", "haberman-survival", "Haberman"],
     "ionosphere": ["ionosphere"],
@@ -34,8 +37,14 @@ OPENML_NAME_CANDIDATES: dict[str, list[str]] = {
     "magic-telescope": ["magic-telescope", "MagicTelescope", "magic"],
     "spambase": ["spambase"],
     "wine-quality-red": ["wine-quality-red", "wine_quality", "wine-quality"],
-    "rice-cammeo-and-osmancik": ["rice-cammeo-and-osmancik", "Rice_Cammeo_Osmancik"],
+    "rice-cammeo-and-osmancik": [43586, "rice-cammeo-and-osmancik", "Rice_Cammeo_Osmancik"],
+    "titanic": [40945, "titanic", "Titanic"],
+    "airlines": [1169, "airlines", "Airlines"],
+    "kddcup99": [1113, "kddcup99", "KDDCup99"],
+    "kr-vs-kp": [3, "kr-vs-kp", "kr-vs-kp"],
+    "blood-transfusion-service-center": [1464, "blood-transfusion-service-center", "blood-transfusion-service-center"],
 }
+
 
 
 def load_dataset_names(dataset_list_path: str | Path) -> list[str]:
@@ -73,13 +82,20 @@ def _fetch_openml_with_fallbacks(dataset_name: str):
     for candidate in candidates:
         for version in versions_to_try:
             try:
-                dataset = fetch_openml(
-                    name=candidate,
-                    version=version,
-                    as_frame=True,
-                    parser="auto",
-                )
-                return dataset, candidate
+                if isinstance(candidate, int):
+                    dataset = fetch_openml(
+                        data_id=candidate,
+                        as_frame=True,
+                        parser="auto",
+                    )
+                else:
+                    dataset = fetch_openml(
+                        name=candidate,
+                        version=version,
+                        as_frame=True,
+                        parser="auto",
+                    )
+                return dataset, str(candidate)
             except Exception as exc:
                 last_error = exc
 
@@ -124,15 +140,90 @@ def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str
 
     # Average correlation (numeric features only)
     if len(num_cols) > 1:
+        print(f"Computing correlation matrix for {len(num_cols)} numerical features...")
         corr_matrix = features[num_cols].corr().abs().to_numpy()
         np.fill_diagonal(corr_matrix, np.nan)
-        avg_corr = np.nanmean(corr_matrix)
-        meta["average_correlation"] = float(avg_corr) if not np.isnan(avg_corr) else 0.0
+        meta["average_correlation"] = float(np.nanmean(corr_matrix))
+        print("Correlation matrix done.")
     else:
         meta["average_correlation"] = 0.0
         
-    # We leave entropy, redundancy and MI for a more advanced script if needed, 
-    # but basic ones are fast to compute here.
+    # Skewness and Kurtosis
+    if len(num_cols) > 0:
+        import scipy.stats
+        num_data = features[num_cols].dropna()
+        if len(num_data) > 0:
+            skew_vals = scipy.stats.skew(num_data, axis=0, nan_policy='omit')
+            kurt_vals = scipy.stats.kurtosis(num_data, axis=0, nan_policy='omit')
+            meta["average_skewness"] = float(np.nanmean(skew_vals))
+            meta["average_kurtosis"] = float(np.nanmean(kurt_vals))
+        else:
+            meta["average_skewness"] = 0.0
+            meta["average_kurtosis"] = 0.0
+    else:
+        meta["average_skewness"] = 0.0
+        meta["average_kurtosis"] = 0.0
+
+    # Sparsity (percentage of exactly 0 values)
+    meta["sparsity"] = float((features == 0).sum().sum() / total_cells * 100.0) if total_cells > 0 else 0.0
+
+    # Entropy (Shannon entropy)
+    import scipy.stats
+    entropies = []
+    for col in features.columns:
+        counts = features[col].value_counts(normalize=True)
+        if len(counts) > 0:
+            entropies.append(scipy.stats.entropy(counts))
+    meta["average_entropy"] = float(np.mean(entropies)) if entropies else 0.0
+
+    # Feature Redundancy (Percentage of highly correlated feature pairs |corr| > 0.8)
+    if len(num_cols) > 1 and "corr_matrix" in locals():
+        high_corr_pairs = np.sum(corr_matrix > 0.8) / 2.0  # symmetric
+        total_pairs = (len(num_cols) * (len(num_cols) - 1)) / 2.0
+        meta["feature_redundancy"] = float(high_corr_pairs / total_pairs)
+    else:
+        meta["feature_redundancy"] = 0.0
+
+    # Average Mutual Information (AMI) with Target
+    try:
+        from sklearn.feature_selection import mutual_info_classif
+        from sklearn.preprocessing import LabelEncoder
+        # Sample to speed up
+        sample_size = min(n_samples, 2000)
+        sample_idx = np.random.choice(n_samples, sample_size, replace=False)
+        f_sample = features.iloc[sample_idx]
+        t_sample = target.iloc[sample_idx]
+        
+        # Prepare numeric/encoded for AMI
+        f_numeric = pd.DataFrame()
+        for col in f_sample.columns:
+            if pd.api.types.is_numeric_dtype(f_sample[col]):
+                f_numeric[col] = f_sample[col].fillna(f_sample[col].median())
+            else:
+                f_numeric[col] = LabelEncoder().fit_transform(f_sample[col].astype(str))
+                
+        t_encoded = LabelEncoder().fit_transform(t_sample.astype(str))
+        ami_scores = mutual_info_classif(f_numeric, t_encoded, random_state=42)
+        meta["average_mutual_information"] = float(np.mean(ami_scores))
+    except Exception as e:
+        print(f"Skipping AMI: {e}")
+        meta["average_mutual_information"] = 0.0
+
+    # Intrinsic Dimension (PCA 95% variance)
+    try:
+        if len(num_cols) > 1:
+            from sklearn.decomposition import PCA
+            from sklearn.preprocessing import StandardScaler
+            num_data = features[num_cols].fillna(features[num_cols].median())
+            scaled_data = StandardScaler().fit_transform(num_data)
+            pca = PCA(n_components=0.95, random_state=42)
+            pca.fit(scaled_data)
+            meta["intrinsic_dimension"] = float(pca.n_components_)
+        else:
+            meta["intrinsic_dimension"] = 1.0
+    except Exception as e:
+        print(f"Skipping Intrinsic Dimension: {e}")
+        meta["intrinsic_dimension"] = 1.0
     
     return meta
 
@@ -144,10 +235,26 @@ def download_openml_dataset(
     random_state: int = 42,
 ) -> Path:
     """Download one dataset from OpenML, downsample if needed, save as CSV and JSON metadata."""
+    print(f"Fetching {dataset_name}...")
     dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name)
+    print(f"Fetched {dataset_name}. Processing X/y...")
 
     x = dataset.data
     y = dataset.target
+
+    if y is None and dataset.frame is not None:
+        fallback_targets = {
+            "heart-disease": "target",
+        }
+        target_name = fallback_targets.get(dataset_name)
+        if target_name and target_name in dataset.frame.columns:
+            y = dataset.frame[target_name]
+            x = dataset.frame.drop(columns=[target_name])
+        else:
+            target_name = dataset.frame.columns[-1]
+            y = dataset.frame[target_name]
+            x = dataset.frame.drop(columns=[target_name])
+
     if x is None or y is None:
         raise ValueError(f"Dataset '{dataset_name}' does not provide X/y data")
 
@@ -175,7 +282,9 @@ def download_openml_dataset(
     # Compute and save meta-features
     features_sampled = combined.drop(columns=[target_column])
     target_sampled = combined[target_column]
+    print(f"Computing meta features for {dataset_name}...")
     meta_features = compute_meta_features(features_sampled, target_sampled)
+    print(f"Meta features done for {dataset_name}.")
     
     meta_path = Path(output_dir) / f"{dataset_name}_meta.json"
     meta_path.write_text(json.dumps(meta_features, indent=2))

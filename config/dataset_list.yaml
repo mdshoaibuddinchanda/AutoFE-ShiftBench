@@ -1,21 +1,37 @@
+# AutoFE-ShiftBench: 25 OpenML benchmark datasets
+# Organized by approximate row count (ascending)
+# All datasets are capped at 100,000 rows during download.
+
 datasets:
+  # Small (< 1K rows)
+  - haberman
+  - sonar
+  - ionosphere
+  - heart-disease
+  - breast-cancer-wisconsin
+  - blood-transfusion-service-center
+  - diabetes
+
+  # Medium (1K - 10K rows)
+  - titanic
+  - credit-g
+  - wine-quality-red
+  - kr-vs-kp
+  - mushroom
+
+  # Medium-Large (10K - 50K rows)
+  - spambase
+  - jm1
+  - PhishingWebsites
+  - default-of-credit-card-clients
+  - magic-telescope
+  - dry-bean-dataset
   - adult
   - bank-marketing
-  - aps_failure
   - electricity
+
+  # Large (50K+ rows, capped at 100K)
+  - aps_failure
   - covertype
-  - dry-bean-dataset
-  - crop-recommendation
-  - breast-cancer-wisconsin
-  - heart-disease
-  - diabetes
-  - haberman
-  - ionosphere
-  - sonar
-  - credit-g
-  - default-of-credit-card-clients
-  - mushroom
-  - magic-telescope
-  - spambase
-  - wine-quality-red
-  - rice-cammeo-and-osmancik
+  - airlines
+  - kddcup99

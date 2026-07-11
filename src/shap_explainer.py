@@ -47,7 +47,7 @@ def compute_shap_values(
                     warnings.simplefilter("ignore")
                     kmeans = KMeans(n_clusters=max_background, random_state=42, n_init="auto")
                     kmeans.fit(x_train)
-                    background = kmeans.cluster_centers_
+                    background = pd.DataFrame(kmeans.cluster_centers_, columns=x_train.columns)
             else:
                 background = x_train.to_numpy()
                 

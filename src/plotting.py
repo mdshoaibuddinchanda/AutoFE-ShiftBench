@@ -82,7 +82,7 @@ def plot_performance_degradation(
     if not gaussian_df.empty:
         # Extract severity
         gaussian_df["severity"] = gaussian_df["condition"].apply(
-            lambda x: 0.0 if x == "clean" else float(x.split("_")[1])
+            lambda x: 0.0 if x == "clean" else float(x.split("_")[-1])
         )
         
         plt.figure(figsize=(8, 5))
@@ -108,7 +108,7 @@ def plot_performance_degradation(
     missing_df = df[df["condition"].str.startswith("missing_") | (df["condition"] == "clean")].copy()
     if not missing_df.empty:
         missing_df["severity"] = missing_df["condition"].apply(
-            lambda x: 0.0 if x == "clean" else float(x.split("_")[1])
+            lambda x: 0.0 if x == "clean" else float(x.split("_")[-1])
         )
         plt.figure(figsize=(8, 5))
         sns.lineplot(

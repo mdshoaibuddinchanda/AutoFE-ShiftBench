@@ -96,3 +96,47 @@ def compute_classification_metrics(
         metrics["pr_auc"] = np.nan
 
     return metrics
+
+from scipy.stats import wasserstein_distance, ks_2samp
+
+def compute_distribution_distance(x_clean: pd.DataFrame, x_shifted: pd.DataFrame, max_samples: int = 5000) -> dict[str, float]:
+    """Compute average Wasserstein and KS distance between clean and shifted test sets."""
+    if x_clean.empty or x_shifted.empty:
+        return {'wasserstein': np.nan, 'ks_stat': np.nan}
+
+    # Sample rows to keep compute feasible
+    if len(x_clean) > max_samples:
+        x_clean = x_clean.sample(n=max_samples, random_state=42)
+        x_shifted = x_shifted.sample(n=max_samples, random_state=42)
+
+    # Ensure we only compare common numeric columns
+    cols = [c for c in x_clean.columns if c in x_shifted.columns and pd.api.types.is_numeric_dtype(x_clean[c])]
+    if not cols:
+        return {'wasserstein': np.nan, 'ks_stat': np.nan}
+
+    w_dists = []
+    ks_dists = []
+    for c in cols:
+        # Drop NaNs for stability
+        c_clean = x_clean[c].dropna().values
+        c_shifted = x_shifted[c].dropna().values
+        if len(c_clean) > 0 and len(c_shifted) > 0:
+            try:
+                w_dists.append(wasserstein_distance(c_clean, c_shifted))
+                ks_dists.append(ks_2samp(c_clean, c_shifted).statistic)
+            except Exception:
+                pass
+
+    return {
+        'wasserstein': float(np.mean(w_dists)) if w_dists else np.nan,
+        'ks_stat': float(np.mean(ks_dists)) if ks_dists else np.nan,
+    }
+
+def compute_jaccard_similarity(list_a: list[str], list_b: list[str]) -> float:
+    """Compute Jaccard similarity between two lists of feature names."""
+    set_a = set(list_a)
+    set_b = set(list_b)
+    if not set_a and not set_b:
+        return 1.0
+    return float(len(set_a.intersection(set_b)) / len(set_a.union(set_b)))
+
