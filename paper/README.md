@@ -7,6 +7,7 @@ Files:
 - `manuscript.tex` — editable Elsevier `elsarticle` source.
 - `references.bib` — bibliography for the methods and software cited in the manuscript.
 - `highlights.txt` — five short submission highlights.
+- `cover_letter.txt` — submission-ready cover letter naming Md. Shoaib Uddin Chanda as corresponding author.
 - `figures/` — self-contained PDF copies of the workflow plus regenerated Figures 2–10. The manuscript uses only these PDF assets and does not depend on paths outside `paper/`.
 
 The source code and manuscript package are maintained at <https://github.com/mdshoaibuddinchanda/AutoFE-ShiftBench>. The local environment used for this audit does not contain `pdflatex`, `xelatex`, `lualatex`, `latexmk`, or `tectonic`, so the source has not been compiled here. Compile from this directory with an Elsevier-compatible LaTeX installation, for example:
