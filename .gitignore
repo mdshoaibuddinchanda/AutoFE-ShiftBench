@@ -1,0 +1,57 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+.env
+
+# Notebook, editor, and operating-system files
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Downloaded, processed, cached, or shifted data
+data/
+models/
+checkpoints/
+*.pkl
+*.pickle
+
+# Benchmark outputs and logs. These remain available locally but are not
+# source-controlled or pushed to GitHub.
+results/
+reports/
+*.jsonl
+*.log
+*.db
+
+# Reproducible scratch and legacy artifacts
+scratch/
+progress.md
+test_out.txt
+
+# LaTeX auxiliary files; the manuscript source and publication PDFs remain
+# trackable under paper/.
+paper/*.aux
+paper/*.bbl
+paper/*.bcf
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.run.xml
+paper/*.toc
+paper/manuscript.pdf
+
+# Raster previews are generated from the publication PDFs and are not needed
+# in the paper package. The PDF figures in paper/figures/ are intentional
+# submission assets and remain trackable.
+paper/figures/*.png
+paper/figures/*.jpg
+paper/figures/*.jpeg

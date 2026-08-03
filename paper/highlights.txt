@@ -1,0 +1,5 @@
+Feature-Synthesis Variance Amplification explains AutoFE degradation.
+Operator-restricted AutoFE nearly matches capped raw baselines.
+Generated products and ratios amplify training-data perturbations.
+Data-set-balanced evidence separates signal from task-row abundance.
+Robust AutoML should optimize quality, stability, and computational cost.
