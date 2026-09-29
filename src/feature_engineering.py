@@ -74,10 +74,13 @@ def _limit_features(
     elif cfg.selection_method == "mi":
         if y_train is None:
             raise ValueError("y_train is required for MI selection.")
-        # Ensure y_train matches cleaned length
+        if not isinstance(y_train, pd.Series):
+            raise TypeError("MI selection requires y_train as a pandas Series so row alignment can be verified")
         if len(y_train) != len(cleaned):
-            y_train = y_train[:len(cleaned)]
-        mi_scores = mutual_info_classif(cleaned, y_train, random_state=cfg.random_seed)
+            raise ValueError(f"MI alignment error (length mismatch): {len(y_train)} labels for {len(cleaned)} feature rows")
+        if not cleaned.index.equals(y_train.index):
+            raise ValueError("MI alignment error: y_train index/order does not match the training feature rows")
+        mi_scores = mutual_info_classif(cleaned, y_train.to_numpy(), random_state=cfg.random_seed)
         mi_series = pd.Series(mi_scores, index=cleaned.columns)
         ranked = mi_series.sort_values(ascending=False).index.tolist()
         

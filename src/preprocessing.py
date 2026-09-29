@@ -208,21 +208,18 @@ def load_processed_dataset(file_path: str | Path) -> dict[str, Any]:
 
 
 def basic_preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    """Compatibility helper for quick in-memory preprocessing."""
-    processed = df.copy().drop_duplicates()
+    """Reject full-frame preprocessing that would learn from held-out rows.
 
-    numeric_cols = processed.select_dtypes(include=["number"]).columns
-    categorical_cols = processed.select_dtypes(exclude=["number"]).columns
-
-    for col in numeric_cols:
-        processed[col] = processed[col].fillna(processed[col].mean())
-
-    for col in categorical_cols:
-        mode_value = processed[col].mode(dropna=True)
-        fill_value = mode_value.iloc[0] if not mode_value.empty else "missing"
-        processed[col] = processed[col].fillna(fill_value)
-
-    return processed
+    This legacy API has no split or training-reference argument. Its former
+    implementation fitted imputations and removed duplicates on the complete
+    frame, so callers could leak evaluation-distribution information. Use
+    :func:`preprocess_dataset`, which splits before fitting, instead.
+    """
+    del df  # Keep the old signature so the error is actionable for callers.
+    raise RuntimeError(
+        "basic_preprocess was disabled because it learned imputation values from "
+        "the complete frame; use preprocess_dataset() for a train/test-safe split"
+    )
 
 
 def _parse_args() -> argparse.Namespace:

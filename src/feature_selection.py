@@ -100,6 +100,10 @@ def _compute_mi_scores(
     random_state: int,
 ) -> pd.Series:
     """Compute feature importance scores from mutual information."""
+    if len(x_train) != len(y_train):
+        raise ValueError(f"MI alignment error: {len(y_train)} labels for {len(x_train)} feature rows")
+    if not x_train.index.equals(y_train.index):
+        raise ValueError("MI alignment error: y_train index/order does not match x_train")
     x_encoded = _encode_feature_frame(x_train)
     if task == "classification":
         score_values = mutual_info_classif(
@@ -127,6 +131,10 @@ def select_top_features(
     cfg = config or FeatureSelectionConfig()
     if cfg.max_features <= 0:
         raise ValueError("max_features must be > 0")
+    if len(x_train) != len(y_train):
+        raise ValueError(f"Training alignment error: {len(y_train)} labels for {len(x_train)} rows")
+    if not x_train.index.equals(y_train.index):
+        raise ValueError("Training alignment error: y_train index/order does not match x_train")
 
     task = cfg.task or _infer_task(y_train)
     l1_scores = _compute_l1_scores(

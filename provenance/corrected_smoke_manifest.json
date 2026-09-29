@@ -1,0 +1,164 @@
+{
+  "artifact_type": "synthetic regression smoke example; not benchmark evidence",
+  "run_id": "smoke-b",
+  "run_status": "complete",
+  "run_counts": {
+    "failed": 0,
+    "success": 4
+  },
+  "expected_tasks": 4,
+  "protocol_version": "autofe-shiftbench-protocol-2",
+  "code_commit": "f265ee118c6e0c07cf3f17e332e8aface6ab7f34",
+  "code_fingerprint": "81b893258b50ad2985f3501583c1070f8c1cc26380a4e86a2caec6f6319264b4",
+  "configuration_fingerprint": "1d6b7bf3749ee2d825be4b538a88c051d9dda369080b86df523dd2e9706cc98c",
+  "runtime_fingerprint": "1cf94205caee8fa742d9d71a0bb23e02d0dee2bb243426817e9ab035ab8fd13a",
+  "runtime": {
+    "catboost": "1.2.5",
+    "featuretools": "1.31.0",
+    "lightgbm": "4.3.0",
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.14",
+    "scikit-learn": "1.5.2",
+    "scipy": "1.13.1",
+    "woodwork": "0.31.0",
+    "xgboost": "2.0.3"
+  },
+  "configuration": {
+    "conditions": [
+      [
+        "clean",
+        0.0
+      ],
+      [
+        "gaussian_noise",
+        0.01
+      ]
+    ],
+    "datasets": [
+      "synthetic"
+    ],
+    "folds": [
+      1
+    ],
+    "models": [
+      "logistic_regression"
+    ],
+    "n_splits": 3,
+    "pipeline_configs": {
+      "AutoFE_Baseline": {
+        "depth": 1,
+        "enable_dfs": true,
+        "max_base_features": 20,
+        "max_features": 100,
+        "monitor_ram": true,
+        "random_seed": 42,
+        "selection_method": "variance",
+        "trans_primitives": [
+          "add_numeric",
+          "subtract_numeric",
+          "multiply_numeric",
+          "divide_numeric"
+        ]
+      },
+      "Raw": {
+        "depth": 1,
+        "enable_dfs": false,
+        "max_base_features": null,
+        "max_features": null,
+        "monitor_ram": true,
+        "random_seed": 42,
+        "selection_method": "none",
+        "trans_primitives": [
+          "add_numeric",
+          "subtract_numeric",
+          "multiply_numeric",
+          "divide_numeric"
+        ]
+      }
+    },
+    "pipelines": [
+      "Raw",
+      "AutoFE_Baseline"
+    ],
+    "protocol": "autofe-shiftbench-protocol-2",
+    "seeds": [
+      42
+    ]
+  },
+  "dataset": {
+    "name": "synthetic",
+    "identity": {
+      "id": "synthetic-v1",
+      "provider": "synthetic",
+      "saved_csv_sha256": "46aaebe75f5905be97363f5dfe91eb3dffe29a18cce67e5a9284a2791344dd6e"
+    },
+    "source_csv_sha256": "46aaebe75f5905be97363f5dfe91eb3dffe29a18cce67e5a9284a2791344dd6e",
+    "source_metadata_sha256": "2b1e2457c50cc78d7bee1b915b73092cbfd5d7068e0aede745a8beb8e3eca314",
+    "dataset_checksum": "9a904f70128229e7d343f5fed128f24147b7167f3a240bff687772959169ff8a",
+    "target_column": "numeric_target",
+    "target_proxy_review": {
+      "exact_target_copies_for_manual_review": [
+        "target_copy"
+      ],
+      "target_column": [
+        "numeric_target"
+      ],
+      "target_like_names_for_manual_review": [
+        "target_copy"
+      ]
+    }
+  },
+  "task": {
+    "task_key": "d3ad3b0cf26d670e93a8fd97776bafd7c854c5d55231f60710221b8659696c4d",
+    "task_fingerprint": "a17dadf634f00092db57534d59108d978613cef14a82bf4d1140b516a915ee65",
+    "cache_fingerprint": "3be7b261eb4e188c6f93d0f56cd868b04f607d8762a8187c8f03307dc78f4d83",
+    "condition": "clean",
+    "pipeline": "AutoFE_Baseline",
+    "model": "logistic_regression",
+    "seed": 42,
+    "fold": 1,
+    "stable_perturbation_seed": 1266883750,
+    "dataset_checksum": "9a904f70128229e7d343f5fed128f24147b7167f3a240bff687772959169ff8a",
+    "runtime_fingerprint": "1cf94205caee8fa742d9d71a0bb23e02d0dee2bb243426817e9ab035ab8fd13a",
+    "train_indices_sha256": "4ce66562ca0345e2dcf0d7376fbca31a2eeb1893414f7813cada6dd942960c11",
+    "test_indices_sha256": "8ad9f8516d5907a9534982a66acb143d284298135846f946384dadaac740250a",
+    "status": "success",
+    "phase_status": {
+      "phase1": "success",
+      "phase2": "success"
+    },
+    "train_matrix_sha256": "7df1151cceb35f073c43774bba2c0edc177251078332aaba4e027156aa335a06",
+    "test_matrix_sha256": "a528f14d75948710749aee05ffd284ca39cf4b298c3162d93a62307bcd7174c3",
+    "prediction_sha256": "dd0d8db3f0e2b47c6af632a42335b7ffe9d60d4b8771309898ad50a9e9754e74"
+  },
+  "feature_cache_manifest": {
+    "cache_fingerprint": "3be7b261eb4e188c6f93d0f56cd868b04f607d8762a8187c8f03307dc78f4d83",
+    "code_fingerprint": "81b893258b50ad2985f3501583c1070f8c1cc26380a4e86a2caec6f6319264b4",
+    "condition": "clean",
+    "configuration_fingerprint": "1d6b7bf3749ee2d825be4b538a88c051d9dda369080b86df523dd2e9706cc98c",
+    "dataset_checksum": "9a904f70128229e7d343f5fed128f24147b7167f3a240bff687772959169ff8a",
+    "dataset_identity": {
+      "id": "synthetic-v1",
+      "provider": "synthetic",
+      "saved_csv_sha256": "46aaebe75f5905be97363f5dfe91eb3dffe29a18cce67e5a9284a2791344dd6e"
+    },
+    "pipeline": "AutoFE_Baseline",
+    "protocol_version": "autofe-shiftbench-protocol-2",
+    "runtime_fingerprint": "1cf94205caee8fa742d9d71a0bb23e02d0dee2bb243426817e9ab035ab8fd13a",
+    "source_csv_sha256": "46aaebe75f5905be97363f5dfe91eb3dffe29a18cce67e5a9284a2791344dd6e",
+    "stable_perturbation_seed": 1266883750,
+    "test_indices_sha256": "8ad9f8516d5907a9534982a66acb143d284298135846f946384dadaac740250a",
+    "train_indices_sha256": "4ce66562ca0345e2dcf0d7376fbca31a2eeb1893414f7813cada6dd942960c11"
+  },
+  "fresh_run_reproducibility": {
+    "second_run_id": "smoke-a",
+    "prediction_sha256_matches": true,
+    "train_matrix_sha256_matches": true,
+    "test_matrix_sha256_matches": true,
+    "prediction_sha256": "dd0d8db3f0e2b47c6af632a42335b7ffe9d60d4b8771309898ad50a9e9754e74",
+    "train_matrix_sha256": "7df1151cceb35f073c43774bba2c0edc177251078332aaba4e027156aa335a06",
+    "test_matrix_sha256": "a528f14d75948710749aee05ffd284ca39cf4b298c3162d93a62307bcd7174c3"
+  }
+}

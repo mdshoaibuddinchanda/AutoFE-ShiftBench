@@ -83,15 +83,15 @@ def _apply_label_noise(
             
     return shifted_y
 
-def _apply_class_prior_shift(
+def _apply_majority_label_relabeling(
     y: pd.Series,
     rng: np.random.Generator,
 ) -> pd.Series:
     """
-    Class Prior Shift.
-    Resample the labels to artificially change the class distribution.
-    For simplicity, we randomly drop 50% of the majority class.
-    Since we only perturb training data, this creates a mismatch with the test data prior.
+    Relabel half of the majority class as another class.
+
+    This changes observed labels and is not class-prior resampling. It is kept
+    only as a separately named label-relabeling experiment.
     """
     shifted_y = y.copy()
     counts = shifted_y.value_counts()
@@ -101,10 +101,7 @@ def _apply_class_prior_shift(
     majority_class = counts.idxmax()
     majority_indices = shifted_y[shifted_y == majority_class].index
     
-    # Drop half of the majority class by setting them to NaN (or we can just leave as is since we need equal length array?)
-    # Wait, apply_perturbation returns x and y of the same length.
-    # To truly do class prior shift without dropping rows (which messes up x alignment), we can flip some majority class instances to minority class.
-    # This simulates a different prior without changing dataset size.
+    # Preserve row alignment while making the intervention explicitly a label change.
     minority_classes = [c for c in counts.index if c != majority_class]
     
     n_to_flip = int(len(majority_indices) * 0.5)
@@ -167,8 +164,8 @@ def _apply_feature_removal(
     rng: np.random.Generator,
 ) -> pd.DataFrame:
     """
-    Feature Removal Shift.
-    Drops the top `fraction` of features (simulated by dropping highest variance features).
+    Feature-availability ablation. The reduced training schema also determines
+    which columns the fitted preprocessor uses for test transformation.
     """
     shifted = x.copy()
     n_drop = max(1, int(len(shifted.columns) * fraction))
@@ -193,12 +190,12 @@ def apply_perturbation(
     random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Apply one of the 8 distinct shift families.
+    Apply a verified training corruption or a separately named ablation.
     """
     rng = np.random.default_rng(random_state)
     
-    if shift_family in ["clean", "covariate_shift", "population_shift"]:
-        # covariate and population are split-level shifts, so no in-place perturbation needed here
+    if shift_family in ["clean", "covariate_partition", "population_partition"]:
+        # Domain partitions are constructed separately from training corruptions.
         return x.copy(), y.copy()
         
     elif shift_family == "gaussian_noise":
@@ -219,11 +216,11 @@ def apply_perturbation(
         y_shifted = _apply_label_noise(y, severity, rng)
         return x.copy(), y_shifted
 
-    elif shift_family == "class_prior_shift":
-        y_shifted = _apply_class_prior_shift(y, rng)
+    elif shift_family == "majority_label_relabeling":
+        y_shifted = _apply_majority_label_relabeling(y, rng)
         return x.copy(), y_shifted
         
-    elif shift_family == "feature_removal":
+    elif shift_family == "feature_availability_ablation":
         if severity is None:
             severity = 0.20
         x_shifted = _apply_feature_removal(x, severity, rng)

@@ -31,7 +31,7 @@ def compute_classification_metrics(
     Supports both Binary and Multiclass tasks automatically.
     """
     if classes is not None:
-        unique_classes = classes
+        unique_classes = np.asarray(classes)
     else:
         unique_classes = np.unique(y_true)
         
@@ -51,7 +51,9 @@ def compute_classification_metrics(
     metrics["recall"] = float(recall_score(y_true, y_pred, average=avg_type, zero_division=0))
     metrics["f1"] = float(f1_score(y_true, y_pred, average=avg_type, zero_division=0))
     
-    # Probabilistic metrics
+    # Map labels to probability-column positions. The runner passes integer
+    # encoded y with the LabelEncoder's original string classes; accept either
+    # representation without mixing them in log-loss/Brier calculations.
     if len(unique_classes) < 2 or y_proba is None or y_proba.size == 0:
         metrics["roc_auc"] = np.nan
         metrics["pr_auc"] = np.nan
@@ -59,23 +61,30 @@ def compute_classification_metrics(
         metrics["brier_score"] = np.nan
         return metrics
 
+    y_values = np.asarray(y_true)
+    class_lookup = {value: index for index, value in enumerate(unique_classes.tolist())}
+    try:
+        y_indices = np.asarray([class_lookup[value] for value in y_values], dtype=int)
+    except (KeyError, TypeError):
+        if np.issubdtype(y_values.dtype, np.integer) and np.all((y_values >= 0) & (y_values < len(unique_classes))):
+            y_indices = y_values.astype(int)
+        else:
+            raise ValueError("y_true labels do not match the supplied probability class order")
+    probability_labels = np.arange(len(unique_classes), dtype=int)
+
     # Log Loss
     try:
-        metrics["log_loss"] = float(log_loss(y_true, y_proba, labels=unique_classes))
+        metrics["log_loss"] = float(log_loss(y_indices, y_proba, labels=probability_labels))
     except Exception:
         metrics["log_loss"] = np.nan
         
     # Brier Score (only standard for binary, but we can compute average Brier for multiclass)
     try:
+        one_hot = np.eye(len(unique_classes), dtype=float)[y_indices]
         if is_binary:
-            metrics["brier_score"] = float(brier_score_loss(y_true, y_proba[:, 1]))
+            metrics["brier_score"] = float(brier_score_loss(y_indices, y_proba[:, 1]))
         else:
-            # Multiclass Brier Score approximation (Brier Score per class, averaged)
-            brier_scores = []
-            for i, cls in enumerate(unique_classes):
-                y_true_binary = (y_true == cls).astype(int)
-                brier_scores.append(brier_score_loss(y_true_binary, y_proba[:, i]))
-            metrics["brier_score"] = float(np.mean(brier_scores))
+            metrics["brier_score"] = float(np.mean(np.sum((y_proba - one_hot) ** 2, axis=1)))
     except Exception:
         metrics["brier_score"] = np.nan
         
@@ -84,15 +93,17 @@ def compute_classification_metrics(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             if is_binary:
-                metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba[:, 1]))
-                metrics["pr_auc"] = float(average_precision_score(y_true, y_proba[:, 1]))
+                metrics["roc_auc"] = float(roc_auc_score(y_indices, y_proba[:, 1]))
+                metrics["pr_auc"] = float(average_precision_score(y_indices, y_proba[:, 1]))
             else:
-                metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba, multi_class="ovr", average="macro"))
+                metrics["roc_auc"] = float(roc_auc_score(
+                    y_indices, y_proba, labels=probability_labels, multi_class="ovr", average="macro",
+                ))
                 # PR-AUC multiclass is not natively "macro" in sklearn average_precision_score for labels.
                 # Compute OVR PR-AUC manually
                 pr_scores = []
-                for i, cls in enumerate(unique_classes):
-                    y_true_binary = (y_true == cls).astype(int)
+                for i in probability_labels:
+                    y_true_binary = (y_indices == i).astype(int)
                     if y_true_binary.sum() > 0:
                         pr_scores.append(average_precision_score(y_true_binary, y_proba[:, i]))
                 metrics["pr_auc"] = float(np.mean(pr_scores)) if pr_scores else np.nan
@@ -144,4 +155,3 @@ def compute_jaccard_similarity(list_a: list[str], list_b: list[str]) -> float:
     if not set_a and not set_b:
         return 1.0
     return float(len(set_a.intersection(set_b)) / len(set_a.union(set_b)))
-

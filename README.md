@@ -1,234 +1,58 @@
 # AutoFE-ShiftBench
 
-AutoFE-ShiftBench is a reproducible, large-scale benchmark for evaluating the trade-off between predictive performance and robustness under realistic feature corruption. It compares standard, raw-feature models against Automated Feature Engineering (AutoFE) enhanced pipelines across 25 diverse datasets and 10 models.
+AutoFE-ShiftBench compares raw-feature classifiers with automated feature engineering on 25 tabular classification datasets: 24 from OpenML and Dry Bean from the UCI Machine Learning Repository. The repository contains a historical run and a separate corrected-run implementation. The historical scores and paper assets have not been recomputed by the corrected code.
 
-## Why This Project?
+## Corrected evaluation protocol
 
-Most AutoML and Feature Engineering evaluations optimize only for clean-test accuracy. This project adds a strict **robustness lens** by injecting synthetic perturbations (Gaussian noise, missing values, label noise) into the data. Crucially, the benchmark implements a **Nested Cross-Validation** approach where AutoFE is strictly fit *inside* the fold, ensuring zero data leakage.
+The primary study uses repeated stratified five-fold outer partitions. This is not nested cross-validation: model and pipeline comparisons use the same evaluation folds, so selecting a winner from those results can be optimistic. Labels may be used to stratify ordinary outer folds. They are not passed to preprocessing, feature selection, or model fitting except as training labels.
 
----
+Imputation, scaling, one-hot vocabulary, feature ranking, DFS feature definitions, and model fitting are learned from training rows. The fitted transformations are applied to held-out features. Held-out labels are only encoded with the training label vocabulary and used for evaluation. Synthetic tests cover these boundaries; they do not establish that every source feature is free from a target proxy.
 
-## Experimental Protocol & Configurations
+The primary conditions are clean training data; Gaussian noise at 0.01, 0.05, and 0.10; missing values at 0.05, 0.10, and 0.20; and label noise at 0.05, 0.10, and 0.20. The test partition remains unchanged, so these conditions measure performance under training-data corruption, not deployment-time distribution shift.
 
-| Configuration | Details |
-| :--- | :--- |
-| **Datasets** | 25 OpenML tabular datasets (capped at 100,000 rows max) |
-| **Task** | Classification (Binary & Multiclass) |
-| **Validation Strategy** | Stratified 5-Fold Cross-Validation |
-| **Replications** | 5 Random Seeds |
-| **Models (10)** | Logistic Regression, Random Forest, Extra Trees, XGBoost, LightGBM, CatBoost, SVM, KNN, Gaussian Naive Bayes, MLP Neural Network |
-| **Perturbations** | 8 Distinct Shift Families (Clean, Gaussian Noise, Missing Values, Label Noise, Covariate Shift, Feature Removal, Population Shift, Class Prior Shift) |
-| **Metrics** | ROC-AUC, PR-AUC, F1 (Macro), MCC, Balanced Accuracy, Accuracy, Log Loss, Brier Score, Precision, Recall |
-| **Effect Sizes** | Cliff's Delta, Wilcoxon Signed-Rank, Friedman, Nemenyi |
+PCA covariate partitions and K-means population partitions are target-free but use the full feature matrix, including held-out rows, to define their geometry. They are separate transductive domain-partition experiments and are excluded from primary comparisons. Majority-class relabeling is a label-relabeling experiment, not class-prior resampling. Dropping training features is a feature-availability ablation.
 
----
+The primary analysis compares Raw with four named AutoFE variants. It pairs results within dataset/task and uses datasets as the independent unit for Wilcoxon contrasts with Holm correction. Folds, seeds, models, and conditions are not treated as independent datasets.
 
-## Hardware Requirements
+## Existing environment and run commands
 
-| Component | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **CPU** | 8 cores | 16+ cores (Intel Ultra / Ryzen 9) |
-| **RAM** | 16 GB | 32 GB |
-| **GPU** | None (CPU-only mode) | NVIDIA RTX 5060+ (8 GB VRAM) |
-| **Disk** | 50 GB free | 100 GB free |
+Activate the existing Conda environment; these instructions do not create an environment:
 
-The benchmark automatically detects hardware and scales parallelization:
-- **CPU tasks** use `cpu_count - 1` workers (leaves 1 core for OS/IO)
-- **GPU tasks** (XGBoost + CatBoost) run on a single GPU worker
+~~~
+conda activate p12
+python -m src.pipeline_runner --run-id corrected-smoke --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 2 --pipelines Raw AutoFE_Baseline --models logistic_regression
+~~~
 
----
+The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
 
-## Datasets
+For a full corrected grid, download the configured datasets and provide every pipeline and classifier explicitly:
 
-| # | Dataset | Domain / Topic |
-| :--- | :--- | :--- |
-| 1 | **Haberman** | Medical |
-| 2 | **Sonar** | Physics / Sonar |
-| 3 | **Ionosphere** | Physics / Radar |
-| 4 | **Heart Disease** | Medical |
-| 5 | **Breast Cancer Wisconsin** | Medical |
-| 6 | **Blood Transfusion** | Medical |
-| 7 | **Diabetes** | Medical |
-| 8 | **Titanic** | Survival |
-| 9 | **Statlog German Credit** | Finance |
-| 10 | **Wine Quality (Red)** | Chemistry |
-| 11 | **KR-VS-KP** | Game / Chess |
-| 12 | **Mushroom** | Biology |
-| 13 | **Spambase** | NLP / Email |
-| 14 | **JM1** | Software Defect |
-| 15 | **Phishing Websites** | Cyber Security |
-| 16 | **Credit Default** | Finance |
-| 17 | **Magic Telescope** | Astronomy |
-| 18 | **Dry Bean** | Agriculture |
-| 19 | **Adult** | Income Prediction |
-| 20 | **Bank Marketing** | Marketing |
-| 21 | **Electricity** | Energy |
-| 22 | **APS Failure** | Industrial / Sensor |
-| 23 | **Covertype** | Forest Cover |
-| 24 | **Airlines** | Logistics |
-| 25 | **KDDCup99** | Cyber Security |
-
----
-
-## The 8 Shift Families
-
-| Shift Family             | Real-world motivation                              | Severity Levels |
-| ------------------------ | -------------------------------------------------- | --------------- |
-| **1. Clean**             | Baseline, no perturbation                          | N/A |
-| **2. Gaussian Noise**    | Sensor measurement noise                           | 0.01, 0.05, 0.10 |
-| **3. Missing Values**    | Data collection failures / dropped packets         | 5%, 10%, 20% |
-| **4. Label Noise**       | Annotation errors / misclicks                      | 5%, 10%, 20% |
-| **5. Covariate Shift**   | Population distribution changes (PCA-based split)  | N/A |
-| **6. Feature Removal**   | Broken sensors, suddenly unavailable variables     | 20% |
-| **7. Population Shift**  | Deployment to a different user/customer population | N/A |
-| **8. Class Prior Shift** | Different prevalence of classes in deployment      | N/A |
-
----
-
-## Quick Start & Reproduction
-
-### Option A: One-Command Setup (Windows)
-
-```batch
-setup_and_run.bat
-```
-
-This will install dependencies, download all 25 datasets, and start the benchmark.
-
-### Option B: Step-by-Step
-
-#### 1) Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-#### 2) Download & Prepare Datasets
-
-```bash
+~~~
+conda activate p12
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-```
+python -m src.pipeline_runner --run-id corrected-full-001 --pipelines Raw Raw_Variance Raw_MI AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
+~~~
 
-#### 3) Run the Benchmark
+Failed dataset downloads stop the run with an error. Missing configured CSVs also stop the run before any tasks start; a partial run is not reported as complete.
 
-```bash
-python -m src.pipeline_runner
-```
+## Provenance and historical results
 
-The benchmark automatically detects your CPU cores and GPU, then parallelizes accordingly.
+- provenance/original_run.json records the historical local ledger hashes and counts.
+- provenance/corrected_smoke_manifest.json is an inspectable synthetic smoke-task example, not a benchmark estimate.
+- Each corrected run has a unique ID, source CSV checksum, dataset identity/version when available, target and proxy review, split hashes, stable perturbation seed, code/configuration fingerprints, per-phase status, and cache fingerprint.
+- The old reports/tables/results_stream.jsonl, its backup, and the original paper figures are historical evidence. Corrected runs write to corrected_runs/ and do not overwrite them.
+- The manuscript methods, captions, and numerical claims remain unchanged until a full corrected run and its analyses are available. The original ledger is present locally; it must not be presented as a corrected result.
+- Legacy readers under `src/analysis/`, `src/plotting.py`, and `notebooks/visualization.ipynb` target historical paths or schemas. They are not corrected primary-analysis tools. `src/check_progress.py` reads a specific corrected run directory and never reads the historical cache.
 
-#### 4) Smoke Test (Quick Validation)
+Check a corrected run's progress with its run directory:
 
-```bash
-python -m src.pipeline_runner --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 1
-```
+~~~
+python -m src.check_progress --run-dir corrected_runs/corrected-full-001
+~~~
 
----
+Generate tables or statistics only from an explicit corrected-run ledger:
 
-## Tracking Progress
-
-Phase 1 (cache generation) is the longest phase and can take **1-3 days** depending on hardware. Caches are saved with **human-readable names** so you can track progress at any time.
-
-### Cache Layout
-
-```
-data/cache/
-├── adult/
-│   ├── Raw_s42_f1_clean_train.pkl
-│   ├── Raw_s42_f1_clean_test.pkl
-│   ├── Raw_s42_f1_clean_meta.json
-│   ├── AutoFE_MI_s42_f1_gaussian_noise_0.05_train.pkl
-│   ├── ...
-│   └── splits_s42_covariate_shift.pkl
-├── diabetes/
-│   ├── ...
-└── ...
-```
-
-Each dataset produces **2,450 cache sets** (7 pipelines × 5 seeds × 5 folds × 14 conditions).
-
-### Check Progress
-
-Run the built-in progress tracker:
-
-```bash
-python -m src.check_progress
-```
-
-This shows a per-dataset progress bar:
-
-```
-======================================================================
-  AutoFE-ShiftBench — Progress Report
-======================================================================
-  Expected caches per dataset: 2,450
-  Total datasets: 25
-  Total expected: 61,250
-----------------------------------------------------------------------
-  Dataset                             Cached   Expected   Progress
-----------------------------------------------------------------------
-  haberman                              2450 / 2450     ████████████████████ ✓ DONE
-  sonar                                 1200 / 2450     █████████░░░░░░░░░░░  49.0%
-  adult                                    0 / 2450     ░░░░░░░░░░░░░░░░░░░░   0.0%
-  ...
-----------------------------------------------------------------------
-  TOTAL                                 3650 / 61250                         6.0%
-======================================================================
-```
-
-You can also manually check by counting files:
-
-```bash
-# Count completed caches for a specific dataset (Windows)
-dir /b data\cache\adult\*_train.pkl | find /c /v ""
-
-# Count completed caches for a specific dataset (Linux/Mac)
-ls data/cache/adult/*_train.pkl | wc -l
-```
-
----
-
-## Project Structure
-
-```text
-AutoFE-ShiftBench/
-├── config/
-│   └── dataset_list.yaml          # Defines the 25 benchmark datasets
-├── data/                          # (Git-ignored) Generated artifacts
-│   ├── raw/                       # Downloaded CSV datasets + JSON meta-features
-│   └── cache/                     # Human-readable pipeline caches (per dataset)
-├── reports/                       # (Git-ignored) Outputs
-│   ├── figures/                   # Generated publication plots (PDF, PNG)
-│   ├── tables/
-│   │   └── results_stream.jsonl   # Streaming results (1 row per model fit)
-│   ├── worker_logs/               # Error logs for debugging
-│   └── terminal.log               # Running log
-├── src/
-│   ├── check_progress.py          # Progress tracking utility
-│   ├── checkpoint.py              # SQLite checkpoint DB for resume support
-│   ├── data_loader.py             # Downloads OpenML datasets + meta-features
-│   ├── evaluation.py              # 10 classification metrics + distribution distances
-│   ├── feature_engineering.py     # Featuretools DFS wrapper + ablations
-│   ├── feature_selection.py       # Variance / MI / Random feature filtering
-│   ├── model.py                   # 10 model factory (CPU + GPU)
-│   ├── pipeline_runner.py         # Main orchestrator (parallelized)
-│   ├── plotting.py                # Seaborn visual suite
-│   ├── preprocessing.py           # Standard scaling + encoding
-│   ├── shap_explainer.py          # SHAP feature importance
-│   ├── shift_generator.py         # 8 perturbation families
-│   ├── splitters.py               # Stratified / Covariate / Population splits
-│   └── stats_analysis.py          # Cliff's Delta, Wilcoxon, Friedman, Nemenyi
-├── notebooks/
-│   └── visualization.ipynb        # Interactive exploration notebook
-├── main.py                        # Single entry point: download + run
-├── setup_and_run.bat              # Windows one-command setup
-├── requirements.txt               # Python dependencies
-├── LICENSE
-└── README.md
-```
-
----
-
-## License
-
-See `LICENSE` file for details.
+~~~
+python -m src.generate_tables --results corrected_runs/corrected-full-001/results.jsonl
+python -c "from src.stats_analysis import run_wilcoxon_analysis; run_wilcoxon_analysis('corrected_runs/corrected-full-001/results.jsonl')"
+~~~

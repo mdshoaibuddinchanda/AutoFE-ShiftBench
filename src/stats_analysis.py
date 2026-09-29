@@ -1,168 +1,138 @@
-"""Statistical summaries, non-parametric tests, and effect sizes."""
+"""Paired, dataset-level analysis for the prespecified primary contrasts."""
 
 from __future__ import annotations
 
-import warnings
+import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon, friedmanchisquare
+from scipy.stats import wilcoxon
 
 
-def cliffs_delta(x: np.ndarray, y: np.ndarray) -> float:
-    """Compute Cliff's Delta effect size for two non-parametric samples."""
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-    
-    if len(x) == 0 or len(y) == 0:
-        return np.nan
-        
-    m, n = len(x), len(y)
-    
-    # Efficient broadcasting for pairwise comparisons
-    x_matrix = np.tile(x, (n, 1)).T
-    y_matrix = np.tile(y, (m, 1))
-    
-    diff = np.sign(x_matrix - y_matrix)
-    return float(diff.mean())
+PRESPECIFIED_PIPELINES = (
+    "AutoFE_Baseline", "AutoFE_MI", "AutoFE_Random", "AutoFE_NoMultiply",
+)
+PRIMARY_CONDITIONS = {
+    "clean",
+    "gaussian_noise_0.01", "gaussian_noise_0.05", "gaussian_noise_0.10",
+    "missing_values_0.05", "missing_values_0.10", "missing_values_0.20",
+    "label_noise_0.05", "label_noise_0.10", "label_noise_0.20",
+}
+CONDITION_ALIASES = {
+    "gaussian_noise_0.1": "gaussian_noise_0.10",
+    "missing_values_0.1": "missing_values_0.10",
+    "missing_values_0.2": "missing_values_0.20",
+    "label_noise_0.1": "label_noise_0.10",
+    "label_noise_0.2": "label_noise_0.20",
+}
 
 
-def run_friedman_nemenyi(data: pd.DataFrame, value_col: str, group_col: str, block_col: str):
-    """
-    Run Friedman test and Nemenyi post-hoc on a DataFrame.
-    Returns the p-value of the Friedman test and the Nemenyi p-value matrix.
-    """
-    try:
-        import scikit_posthocs as sp
-    except ImportError:
-        warnings.warn("scikit-posthocs not installed. Nemenyi test skipped.")
-        return np.nan, pd.DataFrame()
-        
-    # Pivot to get blocks as rows, groups as columns
-    pivot = data.pivot(index=block_col, columns=group_col, values=value_col).dropna()
-    
-    if pivot.empty or pivot.shape[1] < 3:
-        return np.nan, pd.DataFrame()
-        
-    # Friedman
-    stat, p_val = friedmanchisquare(*[pivot[c] for c in pivot.columns])
-    
-    # Nemenyi
-    # scikit-posthocs requires a melted format or block format depending on the function
-    # posthoc_nemenyi_friedman takes a matrix
-    nemenyi_res = sp.posthoc_nemenyi_friedman(pivot.values)
-    nemenyi_res.columns = pivot.columns
-    nemenyi_res.index = pivot.columns
-    
-    return float(p_val), nemenyi_res
+def _holm_adjust(pvalues: list[float]) -> list[float]:
+    """Holm step-down family-wise adjusted p-values, retaining NaN positions."""
+    adjusted = [float("nan")] * len(pvalues)
+    valid = [(index, value) for index, value in enumerate(pvalues) if np.isfinite(value)]
+    ordered = sorted(valid, key=lambda item: item[1])
+    running_max = 0.0
+    count = len(ordered)
+    for rank, (index, value) in enumerate(ordered):
+        running_max = max(running_max, min(1.0, (count - rank) * value))
+        adjusted[index] = running_max
+    return adjusted
+
+
+def _read_results(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Results file not found: {path}")
+    if path.suffix.casefold() == ".jsonl":
+        with path.open("r", encoding="utf-8") as stream:
+            records = [json.loads(line) for line in stream if line.strip()]
+        frame = pd.DataFrame(records)
+    else:
+        frame = pd.read_csv(path)
+    required = {"dataset", "seed", "fold", "condition", "pipeline", "model", "roc_auc"}
+    missing = required.difference(frame.columns)
+    if missing:
+        raise KeyError(f"Missing required results columns: {sorted(missing)}")
+    if "status" in frame:
+        frame = frame[frame["status"] == "success"].copy()
+    frame["condition"] = frame["condition"].replace(CONDITION_ALIASES)
+    frame = frame[frame["condition"].isin(PRIMARY_CONDITIONS)].copy()
+    frame["roc_auc"] = pd.to_numeric(frame["roc_auc"], errors="coerce")
+    frame = frame.dropna(subset=["roc_auc"])
+    if frame.empty:
+        raise ValueError("No successful primary-condition ROC-AUC rows are available")
+    return frame
 
 
 def run_wilcoxon_analysis(
-    final_results_path: str | Path = "reports/tables/results_stream.jsonl",
-    output_path: str | Path = "reports/tables/statistical_results.csv",
+    final_results_path: str | Path | None = None,
+    output_path: str | Path | None = None,
     alpha: float = 0.05,
 ) -> pd.DataFrame:
-    """Run per-dataset Wilcoxon tests on paired cross-validation outcomes with Effect Sizes."""
-    
+    """Compare Raw with four fixed AutoFE variants using datasets as n.
+
+    Scores are first paired on dataset/seed/fold/condition/model, then averaged
+    within dataset and pipeline. Each dataset contributes one paired value to
+    each Wilcoxon test; Holm correction covers the four prespecified contrasts.
+    """
+    if final_results_path is None:
+        raise ValueError("Pass a corrected-run results path explicitly; historical estimates are not corrected results")
     input_path = Path(final_results_path)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Results file not found: {input_path}")
-        
-    if input_path.suffix == ".jsonl":
-        # Aggregate the stream first
-        records = []
-        with open(input_path, "r") as f:
-            import json
-            for line in f:
-                if line.strip():
-                    records.append(json.loads(line))
-        results = pd.DataFrame(records)
-    else:
-        results = pd.read_csv(input_path)
-        
-    # We want to compare Pipeline A (Raw) vs B (AutoFE)
-    # The experimental unit is a single Fold outcome for a specific Condition and Seed and Model
-    # So we pair them on [dataset, seed, fold, condition, model]
-    
-    required_cols = {"dataset", "seed", "fold", "condition", "pipeline", "model", "roc_auc"}
-    missing_cols = required_cols.difference(results.columns)
-    if missing_cols:
-        raise KeyError(f"Missing columns: {missing_cols}")
-        
-    results = results.dropna(subset=["roc_auc"]).copy()
-    if results.empty:
-        raise ValueError("No valid rows for stats.")
-        
-    # Pair by all variables except pipeline
+    results = _read_results(input_path)
+    pipelines_present = set(results["pipeline"].astype(str))
+    missing_pipelines = {"Raw", *PRESPECIFIED_PIPELINES}.difference(pipelines_present)
+    if missing_pipelines:
+        raise ValueError(f"Primary comparison is missing pipelines: {sorted(missing_pipelines)}")
+
+    pairing = ["dataset", "seed", "fold", "condition", "model", "pipeline"]
+    # Collapse retried duplicate successes deterministically before pairing.
+    results = results.groupby(pairing, as_index=False, dropna=False)["roc_auc"].mean()
     pair_cols = ["dataset", "seed", "fold", "condition", "model"]
-    
-    pivoted = results.pivot(index=pair_cols, columns="pipeline", values="roc_auc").reset_index()
-    if "Raw" not in pivoted.columns or "AutoFE" not in pivoted.columns:
-        raise ValueError("Both 'Raw' and 'AutoFE' pipelines must exist to run paired tests.")
-        
-    pivoted = pivoted.dropna(subset=["Raw", "AutoFE"])
-    
-    dataset_rows = []
-    
-    for dataset, group in pivoted.groupby("dataset"):
-        scores_raw = group["Raw"].to_numpy(dtype=float)
-        scores_autofe = group["AutoFE"].to_numpy(dtype=float)
-        
-        if len(scores_raw) >= 2 and not np.allclose(scores_raw, scores_autofe):
-            _stat, p_value = wilcoxon(scores_autofe, scores_raw, alternative="two-sided")
-            p_value_float = float(p_value)
+    wide = results.pivot(index=pair_cols, columns="pipeline", values="roc_auc").reset_index()
+
+    rows: list[dict[str, object]] = []
+    pvalues: list[float] = []
+    for pipeline in PRESPECIFIED_PIPELINES:
+        paired = wide[[*pair_cols, "Raw", pipeline]].dropna(subset=["Raw", pipeline]).copy()
+        dataset_scores = paired.groupby("dataset")[["Raw", pipeline]].mean()
+        differences = (dataset_scores[pipeline] - dataset_scores["Raw"]).to_numpy(dtype=float)
+        if len(differences) >= 2 and not np.allclose(differences, 0.0):
+            p_value = float(wilcoxon(differences, alternative="two-sided").pvalue)
+        elif len(differences) >= 2:
+            p_value = 1.0
         else:
-            p_value_float = float("nan")
-            
-        effect_size = cliffs_delta(scores_autofe, scores_raw)
-        
-        mean_raw = float(np.mean(scores_raw))
-        mean_autofe = float(np.mean(scores_autofe))
-        
-        if np.isnan(mean_raw) or np.isnan(mean_autofe):
-            winner = "undetermined"
-        elif mean_autofe > mean_raw:
-            winner = "AutoFE"
-        elif mean_raw > mean_autofe:
-            winner = "Raw"
-        else:
-            winner = "tie"
-            
-        dataset_rows.append({
-            "dataset": dataset,
-            "n_pairs": len(scores_raw),
-            "raw_mean_auc": mean_raw,
-            "autofe_mean_auc": mean_autofe,
-            "mean_diff": mean_autofe - mean_raw,
-            "cliffs_delta": effect_size,
-            "p_value": p_value_float,
-            "winner": winner
+            p_value = float("nan")
+        pvalues.append(p_value)
+        rows.append({
+            "comparison": f"Raw vs {pipeline}",
+            "autofe_pipeline": pipeline,
+            "n_datasets": int(len(differences)),
+            "mean_dataset_auc_difference": float(np.mean(differences)) if len(differences) else np.nan,
+            "median_dataset_auc_difference": float(np.median(differences)) if len(differences) else np.nan,
+            "dataset_wins": int(np.sum(differences > 0)),
+            "dataset_ties": int(np.sum(np.isclose(differences, 0.0))),
+            "dataset_losses": int(np.sum(differences < 0)),
+            "p_value": p_value,
+            "conditions_used": ",".join(sorted(set(results["condition"].astype(str)))),
+            "independent_unit": "dataset",
         })
-        
-    stats_df = pd.DataFrame(dataset_rows)
-    stats_df = stats_df.sort_values("dataset")
-    
-    # Apply Benjamini-Hochberg Multiple Comparison Correction
-    try:
-        from statsmodels.stats.multitest import multipletests
-        valid_mask = stats_df["p_value"].notna()
-        stats_df["corrected_p_value"] = np.nan
-        stats_df["significant"] = False
-        if valid_mask.any():
-            _, corrected_p, _, _ = multipletests(stats_df.loc[valid_mask, "p_value"], alpha=alpha, method="fdr_bh")
-            stats_df.loc[valid_mask, "corrected_p_value"] = corrected_p
-            stats_df.loc[valid_mask, "significant"] = corrected_p < alpha
-    except ImportError:
-        warnings.warn("statsmodels not found. Falling back to uncorrected p-values.")
-        stats_df["corrected_p_value"] = stats_df["p_value"]
-        stats_df["significant"] = stats_df["p_value"] < alpha
-    
-    out_path = Path(output_path)
+
+    adjusted = _holm_adjust(pvalues)
+    for row, p_adjusted in zip(rows, adjusted):
+        row["holm_adjusted_p_value"] = p_adjusted
+        row["significant"] = bool(np.isfinite(p_adjusted) and p_adjusted < alpha)
+    output = pd.DataFrame(rows)
+    out_path = Path(output_path) if output_path else input_path.with_name("statistical_results_dataset_level.csv")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    stats_df.to_csv(out_path, index=False)
-    
-    return stats_df
+    output.to_csv(out_path, index=False)
+    return output
+
 
 if __name__ == "__main__":
-    run_wilcoxon_analysis()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--results", required=True)
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    run_wilcoxon_analysis(args.results, args.output)

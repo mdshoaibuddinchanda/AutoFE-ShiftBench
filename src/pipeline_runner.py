@@ -1,68 +1,77 @@
-"""Benchmark orchestrator with human-readable caching and full parallelization.
+"""Run isolated, provenance-tracked corrected benchmark experiments.
 
-Cache Layout (human-readable):
-    data/cache/{dataset}/splits_s{seed}_{shift_family}.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_train.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_test.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_meta.json
-
-Progress Tracking:
-    Each dataset gets its own subdirectory under data/cache/.
-    To check progress:  python -m src.check_progress
-    Or simply:          dir /b data\\cache\\<dataset>\\*_train.pkl | find /c /v ""
+The default experiment is the training-only corruption study. Domain partitions,
+feature availability ablations, and majority-label relabeling are deliberately
+excluded from this primary condition grid.
 """
 
+from __future__ import annotations
+
 import argparse
-import gc
 import json
-import logging
-import multiprocessing
 import os
+import platform
 import sys
 import time
 import traceback
-import warnings
+from importlib.metadata import PackageNotFoundError, version as package_version
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
-import psutil
+import sklearn
+from sklearn.preprocessing import LabelEncoder
 
-# ---------------------------------------------------------------------------
-# Environment setup (inherited by child processes on Windows via spawn)
-# ---------------------------------------------------------------------------
-os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(max(1, os.cpu_count() - 1)))
-warnings.filterwarnings("ignore", category=UserWarning, module="woodwork")
-warnings.filterwarnings("ignore", category=UserWarning, module="joblib")
-warnings.filterwarnings("ignore", category=FutureWarning)
-
-from src.checkpoint import init_db, has_run, log_run
-from src.data_loader import load_csv_dataset, load_dataset_names
-from src.evaluation import (
-    compute_classification_metrics,
-    compute_distribution_distance,
-    compute_jaccard_similarity,
-)
-from src.feature_engineering import expand_features_with_dfs, DFSConfig
-from src.feature_selection import FeatureSelectionConfig, select_top_features
+from src.checkpoint import has_success, init_db, record_task
+from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
+from src.evaluation import compute_classification_metrics
+from src.feature_engineering import DFSConfig, expand_features_with_dfs
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
+from src.provenance import (
+    PROTOCOL_VERSION,
+    atomic_write_json,
+    cache_fingerprint,
+    code_fingerprint,
+    current_git_commit,
+    file_sha256,
+    frame_sha256,
+    index_sha256,
+    stable_digest,
+    stable_seed,
+    vector_sha256,
+    verify_cache_manifest,
+)
 from src.shift_generator import apply_perturbation
-from src.shap_explainer import compute_shap_values
+from src.splitters import (
+    assert_fold_integrity,
+    get_covariate_splits,
+    get_population_splits,
+    get_stratified_splits,
+)
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-N_CPU_WORKERS = max(1, os.cpu_count() - 1)
-N_GPU_WORKERS = 1  # XGBoost + CatBoost share VRAM; sequential is correct
-RAM_LIMIT_PERCENT = 85  # Pause spawning if RAM exceeds this %
-MAX_TASKS_PER_CHILD = 50  # Reduce process respawn overhead
 
-PIPELINE_CONFIGS = {
-    "Raw": DFSConfig(enable_dfs=False, selection_method="none"),
-    "Raw_Variance": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100),
-    "Raw_MI": DFSConfig(enable_dfs=False, selection_method="mi", max_features=100),
+PRIMARY_CONDITIONS: tuple[tuple[str, float], ...] = (
+    ("clean", 0.0),
+    ("gaussian_noise", 0.01), ("gaussian_noise", 0.05), ("gaussian_noise", 0.10),
+    ("missing_values", 0.05), ("missing_values", 0.10), ("missing_values", 0.20),
+    ("label_noise", 0.05), ("label_noise", 0.10), ("label_noise", 0.20),
+)
+DOMAIN_PARTITION_CONDITIONS: tuple[tuple[str, float], ...] = (
+    ("covariate_partition", 0.0), ("population_partition", 0.0),
+)
+SEPARATE_EXPERIMENT_CONDITIONS: tuple[tuple[str, float], ...] = (
+    ("feature_availability_ablation", 0.20), ("majority_label_relabeling", 0.0),
+)
+
+PIPELINE_CONFIGS: dict[str, DFSConfig] = {
+    # Raw retains every preprocessed input column. The historical implementation
+    # capped it at 20 base columns, making its 100-feature selectors no-ops.
+    "Raw": DFSConfig(enable_dfs=False, selection_method="none", max_features=None, max_base_features=None),
+    "Raw_Variance": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100, max_base_features=None),
+    "Raw_MI": DFSConfig(enable_dfs=False, selection_method="mi", max_features=100, max_base_features=None),
     "AutoFE_Baseline": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1),
     "AutoFE_MI": DFSConfig(enable_dfs=True, selection_method="mi", max_features=100, depth=1),
     "AutoFE_Random": DFSConfig(enable_dfs=True, selection_method="random", max_features=100, depth=1),
@@ -72,532 +81,646 @@ PIPELINE_CONFIGS = {
     ),
 }
 
-PIPELINE_NAMES = list(PIPELINE_CONFIGS.keys())
 
-CPU_MODELS = [
-    "logistic_regression", "random_forest", "extra_trees",
-    "linear_svm", "knn", "gaussian_nb", "mlp", "lightgbm",
-]
-GPU_MODELS = ["xgboost", "catboost"]
-
-SHIFT_FAMILIES = [
-    ("clean", 0.0),
-    ("gaussian_noise", 0.01), ("gaussian_noise", 0.05), ("gaussian_noise", 0.10),
-    ("missing_values", 0.05), ("missing_values", 0.10), ("missing_values", 0.20),
-    ("label_noise", 0.05), ("label_noise", 0.10), ("label_noise", 0.20),
-    ("covariate_shift", 0.0),
-    ("feature_removal", 0.20),
-    ("population_shift", 0.0),
-    ("class_prior_shift", 0.0),
-]
-
-_writer_queue = None
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-def setup_logger(log_file: str | Path) -> logging.Logger:
-    logger = logging.getLogger("AutoFE_Benchmark")
-    logger.setLevel(logging.INFO)
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    fh = logging.FileHandler(log_file, mode="a")
-    fh.setLevel(logging.INFO)
-    formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
-    ch.setFormatter(formatter)
-    fh.setFormatter(formatter)
-    logger.addHandler(ch)
-    logger.addHandler(fh)
-    return logger
+def _condition_name(family: str, severity: float) -> str:
+    return family if severity == 0.0 else f"{family}_{severity:.2f}"
 
 
-# ---------------------------------------------------------------------------
-# Human-readable cache helpers
-# ---------------------------------------------------------------------------
-
-def _cache_dir_for_dataset(dataset_name: str) -> Path:
-    """Return data/cache/{dataset_name}/, creating it if needed."""
-    d = Path("data/cache") / dataset_name
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _split_cache_path(dataset_name: str, seed: int, shift_family: str) -> Path:
-    """data/cache/{dataset}/splits_s{seed}_{shift_family}.pkl"""
-    return _cache_dir_for_dataset(dataset_name) / f"splits_s{seed}_{shift_family}.pkl"
+def _resolve_target_column(frame: pd.DataFrame, requested: str | None = None) -> str:
+    """Resolve a single target explicitly; refuse a silent last-column fallback."""
+    if requested and requested in frame.columns:
+        return requested
+    if "target_label" in frame.columns:
+        return "target_label"
+    if "target" in frame.columns:
+        return "target"
+    raise KeyError("Target column is not declared in metadata and neither 'target' nor 'target_label' exists")
 
 
-def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
-                          seed: int, fold: int, condition: str):
-    """Return (train_pkl, test_pkl, meta_json) with human-readable names.
+def _task_dataset_checksum(
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    x_test: pd.DataFrame,
+    train_idx: np.ndarray,
+    test_idx: np.ndarray,
+) -> str:
+    """Hash task-visible data without using held-out labels for cache decisions."""
+    return stable_digest({
+        "x_train": frame_sha256(x_train),
+        "y_train": vector_sha256(y_train),
+        "x_test": frame_sha256(x_test),
+        "train_indices": index_sha256(train_idx),
+        "test_indices": index_sha256(test_idx),
+    })
 
-    Example:
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_train.pkl
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_test.pkl
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_meta.json
+
+def _stable_perturbation_seed(
+    dataset_identity: dict[str, Any],
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    repetition_seed: int,
+    fold: int,
+    condition: str,
+) -> int:
+    """Derive corruption randomness from dataset identity and training rows only.
+
+    The saved CSV checksum includes held-out labels and would let an evaluation
+    label change alter the training corruption. The training-only fingerprint
+    distinguishes changed local data while leaving held-out features/labels out.
     """
-    d = _cache_dir_for_dataset(dataset_name)
-    base = f"{pipeline_name}_s{seed}_f{fold}_{condition}"
+    safe_identity = {
+        key: value for key, value in dataset_identity.items()
+        if key not in {"saved_csv_sha256", "csv_sha256", "source_csv_sha256"}
+    }
+    safe_identity["training_rows_sha256"] = stable_digest({
+        "x_train": frame_sha256(x_train),
+        "y_train": vector_sha256(y_train),
+    })
+    return stable_seed(safe_identity, repetition_seed, fold, condition)
+
+
+def _prepare_matrices(
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    x_test: pd.DataFrame,
+    *,
+    family: str,
+    severity: float,
+    perturbation_seed: int,
+    pipeline_name: str,
+    config: DFSConfig,
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, LabelEncoder, dict[str, Any], pd.DataFrame]:
+    """Fit every learned step on training rows and transform held-out X only."""
+    if not x_train.index.equals(y_train.index):
+        raise ValueError("Training X/y row index and order differ before perturbation")
+    x_train_corrupt, y_train_corrupt = apply_perturbation(
+        x_train, y_train, shift_family=family, severity=severity, random_state=perturbation_seed,
+    )
+    if not x_train_corrupt.index.equals(y_train_corrupt.index):
+        raise ValueError("Perturbation changed training X/y row alignment")
+
+    # The label vocabulary is learned from training labels only. Test labels are
+    # transformed solely after the fitted model predicts, for metric calculation.
+    encoder = LabelEncoder().fit(y_train.astype(str))
+    y_train_encoded = encoder.transform(y_train_corrupt.astype(str))
+
+    preprocessor = _build_preprocessor(x_train_corrupt, encoding="onehot", scale_numeric=True)
+    train_arr = _to_dense_array(preprocessor.fit_transform(x_train_corrupt))
+    test_arr = _to_dense_array(preprocessor.transform(x_test))
+    clean_test_arr = _to_dense_array(preprocessor.transform(x_test))
+    columns = preprocessor.get_feature_names_out().tolist()
+    x_train_prepped = pd.DataFrame(train_arr, columns=columns).reset_index(drop=True)
+    x_test_prepped = pd.DataFrame(test_arr, columns=columns).reset_index(drop=True)
+    x_test_clean = pd.DataFrame(clean_test_arr, columns=columns).reset_index(drop=True)
+    y_train_series = pd.Series(y_train_encoded, index=x_train_prepped.index)
+
+    cfg = DFSConfig(**asdict(config))
+    cfg.random_seed = perturbation_seed
+    x_train_fe, x_test_fe, metadata = expand_features_with_dfs(
+        x_train_prepped, x_test_prepped, y_train_series, config=cfg,
+    )
     return (
-        d / f"{base}_train.pkl",
-        d / f"{base}_test.pkl",
-        d / f"{base}_meta.json",
+        x_train_fe.reset_index(drop=True), x_test_fe.reset_index(drop=True),
+        y_train_encoded, encoder, metadata, x_test_clean,
     )
 
 
-# ---------------------------------------------------------------------------
-# Pipeline generation (Phase 1 core)
-# ---------------------------------------------------------------------------
-
-def _run_pipeline_generation(x_train, x_test, y_train,
-                             dataset_name, seed, fold, condition):
-    """Generate all 7 pipeline variants for one experimental unit.
-
-    Returns:
-        res_pipelines: dict[str, (DataFrame, DataFrame)]
-        res_meta: dict[str, dict]
-    """
-    res_pipelines = {}
-    res_meta = {}
-
-    for p_name, cfg in PIPELINE_CONFIGS.items():
-        # Set seed on configs that need it
-        cfg_copy = DFSConfig(
-            enable_dfs=cfg.enable_dfs,
-            depth=cfg.depth,
-            max_features=cfg.max_features,
-            max_base_features=cfg.max_base_features,
-            selection_method=cfg.selection_method,
-            trans_primitives=list(cfg.trans_primitives),
-            monitor_ram=cfg.monitor_ram,
-            random_seed=seed,
-        )
-
-        train_cache, test_cache, meta_cache = _pipeline_cache_paths(
-            dataset_name, p_name, seed, fold, condition
-        )
-
-        if train_cache.exists() and test_cache.exists() and meta_cache.exists():
-            x_train_fe = pd.read_pickle(train_cache)
-            x_test_fe = pd.read_pickle(test_cache)
-            with open(meta_cache) as f:
-                meta = json.load(f)
-            meta["dfs_cache_hit"] = True
-        else:
-            t0 = time.time()
-            x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(
-                x_train, x_test, y_train, config=cfg_copy,
-            )
-            gen_time = time.time() - t0
-
-            meta = {
-                "num_original": x_train.shape[1],
-                "num_generated": dfs_meta.get("n_generated", 0),
-                "num_selected": dfs_meta.get("n_retained", x_train_fe.shape[1]),
-                "generation_time_s": gen_time,
-                "ram_used_mb": dfs_meta.get("ram_used_mb", 0),
-                "feature_metadata": dfs_meta.get("feature_metadata", []),
-                "dfs_cache_hit": False,
-            }
-            x_train_fe.to_pickle(train_cache)
-            x_test_fe.to_pickle(test_cache)
-            with open(meta_cache, "w") as f:
-                json.dump(meta, f)
-
-        res_pipelines[p_name] = (x_train_fe, x_test_fe)
-        res_meta[p_name] = meta
-
-    return res_pipelines, res_meta
-
-
-# ---------------------------------------------------------------------------
-# Data splitting + perturbation
-# ---------------------------------------------------------------------------
-
-def get_data_splits(data_path, dataset_name, seed, fold, condition,
-                    shift_family, severity):
-    """Load data, create splits, apply perturbation, run pipeline generation."""
-    df = load_csv_dataset(data_path)
-    target_col = "target_label" if "target_label" in df.columns else "target"
-    y = df[target_col]
-
-    split_cache = _split_cache_path(dataset_name, seed, shift_family)
-    if split_cache.exists():
-        splits = pd.read_pickle(split_cache)
-    else:
-        from src.splitters import (
-            get_stratified_splits, get_covariate_splits, get_population_splits,
-        )
-        if shift_family == "covariate_shift":
-            splits = get_covariate_splits(df, 5, seed)
-        elif shift_family == "population_shift":
-            splits = get_population_splits(df, 5, seed)
-        else:
-            splits = get_stratified_splits(df, y, 5, seed)
-        split_cache.parent.mkdir(parents=True, exist_ok=True)
-        pd.to_pickle(splits, split_cache)
-
-    train_idx, test_idx = splits[fold - 1]
-
-    x_train = df.iloc[train_idx].drop(columns=[target_col]).copy()
-    y_train = y.iloc[train_idx].copy()
-    x_test = df.iloc[test_idx].drop(columns=[target_col]).copy()
-    y_test = y.iloc[test_idx].copy()
-
-    rng_seed = hash((seed, fold, condition)) % (2**31)
-    x_train_cond, y_train_cond = apply_perturbation(
-        x_train, y_train, shift_family=shift_family,
-        severity=severity, random_state=rng_seed,
+def prepare_task(
+    frame: pd.DataFrame,
+    *,
+    target_column: str,
+    train_indices: np.ndarray,
+    test_indices: np.ndarray,
+    family: str,
+    severity: float,
+    perturbation_seed: int,
+    pipeline_name: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray, LabelEncoder, dict[str, Any], pd.DataFrame]:
+    """Public preparation seam used by poison/alignment regression tests."""
+    if target_column not in frame.columns:
+        raise KeyError(f"Resolved target column {target_column!r} is absent")
+    X = frame.drop(columns=[target_column])
+    if target_column in X.columns:
+        raise AssertionError("Resolved target must be absent at the split/preprocessing boundary")
+    if np.intersect1d(train_indices, test_indices).size:
+        raise AssertionError("Train/test row indices overlap")
+    x_train, y_train = X.iloc[train_indices].copy(), frame[target_column].iloc[train_indices].copy()
+    x_test, y_test = X.iloc[test_indices].copy(), frame[target_column].iloc[test_indices].copy()
+    x_train_fe, x_test_fe, y_train_encoded, encoder, metadata, x_test_clean = _prepare_matrices(
+        x_train, y_train, x_test,
+        family=family, severity=severity, perturbation_seed=perturbation_seed,
+        pipeline_name=pipeline_name, config=PIPELINE_CONFIGS[pipeline_name],
     )
-    x_test_cond, y_test_cond = x_test.copy(), y_test.copy()
-
-    from sklearn.preprocessing import LabelEncoder
-    label_enc = LabelEncoder()
-    y_train_enc = label_enc.fit_transform(y_train_cond.astype(str))
-    y_test_enc = label_enc.transform(y_test_cond.astype(str))
-
-    preprocessor = _build_preprocessor(x_train_cond, encoding="onehot", scale_numeric=True)
-    x_train_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.fit_transform(x_train_cond)),
-        columns=preprocessor.get_feature_names_out(),
-    )
-    x_test_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.transform(x_test_cond)),
-        columns=preprocessor.get_feature_names_out(),
-    )
-
-    # Clean test set for Wasserstein distances
-    x_test_clean_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.transform(x_test)),
-        columns=preprocessor.get_feature_names_out(),
-    )
-
-    res_pipelines, res_meta = _run_pipeline_generation(
-        x_train_prep, x_test_prep, y_train_enc,
-        dataset_name, seed, fold, condition,
-    )
-
-    return res_pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean_prep
-
-
-# ---------------------------------------------------------------------------
-# Worker functions
-# ---------------------------------------------------------------------------
-
-def precompute_unit(kwargs):
-    """Phase 1 worker: generate splits + all 7 pipeline caches for one unit."""
     try:
-        kwargs_copy = kwargs.copy()
-        kwargs_copy.pop("size", None)
-        get_data_splits(**kwargs_copy)
-        gc.collect()
-        return kwargs_copy["dataset_name"]
-    except Exception:
-        with open("reports/worker_logs/phase1_error.log", "a") as f:
-            f.write(f"Precompute error on {kwargs}: {traceback.format_exc()}\n")
-        return None
+        y_test_encoded = encoder.transform(y_test.astype(str))
+    except ValueError as exc:
+        raise ValueError("Held-out labels contain a class absent from training labels") from exc
+    return x_train_fe, x_test_fe, y_train_encoded, y_test_encoded, encoder, metadata, x_test_clean
 
 
-def train_unit(kwargs):
-    """Phase 2 worker: train one (pipeline, model) combo and write results."""
-    try:
-        dataset_name = kwargs["dataset_name"]
-        seed = kwargs["seed"]
-        fold = kwargs["fold"]
-        condition = kwargs["condition"]
-        pipeline_name = kwargs["pipeline"]
-        model_type = kwargs["model"]
-
-        if has_run(dataset_name, seed, fold, condition, pipeline_name, model_type):
-            return
-
-        pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean = (
-            get_data_splits(
-                kwargs["data_path"], dataset_name, seed, fold, condition,
-                kwargs["shift_family"], kwargs["severity"],
-            )
-        )
-
-        X_tr, X_te = pipelines[pipeline_name]
-        # Replace infs with large finite values so models don't crash
-        X_tr = np.nan_to_num(X_tr.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
-        X_te = np.nan_to_num(X_te.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
-        meta = res_meta[pipeline_name]
-
-        use_gpu = model_type in GPU_MODELS
-        t0 = time.time()
-        model = build_model(model_type, random_state=seed, use_gpu=use_gpu)
-        model.fit(X_tr, y_train_enc)
-        train_time = time.time() - t0
-
-        t1 = time.time()
-        y_pred = model.predict(X_te)
-        if hasattr(model, "predict_proba"):
-            y_proba = model.predict_proba(X_te)
-        else:
-            y_proba = np.zeros((len(y_test_enc), len(label_enc.classes_)))
-        infer_time = time.time() - t1
-
-        y_pred_train = model.predict(X_tr)
-        if hasattr(model, "predict_proba"):
-            y_proba_train = model.predict_proba(X_tr)
-        else:
-            y_proba_train = np.zeros((len(y_train_enc), len(label_enc.classes_)))
-
-        metrics_test = compute_classification_metrics(y_test_enc, y_pred, y_proba, label_enc.classes_)
-        metrics_train = compute_classification_metrics(y_train_enc, y_pred_train, y_proba_train, label_enc.classes_)
-
-        dist_metrics = compute_distribution_distance(x_test_clean, pipelines[pipeline_name][1])
-        if condition == "clean":
-            dist_metrics["wasserstein"] = 0.0
-            dist_metrics["ks_stat"] = 0.0
-
-        res = {
-            "dataset": dataset_name,
-            "seed": seed,
-            "fold": fold,
-            "condition": condition,
-            "pipeline": pipeline_name,
-            "model": model_type,
-            "status": "success",
-            "n_train": len(X_tr),
-            "n_test": len(X_te),
-            "n_original": x_test_clean.shape[1],
-            "train_time_s": train_time,
-            "infer_time_s": infer_time,
-            "autofe_gen_time_s": meta.get("generation_time_s", 0),
-            "autofe_cache_hit": meta.get("dfs_cache_hit", False),
-            "n_generated": meta.get("num_generated", 0),
-            "n_retained": meta.get("num_selected", 0),
-            "ram_used_mb": meta.get("ram_used_mb", 0),
-            "wasserstein": dist_metrics["wasserstein"],
-            "ks_stat": dist_metrics["ks_stat"],
-            "train_auc": metrics_train.get("roc_auc", np.nan),
-            "test_auc": metrics_test.get("roc_auc", np.nan),
-            **metrics_test,
-        }
-
-        _writer_queue.put(res)
-
-        del model, X_tr, X_te, pipelines, x_test_clean
-        gc.collect()
-
-    except Exception:
-        with open("reports/worker_logs/phase2_error.log", "a") as f:
-            f.write(f"Train error {kwargs}: {traceback.format_exc()}\n")
+def _cache_paths(run_dir: Path, feature_task_key: str, pipeline_name: str) -> tuple[Path, Path]:
+    cache_dir = run_dir / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{feature_task_key}_{pipeline_name}"
+    return cache_dir / f"{stem}.pkl", cache_dir / f"{stem}.manifest.json"
 
 
-# ---------------------------------------------------------------------------
-# Writer process (sequential disk I/O)
-# ---------------------------------------------------------------------------
-
-def writer_process(queue, results_path):
-    """Dedicated process that writes results to JSONL and logs to checkpoint DB."""
-    init_db()
-    with open(results_path, "a") as f:
-        while True:
-            res = queue.get()
-            if res == "DONE":
-                break
-            f.write(json.dumps(res) + "\n")
-            f.flush()
-            log_run(
-                res["dataset"], res["seed"], res["fold"],
-                res["condition"], res["pipeline"], res["model"],
-            )
-
-
-def init_worker(q):
-    """Pool initializer: share the writer queue with child processes."""
-    global _writer_queue
-    _writer_queue = q
-
-
-# ---------------------------------------------------------------------------
-# Hardware detection
-# ---------------------------------------------------------------------------
-
-def detect_hardware():
-    """Print a summary of the available hardware."""
-    cpu_count = os.cpu_count() or 1
-    ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-
-    print("=" * 60)
-    print("  AutoFE-ShiftBench — Hardware Detection")
-    print("=" * 60)
-    print(f"  CPU cores:       {cpu_count}")
-    print(f"  Workers (CPU):   {N_CPU_WORKERS}")
-    print(f"  Workers (GPU):   {N_GPU_WORKERS}")
-    print(f"  RAM:             {ram_gb:.1f} GB")
-
-    # GPU detection
-    try:
-        import torch
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
-            print(f"  GPU:             {gpu_name} ({gpu_mem:.1f} GB VRAM)")
-        else:
-            print("  GPU:             Not detected (CUDA unavailable)")
-    except Exception:
-        # Try xgboost device detection instead
+def _load_or_create_feature_cache(
+    run_dir: Path,
+    feature_task_key: str,
+    pipeline_name: str,
+    expected_manifest: dict[str, Any],
+    make_payload: Callable[[], tuple[Any, ...]],
+) -> tuple[Any, ...]:
+    cache_path, manifest_path = _cache_paths(run_dir, feature_task_key, pipeline_name)
+    expected = dict(expected_manifest, pipeline=pipeline_name)
+    expected["cache_fingerprint"] = cache_fingerprint(expected)
+    rejected_reason = None
+    if cache_path.exists() and manifest_path.exists():
         try:
-            from xgboost import XGBClassifier
-            m = XGBClassifier(device="cuda", n_estimators=1, verbosity=0)
-            print("  GPU:             Available (XGBoost CUDA)")
-        except Exception:
-            print("  GPU:             Not detected")
+            observed = json.loads(manifest_path.read_text(encoding="utf-8"))
+            verify_cache_manifest(expected, observed)
+            return pd.read_pickle(cache_path)
+        except Exception as exc:
+            # A stale, malformed, or unreadable cache is never accepted. It is
+            # removed and regenerated from the current task inputs.
+            rejected_reason = f"{type(exc).__name__}: {str(exc)}"[:500]
+            cache_path.unlink(missing_ok=True)
+            manifest_path.unlink(missing_ok=True)
+    payload = make_payload()
+    temp_path = cache_path.with_suffix(f".{os.getpid()}.tmp")
+    pd.to_pickle(payload, temp_path)
+    os.replace(temp_path, cache_path)
+    if rejected_reason:
+        expected["cache_regenerated_after_rejection"] = rejected_reason
+    atomic_write_json(manifest_path, expected)
+    return payload
 
-    print("=" * 60)
+
+def _safe_result_write(path: Path, row: dict[str, Any]) -> None:
+    def json_safe(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(key): json_safe(child) for key, child in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [json_safe(child) for child in value]
+        if isinstance(value, np.generic):
+            value = value.item()
+        if isinstance(value, float) and not np.isfinite(value):
+            return None
+        return value
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(json_safe(row), sort_keys=True, allow_nan=False, default=str) + "\n")
+        stream.flush()
 
 
-# ---------------------------------------------------------------------------
-# Main orchestrator
-# ---------------------------------------------------------------------------
+def _record_failure(
+    *, run_dir: Path, db_path: Path, run_id: str, task_key: str,
+    phase: str, dataset: str, seed: int, fold: int, condition: str,
+    pipeline: str, model: str, fingerprint: str, exc: BaseException,
+) -> dict[str, Any]:
+    summary = " ".join(str(exc).split())[:1000]
+    record_task(
+        db_path, run_id=run_id, task_key=task_key, phase=phase, status="failed",
+        dataset=dataset, seed=seed, fold=fold, condition=condition,
+        pipeline=pipeline, model=model, manifest_fingerprint=fingerprint,
+        exception_type=type(exc).__name__, error_summary=summary,
+    )
+    row = {
+        "run_id": run_id, "task_key": task_key, "dataset": dataset, "seed": seed,
+        "fold": fold, "condition": condition, "pipeline": pipeline, "model": model,
+        "phase": phase, "status": "failed", "exception_type": type(exc).__name__,
+        "error_summary": summary,
+    }
+    _safe_result_write(run_dir / "results.jsonl", row)
+    return row
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="AutoFE-ShiftBench runner")
-    parser.add_argument("--max-datasets", type=int, default=None)
-    parser.add_argument("--max-seeds", type=int, default=None)
-    parser.add_argument("--max-folds", type=int, default=None)
-    parser.add_argument("--max-conditions", type=int, default=None)
-    args = parser.parse_args()
 
-    # Ensure directories exist
-    Path("reports/tables").mkdir(parents=True, exist_ok=True)
-    Path("reports/worker_logs").mkdir(parents=True, exist_ok=True)
+def _dataset_identity(dataset_name: str, csv_path: Path, sidecar_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    source_checksum = file_sha256(csv_path)
+    sidecar: dict[str, Any] = {}
+    if sidecar_path.exists():
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    identity = sidecar.get("dataset_identity", {})
+    if not identity:
+        identity = {"provider": "local_csv", "requested_name": dataset_name}
+    identity = dict(identity)
+    identity["saved_csv_sha256"] = source_checksum
+    return identity, sidecar
 
-    init_db()
-    detect_hardware()
-    logger = setup_logger("reports/terminal.log")
-    results_path = Path("reports/tables/results_stream.jsonl")
 
-    # ---- Load experiment grid ----
-    datasets = load_dataset_names("config/dataset_list.yaml")
+def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[str, Any]]) -> None:
+    latest: dict[str, dict[str, Any]] = {}
+    for outcome in outcomes:
+        latest[outcome["task_key"]] = outcome
+    outcomes[:] = list(latest.values())
+    counts: dict[str, int] = {"success": 0, "failed": 0}
+    for outcome in outcomes:
+        counts[outcome["status"]] = counts.get(outcome["status"], 0) + 1
+    configuration = base.get("configuration", {})
+    expected = (
+        len(configuration.get("datasets", []))
+        * len(configuration.get("seeds", []))
+        * len(configuration.get("folds", []))
+        * len(configuration.get("conditions", []))
+        * len(configuration.get("pipelines", []))
+        * len(configuration.get("models", []))
+    )
+    if len(outcomes) < expected:
+        status = "running_with_failures" if counts["failed"] else "running"
+    else:
+        status = "completed_with_failures" if counts["failed"] else "complete"
+    manifest = dict(base, status=status, expected_tasks=expected, counts=counts, tasks=outcomes)
+    atomic_write_json(run_dir / "manifest.json", manifest)
+
+
+def _upsert_outcome(outcomes: list[dict[str, Any]], outcome: dict[str, Any]) -> None:
+    """Keep one current manifest entry per task while retaining attempt rows in JSONL."""
+    outcomes[:] = [row for row in outcomes if row.get("task_key") != outcome["task_key"]]
+    outcomes.append(outcome)
+
+
+def _runtime_versions() -> dict[str, str]:
+    packages = (
+        "numpy", "pandas", "scikit-learn", "scipy", "featuretools", "woodwork",
+        "xgboost", "lightgbm", "catboost",
+    )
+    versions: dict[str, str] = {
+        "python": platform.python_version(), "platform": platform.platform(),
+    }
+    for package in packages:
+        try:
+            versions[package] = package_version(package)
+        except PackageNotFoundError:
+            versions[package] = "not-installed"
+    return versions
+
+
+def run_experiment(
+    data_paths: dict[str, str | Path],
+    *,
+    run_id: str,
+    output_root: str | Path = "corrected_runs",
+    seeds: list[int] | None = None,
+    folds: list[int] | None = None,
+    conditions: tuple[tuple[str, float], ...] = PRIMARY_CONDITIONS,
+    pipelines: tuple[str, ...] = ("Raw", "AutoFE_Baseline"),
+    models: tuple[str, ...] = ("logistic_regression",),
+    n_splits: int = 5,
+    failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
+    """Run a small or full grid with explicit task status and isolated outputs."""
+    seeds = seeds or [42, 123, 456, 789, 2025]
+    folds = folds or list(range(1, n_splits + 1))
+    selected_families = {family for family, _severity in conditions}
+    primary_families = {"clean", "gaussian_noise", "missing_values", "label_noise"}
+    domain_families = {"covariate_partition", "population_partition"}
+    availability_families = {"feature_availability_ablation"}
+    relabel_families = {"majority_label_relabeling"}
+    scope_sets = {
+        "primary_training_corruption": primary_families,
+        "transductive_domain_partition": domain_families,
+        "feature_availability_ablation": availability_families,
+        "majority_label_relabeling": relabel_families,
+    }
+    selected_scopes = [scope for scope, families_in_scope in scope_sets.items()
+                       if selected_families and selected_families.issubset(families_in_scope)]
+    if len(selected_scopes) != 1:
+        raise ValueError(
+            "A run must contain conditions from exactly one scope: primary corruption, "
+            "domain partition, feature-availability ablation, or majority-label relabeling"
+        )
+    experiment_scope = selected_scopes[0]
+    unknown_pipelines = sorted(set(pipelines).difference(PIPELINE_CONFIGS))
+    if unknown_pipelines:
+        raise ValueError(f"Unknown pipelines: {unknown_pipelines}")
+    if not data_paths:
+        raise ValueError("At least one dataset path is required")
+    normalized_data_paths = {name: Path(path) for name, path in data_paths.items()}
+    missing_paths = [str(path) for path in normalized_data_paths.values() if not path.exists()]
+    if missing_paths:
+        raise FileNotFoundError(f"Configured datasets are missing; no run was started: {missing_paths}")
+    source_checksums = {name: file_sha256(path) for name, path in normalized_data_paths.items()}
+    sidecar_paths = {
+        name: path.with_name(f"{path.stem}_meta.json")
+        for name, path in normalized_data_paths.items()
+    }
+    sidecar_checksums = {
+        name: file_sha256(path) if path.exists() else None
+        for name, path in sidecar_paths.items()
+    }
+    run_dir = Path(output_root) / run_id
+    existing_manifest = None
+    manifest_path = run_dir / "manifest.json"
+    if run_dir.exists():
+        if manifest_path.exists():
+            existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if existing.get("run_id") != run_id:
+                raise ValueError("Existing run directory has a different run ID")
+            existing_manifest = existing
+        elif any(run_dir.iterdir()):
+            raise ValueError("Existing run directory has no manifest; choose a new run ID")
+    source_fingerprint = code_fingerprint(Path.cwd())
+    runtime_info = _runtime_versions()
+    runtime_fingerprint = stable_digest(runtime_info)
+    config_data = {
+        "protocol": PROTOCOL_VERSION, "datasets": list(normalized_data_paths),
+        "conditions": [list(x) for x in conditions],
+        "pipelines": list(pipelines), "models": list(models), "seeds": seeds,
+        "folds": folds, "n_splits": n_splits,
+        "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
+    }
+    config_fingerprint = stable_digest(config_data)
+    if existing_manifest and (
+        existing_manifest.get("configuration_fingerprint") != config_fingerprint
+        or existing_manifest.get("code_fingerprint") != source_fingerprint
+        or existing_manifest.get("runtime_fingerprint") != runtime_fingerprint
+    ):
+        raise ValueError("Existing run ID has a different code/configuration/runtime identity; choose a new run ID")
+    if existing_manifest:
+        previous_identities = {
+            row.get("dataset"): (row.get("source_csv_sha256"), row.get("source_metadata_sha256"))
+            for row in existing_manifest.get("datasets", [])
+        }
+        changed = [
+            name for name in source_checksums
+            if name in previous_identities
+            and previous_identities[name] != (source_checksums[name], sidecar_checksums[name])
+        ]
+        if changed:
+            raise ValueError(
+                f"Dataset source or metadata checksum changed for {changed}; use a new run ID to preserve provenance"
+            )
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    db_path = run_dir / "checkpoints.sqlite"
+    init_db(db_path)
+    base_manifest = {
+        "run_id": run_id, "protocol_version": PROTOCOL_VERSION,
+        "created_utc": (existing_manifest or {}).get(
+            "created_utc", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        ),
+        "code_commit": current_git_commit(Path.cwd()),
+        "code_fingerprint": source_fingerprint,
+        "configuration": config_data, "configuration_fingerprint": config_fingerprint,
+        "runtime": runtime_info,
+        "runtime_fingerprint": runtime_fingerprint,
+        "primary_conditions": ["clean", "gaussian_noise_*", "missing_values_*", "label_noise_*"],
+        "experiment_scope": experiment_scope,
+        "partition_uses_held_out_features": False,
+        "datasets": list((existing_manifest or {}).get("datasets", [])),
+    }
+    outcomes: list[dict[str, Any]] = list((existing_manifest or {}).get("tasks", []))
+    if existing_manifest is None:
+        _save_run_manifest(run_dir, base_manifest, outcomes)
+
+    has_transductive_partition = experiment_scope == "transductive_domain_partition"
+    base_manifest["partition_uses_held_out_features"] = has_transductive_partition
+    if experiment_scope != "primary_training_corruption":
+        base_manifest["primary_conditions"] = []
+    if has_transductive_partition:
+        base_manifest["domain_partition_note"] = (
+            "PCA/K-means partition geometry uses the complete feature matrix, including held-out rows; "
+            "these conditions are a separate transductive domain-partition experiment."
+        )
+    for dataset_name, csv_path in normalized_data_paths.items():
+        source_csv_checksum = source_checksums[dataset_name]
+        sidecar_path = sidecar_paths[dataset_name]
+        dataset_identity, sidecar = _dataset_identity(dataset_name, csv_path, sidecar_path)
+        frame = load_csv_dataset(csv_path)
+        target_column = _resolve_target_column(frame, sidecar.get("target_column"))
+        X = frame.drop(columns=[target_column])
+        if target_column in X.columns:
+            raise AssertionError("Target column reached splitter input")
+        y = frame[target_column]
+        proxy_audit = inspect_target_proxy_candidates(
+            X, y, target_column=target_column,
+            source_target_name=sidecar.get("source_target_name"),
+        )
+        dataset_manifest = {
+            "dataset": dataset_name, "path": csv_path.as_posix(),
+            "dataset_identity": dataset_identity, "source_csv_sha256": source_csv_checksum,
+            "source_metadata_sha256": sidecar_checksums[dataset_name],
+            "target_column": target_column, "schema_columns": list(frame.columns),
+            "target_proxy_review": proxy_audit,
+        }
+        base_manifest["datasets"] = [
+            row for row in base_manifest.get("datasets", []) if row.get("dataset") != dataset_name
+        ] + [dataset_manifest]
+        for seed in seeds:
+            ordinary_splits = get_stratified_splits(X, y, n_splits, seed, target_column=target_column)
+            assert_fold_integrity(ordinary_splits, len(frame))
+            domain_splits: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {}
+            for family, severity in conditions:
+                if family == "covariate_partition":
+                    splits = domain_splits.setdefault(
+                        family, get_covariate_splits(X, n_splits, seed, target_column=target_column),
+                    )
+                elif family == "population_partition":
+                    splits = domain_splits.setdefault(
+                        family, get_population_splits(X, n_splits, seed, target_column=target_column),
+                    )
+                else:
+                    splits = ordinary_splits
+                assert_fold_integrity(splits, len(frame))
+                for fold in folds:
+                    if fold < 1 or fold > len(splits):
+                        raise ValueError(f"Fold {fold} outside 1..{len(splits)}")
+                    train_idx, test_idx = (np.asarray(idx, dtype=np.int64) for idx in splits[fold - 1])
+                    x_train, y_train = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
+                    x_test, y_test = X.iloc[test_idx].copy(), y.iloc[test_idx].copy()
+                    task_checksum = _task_dataset_checksum(x_train, y_train, x_test, train_idx, test_idx)
+                    condition = _condition_name(family, severity)
+                    perturb_seed = _stable_perturbation_seed(
+                        dataset_identity, x_train, y_train, seed, fold, condition,
+                    )
+                    feature_key = stable_digest({
+                        "dataset": dataset_name, "seed": seed, "fold": fold,
+                        "condition": condition, "dataset_checksum": task_checksum,
+                    })[:20]
+                    for pipeline_name in pipelines:
+                        for model_name in models:
+                            task = {
+                                "dataset": dataset_name, "seed": seed, "fold": fold,
+                                "condition": condition, "pipeline": pipeline_name, "model": model_name,
+                            }
+                            task_key = stable_digest(dict(task, run_id=run_id))
+                            task_manifest = {
+                                **task, "task_key": task_key, "feature_task_key": feature_key,
+                                "dataset_identity": dataset_identity,
+                                "source_csv_sha256": source_csv_checksum,
+                                "dataset_checksum": task_checksum,
+                                "train_indices_sha256": index_sha256(train_idx),
+                                "test_indices_sha256": index_sha256(test_idx),
+                                "stable_perturbation_seed": perturb_seed,
+                                "configuration_fingerprint": config_fingerprint,
+                                "code_fingerprint": source_fingerprint,
+                                "runtime_fingerprint": runtime_fingerprint,
+                                "target_column": target_column,
+                                "status": "running",
+                            }
+                            feature_manifest = {
+                                "dataset_checksum": task_checksum,
+                                "train_indices_sha256": task_manifest["train_indices_sha256"],
+                                "test_indices_sha256": task_manifest["test_indices_sha256"],
+                                "stable_perturbation_seed": perturb_seed,
+                                "configuration_fingerprint": config_fingerprint,
+                                "code_fingerprint": source_fingerprint,
+                                "runtime_fingerprint": runtime_fingerprint,
+                                "protocol_version": PROTOCOL_VERSION,
+                                "source_csv_sha256": source_csv_checksum,
+                                "dataset_identity": dataset_identity,
+                                "condition": condition,
+                                "pipeline": pipeline_name,
+                            }
+                            task_fp = cache_fingerprint(task_manifest)
+                            feature_cache_fp = cache_fingerprint(feature_manifest)
+                            task_manifest["task_fingerprint"] = task_fp
+                            task_manifest["cache_fingerprint"] = feature_cache_fp
+                            if (has_success(db_path, run_id, task_key, "phase2", task_fp)
+                                    and has_success(db_path, run_id, task_key, "phase1", task_fp)):
+                                _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
+                                _save_run_manifest(run_dir, base_manifest, outcomes)
+                                continue
+                            try:
+                                if failure_hook:
+                                    failure_hook("phase1", task)
+                                cache_path, cache_manifest_path = _cache_paths(run_dir, feature_key, pipeline_name)
+                                cache_was_present = cache_path.exists() and cache_manifest_path.exists()
+                                payload = _load_or_create_feature_cache(
+                                    run_dir, feature_key, pipeline_name, feature_manifest,
+                                    lambda: _prepare_matrices(
+                                        x_train, y_train, x_test,
+                                        family=family, severity=severity,
+                                        perturbation_seed=perturb_seed,
+                                        pipeline_name=pipeline_name,
+                                        config=PIPELINE_CONFIGS[pipeline_name],
+                                    ),
+                                )
+                                (x_train_fe, x_test_fe, y_train_enc, encoder,
+                                 fe_meta, x_test_clean) = payload
+                                record_task(
+                                    db_path, run_id=run_id, task_key=task_key,
+                                    phase="phase1", status="success", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    manifest_fingerprint=task_fp,
+                                )
+                            except Exception as exc:
+                                failure = _record_failure(
+                                    run_dir=run_dir, db_path=db_path, run_id=run_id,
+                                    task_key=task_key, phase="phase1", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    fingerprint=task_fp, exc=exc,
+                                )
+                                _upsert_outcome(outcomes, dict(task_manifest, **failure))
+                                _save_run_manifest(run_dir, base_manifest, outcomes)
+                                continue
+                            try:
+                                if failure_hook:
+                                    failure_hook("phase2", task)
+                                xtr = np.nan_to_num(x_train_fe.to_numpy(dtype=np.float32), nan=0.0,
+                                                    posinf=1e10, neginf=-1e10)
+                                xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0,
+                                                    posinf=1e10, neginf=-1e10)
+                                model = build_model(model_name, random_state=seed, use_gpu=False)
+                                started = time.perf_counter()
+                                model.fit(xtr, y_train_enc)
+                                train_time = time.perf_counter() - started
+                                started = time.perf_counter()
+                                y_pred = model.predict(xte)
+                                y_proba = model.predict_proba(xte) if hasattr(model, "predict_proba") else np.zeros(
+                                    (len(xte), len(encoder.classes_)))
+                                infer_time = time.perf_counter() - started
+                                try:
+                                    y_test_enc = encoder.transform(y_test.astype(str))
+                                except ValueError as exc:
+                                    raise ValueError("Held-out labels contain a class absent from training labels") from exc
+                                train_pred = model.predict(xtr)
+                                train_proba = model.predict_proba(xtr) if hasattr(model, "predict_proba") else np.zeros(
+                                    (len(y_train_enc), len(encoder.classes_)))
+                                test_metrics = compute_classification_metrics(
+                                    y_test_enc, y_pred, y_proba, encoder.classes_,
+                                )
+                                train_metrics = compute_classification_metrics(
+                                    y_train_enc, train_pred, train_proba, encoder.classes_,
+                                )
+                                result = {
+                                    **task, "run_id": run_id, "task_key": task_key,
+                                    "status": "success", "n_train": len(xtr), "n_test": len(xte),
+                                    "n_original": int(x_test_clean.shape[1]),
+                                    "train_time_s": train_time, "infer_time_s": infer_time,
+                                    "autofe_gen_time_s": float(fe_meta.get("generation_time_s", 0.0)),
+                                    "autofe_cache_hit": cache_was_present,
+                                    "n_generated": int(fe_meta.get("n_generated", 0)),
+                                    "n_retained": int(fe_meta.get("n_retained", x_train_fe.shape[1])),
+                                    "ram_used_mb": float(fe_meta.get("ram_used_mb", 0.0)),
+                                    # The held-out features are unchanged in the primary
+                                    # protocol; do not report a test distribution-shift score.
+                                    "wasserstein": None,
+                                    "ks_stat": None,
+                                    "cache_fingerprint": feature_cache_fp,
+                                    "task_fingerprint": task_fp,
+                                    "train_matrix_sha256": frame_sha256(x_train_fe),
+                                    "test_matrix_sha256": frame_sha256(x_test_fe),
+                                    "prediction_sha256": stable_digest(np.asarray(y_pred).tolist()),
+                                    "train_auc": train_metrics.get("roc_auc"),
+                                    **test_metrics,
+                                }
+                                _safe_result_write(run_dir / "results.jsonl", result)
+                                record_task(
+                                    db_path, run_id=run_id, task_key=task_key,
+                                    phase="phase2", status="success", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    manifest_fingerprint=task_fp,
+                                )
+                                _upsert_outcome(outcomes, dict(task_manifest, status="success"))
+                            except Exception as exc:
+                                failure = _record_failure(
+                                    run_dir=run_dir, db_path=db_path, run_id=run_id,
+                                    task_key=task_key, phase="phase2", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    fingerprint=task_fp, exc=exc,
+                                )
+                                _upsert_outcome(outcomes, dict(task_manifest, **failure))
+                            _save_run_manifest(run_dir, base_manifest, outcomes)
+    _save_run_manifest(run_dir, base_manifest, outcomes)
+    return json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run a provenance-tracked corrected AutoFE-ShiftBench experiment")
+    parser.add_argument("--run-id", default=time.strftime("corrected-%Y%m%dT%H%M%SZ", time.gmtime()))
+    parser.add_argument("--data-dir", default="data/raw")
+    parser.add_argument("--output-root", default="corrected_runs")
+    parser.add_argument("--max-datasets", type=int)
+    parser.add_argument("--max-seeds", type=int)
+    parser.add_argument("--max-folds", type=int)
+    parser.add_argument("--max-conditions", type=int)
+    parser.add_argument("--pipelines", nargs="+", default=["Raw", "AutoFE_Baseline"])
+    parser.add_argument("--models", nargs="+", default=["logistic_regression"])
+    args = parser.parse_args(argv)
+
+    names = load_dataset_names("config/dataset_list.yaml")
     if args.max_datasets:
-        datasets = datasets[:args.max_datasets]
-
-    seeds = [42, 123, 456, 789, 2025]
-    if args.max_seeds:
-        seeds = seeds[:args.max_seeds]
-
-    folds = list(range(1, 6))
-    if args.max_folds:
-        folds = folds[:args.max_folds]
-
-    families = list(SHIFT_FAMILIES)
-    if args.max_conditions:
-        families = families[:args.max_conditions]
-
-    # ---- Build precompute task list ----
-    precompute_tasks = []
-    for d in datasets:
-        dp = Path(f"data/raw/{d}.csv")
-        if not dp.exists():
-            logger.warning(f"Dataset CSV not found, skipping: {dp}")
-            continue
-        size = dp.stat().st_size
-        for s in seeds:
-            for f in folds:
-                for fam, sev in families:
-                    cond_name = fam if sev == 0.0 else f"{fam}_{sev}"
-                    precompute_tasks.append({
-                        "dataset_name": d, "data_path": dp, "seed": s, "fold": f,
-                        "shift_family": fam, "severity": sev, "condition": cond_name,
-                        "size": size,
-                    })
-
-    # Sort datasets so we still process the smallest ones first for fast feedback
-    # Calculate dataset sizes
-    dataset_sizes = {}
-    for pt in precompute_tasks:
-        dataset_sizes[pt["dataset_name"]] = pt["size"]
-    
-    sorted_datasets = sorted([d for d in datasets if d in dataset_sizes], key=lambda x: dataset_sizes[x])
-
-    # ---- Setup Writer ----
-    manager = multiprocessing.Manager()
-    queue = manager.Queue()
-    writer = multiprocessing.Process(target=writer_process, args=(queue, results_path))
-    writer.start()
-
-    phase1_workers = min(N_CPU_WORKERS, 4)  # Capped at 4 to prevent OOM
-    
-    # Process each dataset completely to allow cache cleanup
-    for d in sorted_datasets:
-        logger.info(f"--- Processing dataset: {d} ---")
-        dataset_tasks = [t for t in precompute_tasks if t["dataset_name"] == d]
-        
-        if not dataset_tasks:
-            continue
-            
-        # ---- Phase 1: Precompute splits + AutoFE caches for this dataset ----
-        logger.info(f"Phase 1 [{d}]: {len(dataset_tasks)} units using {phase1_workers} workers...")
-        completed = 0
-        total = len(dataset_tasks)
-        with multiprocessing.Pool(phase1_workers, maxtasksperchild=1) as pool:
-            for result in pool.imap_unordered(precompute_unit, dataset_tasks):
-                completed += 1
-                if completed % 50 == 0 or completed == total:
-                    ram_pct = psutil.virtual_memory().percent
-                    logger.info(f"Phase 1 [{d}]: {completed}/{total} ({100*completed/total:.1f}%) | RAM: {ram_pct:.0f}%")
-        
-        # ---- Phase 2: Train models for this dataset ----
-        cpu_tasks = []
-        gpu_tasks = []
-        for pt in dataset_tasks:
-            for p in PIPELINE_NAMES:
-                for m in CPU_MODELS:
-                    if not has_run(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m):
-                        t = pt.copy()
-                        t["pipeline"] = p
-                        t["model"] = m
-                        cpu_tasks.append(t)
-                for m in GPU_MODELS:
-                    if not has_run(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m):
-                        t = pt.copy()
-                        t["pipeline"] = p
-                        t["model"] = m
-                        gpu_tasks.append(t)
-                        
-        logger.info(f"Phase 2 [{d}]: Evaluating {len(cpu_tasks)} CPU and {len(gpu_tasks)} GPU tasks...")
-        
-        if cpu_tasks or gpu_tasks:
-            cpu_pool = multiprocessing.Pool(
-                N_CPU_WORKERS, initializer=init_worker, initargs=(queue,),
-                maxtasksperchild=MAX_TASKS_PER_CHILD,
-            )
-            gpu_pool = multiprocessing.Pool(
-                N_GPU_WORKERS, initializer=init_worker, initargs=(queue,),
-                maxtasksperchild=MAX_TASKS_PER_CHILD,
-            )
-
-            cpu_res = cpu_pool.map_async(train_unit, cpu_tasks)
-            gpu_res = gpu_pool.map_async(train_unit, gpu_tasks)
-
-            cpu_res.wait()
-            gpu_res.wait()
-
-            cpu_pool.close()
-            cpu_pool.join()
-            gpu_pool.close()
-            gpu_pool.join()
-
-        # ---- Phase 3: Cleanup cache to prevent 600GB disk usage ----
-        import shutil
-        cache_dir = Path("data/cache") / d
-        if cache_dir.exists():
-            shutil.rmtree(cache_dir, ignore_errors=True)
-            logger.info(f"Phase 3 [{d}]: Deleted cache directory {cache_dir}")
-            
-    queue.put("DONE")
-    writer.join()
-    logger.info("Benchmark finished! All caches cleaned up.")
+        names = names[:args.max_datasets]
+    data_paths = {name: Path(args.data_dir) / f"{name}.csv" for name in names}
+    missing = [str(path) for path in data_paths.values() if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"Configured dataset CSVs are missing; no partial run started: {missing}")
+    conditions = PRIMARY_CONDITIONS[:args.max_conditions] if args.max_conditions else PRIMARY_CONDITIONS
+    manifest = run_experiment(
+        data_paths, run_id=args.run_id, output_root=args.output_root,
+        seeds=[42, 123, 456, 789, 2025][:args.max_seeds] if args.max_seeds else None,
+        folds=list(range(1, args.max_folds + 1)) if args.max_folds else None,
+        conditions=conditions, pipelines=tuple(args.pipelines), models=tuple(args.models),
+    )
+    print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
     main()

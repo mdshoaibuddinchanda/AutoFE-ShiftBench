@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import warnings
 from pathlib import Path
 
@@ -11,6 +12,8 @@ import json
 import numpy as np
 import pandas as pd
 import yaml
+
+from src.provenance import file_sha256
 
 
 DEFAULT_TARGET_COLUMN = "target"
@@ -23,7 +26,6 @@ OPENML_NAME_CANDIDATES: dict[str, list[str | int]] = {
     "aps_failure": [41138, "aps_failure", "aps-failure"],
     "electricity": ["electricity"],
     "covertype": ["covertype", "Covertype"],
-    "dry-bean-dataset": [42585, "dry-bean-dataset", "Dry_Bean_Dataset"],
     "crop-recommendation": [43491, "crop-recommendation", "Crop_Recommendation"],
     "breast-cancer-wisconsin": ["breast-cancer-wisconsin", "breast_cancer", "wdbc"],
     "heart-disease": [43398, "heart-disease", "heart-statlog", 53],
@@ -106,7 +108,11 @@ def _fetch_openml_with_fallbacks(dataset_name: str):
     )
 
 
-def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str, float]:
+def compute_meta_features(
+    features: pd.DataFrame,
+    target: pd.Series,
+    random_state: int = 42,
+) -> dict[str, float]:
     """Compute meta-features for dataset analysis."""
     meta = {}
     
@@ -190,7 +196,7 @@ def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str
         from sklearn.preprocessing import LabelEncoder
         # Sample to speed up
         sample_size = min(n_samples, 2000)
-        sample_idx = np.random.choice(n_samples, sample_size, replace=False)
+        sample_idx = np.random.default_rng(random_state).choice(n_samples, sample_size, replace=False)
         f_sample = features.iloc[sample_idx]
         t_sample = target.iloc[sample_idx]
         
@@ -234,13 +240,27 @@ def download_openml_dataset(
     max_rows: int = DEFAULT_MAX_ROWS,
     random_state: int = 42,
 ) -> Path:
-    """Download one dataset from OpenML, downsample if needed, save as CSV and JSON metadata."""
+    """Download one configured benchmark dataset, downsample if needed, and save CSV plus metadata."""
     print(f"Fetching {dataset_name}...")
-    dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name)
-    print(f"Fetched {dataset_name}. Processing X/y...")
+    uci_metadata = None
+    if dataset_name == "dry-bean-dataset":
+        # Dry Bean is a UCI dataset, not OpenML data_id 42585 (which is a different
+        # dataset). Keep the benchmark's intended dataset name and record its source.
+        from ucimlrepo import fetch_ucirepo
 
-    x = dataset.data
-    y = dataset.target
+        dataset = fetch_ucirepo(id=602)
+        x = dataset.data.features
+        target_frame = dataset.data.targets
+        if target_frame is None or target_frame.shape[1] != 1:
+            raise ValueError("UCI Dry Bean must expose exactly one target column")
+        y = target_frame.iloc[:, 0]
+        uci_metadata = dataset.metadata
+        resolved_name = str(uci_metadata.get("name", "Dry Bean"))
+    else:
+        dataset, resolved_name = _fetch_openml_with_fallbacks(dataset_name)
+        x = dataset.data
+        y = dataset.target
+    print(f"Fetched {dataset_name}. Processing X/y...")
 
     if y is None and dataset.frame is not None:
         fallback_targets = {
@@ -251,19 +271,17 @@ def download_openml_dataset(
             y = dataset.frame[target_name]
             x = dataset.frame.drop(columns=[target_name])
         else:
-            target_name = dataset.frame.columns[-1]
-            y = dataset.frame[target_name]
-            x = dataset.frame.drop(columns=[target_name])
+            raise ValueError(
+                f"OpenML dataset '{dataset_name}' has no target metadata and no explicit fallback target is configured"
+            )
 
     if x is None or y is None:
         raise ValueError(f"Dataset '{dataset_name}' does not provide X/y data")
 
     features = x.copy()
-    target_column = (
-        DEFAULT_TARGET_COLUMN
-        if DEFAULT_TARGET_COLUMN not in features.columns
-        else "target_label"
-    )
+    target_column = DEFAULT_TARGET_COLUMN
+    while target_column in features.columns:
+        target_column = "target_label" if target_column == DEFAULT_TARGET_COLUMN else f"_{target_column}_"
 
     combined = features.copy()
     combined[target_column] = pd.Series(y).reset_index(drop=True)
@@ -283,11 +301,63 @@ def download_openml_dataset(
     features_sampled = combined.drop(columns=[target_column])
     target_sampled = combined[target_column]
     print(f"Computing meta features for {dataset_name}...")
-    meta_features = compute_meta_features(features_sampled, target_sampled)
+    meta_features = compute_meta_features(features_sampled, target_sampled, random_state=random_state)
     print(f"Meta features done for {dataset_name}.")
     
+    if uci_metadata is not None:
+        target_columns = uci_metadata.get("target_col", [])
+        source_target_name = str(target_columns[0]) if target_columns else "Class"
+        dataset_identity = {
+            "provider": "UCI",
+            "requested_name": dataset_name,
+            "resolved_name": resolved_name,
+            "uci_id": str(uci_metadata.get("uci_id", 602)),
+            "doi": uci_metadata.get("dataset_doi"),
+            "repository_url": uci_metadata.get("repository_url"),
+            "last_updated": uci_metadata.get("last_updated"),
+        }
+    else:
+        details = getattr(dataset, "details", {}) or {}
+        dataset_id = details.get("id") if isinstance(details, dict) else None
+        dataset_version = details.get("version") if isinstance(details, dict) else None
+        target_names = getattr(dataset, "target_names", None)
+        if isinstance(target_names, (list, tuple, np.ndarray)):
+            source_target_name = str(target_names[0]) if len(target_names) else "target"
+        else:
+            source_target_name = str(target_names or "target")
+        dataset_identity = {
+            "provider": "OpenML",
+            "requested_name": dataset_name,
+            "resolved_name": str(resolved_name),
+            "openml_id": str(dataset_id) if dataset_id is not None else None,
+            "openml_version": str(dataset_version) if dataset_version is not None else None,
+        }
+    proxy_audit = inspect_target_proxy_candidates(
+        features_sampled,
+        target_sampled,
+        target_column=target_column,
+        source_target_name=source_target_name,
+    )
+    meta_features["dataset_identity"] = dataset_identity
+    meta_features["target_column"] = target_column
+    meta_features["source_target_name"] = source_target_name
+    meta_features["saved_csv_sha256"] = file_sha256(output_path)
+    meta_features["schema_columns"] = [str(column) for column in combined.columns]
+    meta_features["target_proxy_review"] = proxy_audit
+
     meta_path = Path(output_dir) / f"{dataset_name}_meta.json"
-    meta_path.write_text(json.dumps(meta_features, indent=2))
+    def json_safe(value):
+        if isinstance(value, dict):
+            return {key: json_safe(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [json_safe(child) for child in value]
+        if isinstance(value, (np.integer, np.floating)):
+            value = value.item()
+        if isinstance(value, float) and not np.isfinite(value):
+            return None
+        return value
+
+    meta_path.write_text(json.dumps(json_safe(meta_features), indent=2, allow_nan=False))
     
     return output_path
 
@@ -297,12 +367,18 @@ def download_datasets_from_list(
     output_dir: str | Path = "data/raw",
     max_rows: int = DEFAULT_MAX_ROWS,
     random_state: int = 42,
+    dataset_names: list[str] | None = None,
 ) -> dict[str, Path]:
-    """Download all datasets from dataset_list.yaml into data/raw."""
-    dataset_names = load_dataset_names(dataset_list_path)
+    """Download selected configured datasets into the raw-data directory."""
+    configured_names = load_dataset_names(dataset_list_path)
+    selected_names = configured_names if dataset_names is None else list(dataset_names)
+    unknown = sorted(set(selected_names).difference(configured_names))
+    if unknown:
+        raise ValueError(f"Requested datasets are not configured: {unknown}")
 
     saved_paths: dict[str, Path] = {}
-    for dataset_name in dataset_names:
+    failures: dict[str, str] = {}
+    for dataset_name in selected_names:
         print(f"Downloading {dataset_name}...")
         try:
             saved_paths[dataset_name] = download_openml_dataset(
@@ -314,6 +390,11 @@ def download_datasets_from_list(
             print(f"  -> Saved to {saved_paths[dataset_name]}")
         except Exception as e:
             print(f"  -> Failed to download {dataset_name}: {e}")
+            failures[dataset_name] = f"{type(e).__name__}: {e}"
+
+    if failures:
+        names = ", ".join(sorted(failures))
+        raise RuntimeError(f"Dataset download incomplete for: {names}. Details: {failures}")
 
     return saved_paths
 
@@ -324,6 +405,38 @@ def load_csv_dataset(file_path: str | Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found: {path}")
     return pd.read_csv(path)
+
+
+def inspect_target_proxy_candidates(
+    features: pd.DataFrame,
+    target: pd.Series,
+    *,
+    target_column: str,
+    source_target_name: str | None = None,
+) -> dict[str, list[str]]:
+    """Return exact-copy and name-based target proxy candidates for manual review.
+
+    Candidates are reported, never deleted automatically. Similarity can indicate
+    a legitimate feature or a leakage proxy and requires dataset-level review.
+    """
+    exact_copies: list[str] = []
+    suspicious_names: list[str] = []
+    target_values = target.reset_index(drop=True).astype("string")
+    tokens = {"target", "label", "class", "outcome", "response"}
+    if source_target_name:
+        tokens.add(str(source_target_name).casefold())
+    for column in features.columns:
+        candidate = features[column].reset_index(drop=True)
+        if len(candidate) == len(target_values) and candidate.astype("string").equals(target_values):
+            exact_copies.append(str(column))
+        name_tokens = set(re.findall(r"[a-z0-9]+", str(column).casefold()))
+        if name_tokens.intersection(tokens):
+            suspicious_names.append(str(column))
+    return {
+        "target_column": [target_column],
+        "exact_target_copies_for_manual_review": exact_copies,
+        "target_like_names_for_manual_review": suspicious_names,
+    }
 
 if __name__ == "__main__":
     results = download_datasets_from_list()

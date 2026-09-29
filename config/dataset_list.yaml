@@ -1,4 +1,4 @@
-# AutoFE-ShiftBench: 25 OpenML benchmark datasets
+# AutoFE-ShiftBench: 24 OpenML benchmark datasets plus Dry Bean from UCI
 # Organized by approximate row count (ascending)
 # All datasets are capped at 100,000 rows during download.
 

@@ -47,6 +47,20 @@ PRIMARY_DATASETS = {
     "airlines",
 }
 
+PRIMARY_CONDITIONS = {
+    "clean",
+    "gaussian_noise_0.01", "gaussian_noise_0.05", "gaussian_noise_0.10",
+    "missing_values_0.05", "missing_values_0.10", "missing_values_0.20",
+    "label_noise_0.05", "label_noise_0.10", "label_noise_0.20",
+}
+CONDITION_ALIASES = {
+    "gaussian_noise_0.1": "gaussian_noise_0.10",
+    "missing_values_0.1": "missing_values_0.10",
+    "missing_values_0.2": "missing_values_0.20",
+    "label_noise_0.1": "label_noise_0.10",
+    "label_noise_0.2": "label_noise_0.20",
+}
+
 DOMAIN_BY_DATASET = {
     "haberman": "Healthcare",
     "heart-disease": "Healthcare",
@@ -70,6 +84,9 @@ DOMAIN_BY_DATASET = {
     "wine-quality-red": "Other",
     "kr-vs-kp": "Other",
     "magic-telescope": "Other",
+    "aps_failure": "Engineering",
+    "covertype": "Environment",
+    "kddcup99": "Cybersecurity",
 }
 
 def set_q1_publication_style():
@@ -126,8 +143,8 @@ def _save_figure(fig, out_dir: Path, stem: str, dpi: int = 300):
 
 
 def _load_data(
-    results_path="reports/tables/results_stream.jsonl",
-    datasets: Iterable[str] | None = PRIMARY_DATASETS,
+    results_path,
+    datasets: Iterable[str] | None = None,
 ):
     path = Path(results_path)
     if not path.exists():
@@ -140,6 +157,9 @@ def _load_data(
     df = pd.DataFrame(records)
     if "status" in df.columns:
         df = df[df["status"] == "success"].copy()
+    if "condition" in df.columns:
+        df["condition"] = df["condition"].replace(CONDITION_ALIASES)
+        df = df[df["condition"].isin(PRIMARY_CONDITIONS)].copy()
     if datasets is not None and "dataset" in df.columns:
         df = df[df["dataset"].isin(set(datasets))].copy()
     return df
@@ -280,13 +300,11 @@ def plot_fig8_cd_diagram(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     if df.empty or "roc_auc" not in df.columns: return
     set_q1_publication_style()
     
-    # Aggregate to dataset-fold level so models are averaged out for the test
-    agg = df.groupby(["dataset", "seed", "fold", "condition", "pipeline"])["roc_auc"].mean().reset_index()
-    
-    # Pivot so each row is a task, each col is a pipeline
-    pivot = agg.pivot(index=["dataset", "seed", "fold", "condition"], columns="pipeline", values="roc_auc").dropna()
-    
-    if len(pivot) < 10: return # not enough data
+    # Average repeated tasks within each dataset. The independent unit for this
+    # diagnostic is the dataset, not its folds, seeds, models, or conditions.
+    agg = df.groupby(["dataset", "pipeline"])["roc_auc"].mean().reset_index()
+    pivot = agg.pivot(index="dataset", columns="pipeline", values="roc_auc").dropna()
+    if len(pivot) < 3: return
     
     # Nemenyi critical difference plot requires scikit-posthocs
     avg_ranks = pivot.rank(axis=1, ascending=False).mean()
@@ -396,16 +414,19 @@ def plot_fig10_ablation(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
 
 
 def generate_all(
-    results_path="reports/tables/results_stream.jsonl",
-    out_dir="reports/figures/q1_paper_regenerated",
-    datasets: Iterable[str] | None = PRIMARY_DATASETS,
+    results_path=None,
+    out_dir=None,
+    datasets: Iterable[str] | None = None,
     dpi: int = 300,
 ):
+    if results_path is None or out_dir is None:
+        raise ValueError("Pass a corrected results_path and a new out_dir explicitly; historical figures are not overwritten implicitly")
     df = _load_data(results_path, datasets=datasets)
+    selected_datasets = list(datasets) if datasets is not None else sorted(df["dataset"].dropna().unique())
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    plot_fig2_dataset_diversity(out_dir, datasets=datasets or PRIMARY_DATASETS, dpi=dpi)
+    plot_fig2_dataset_diversity(out_dir, datasets=selected_datasets, dpi=dpi)
     plot_fig3_pipeline_ranking(df, out_dir, dpi=dpi)
     plot_fig4_model_ranking(df, out_dir, dpi=dpi)
     plot_fig5_robustness_shift(df, out_dir, dpi=dpi)
@@ -414,7 +435,12 @@ def generate_all(
     plot_fig8_cd_diagram(df, out_dir, dpi=dpi)
     plot_fig9_heatmap(df, out_dir, dpi=dpi)
     plot_fig10_ablation(df, out_dir, dpi=dpi)
-    print(f"Generated Figures 2-10 for {len(set(datasets or PRIMARY_DATASETS))} datasets in {out_dir.absolute()}")
+    print(f"Generated Figures 2-10 for {len(set(selected_datasets))} datasets in {out_dir.absolute()}")
 
 if __name__ == "__main__":
-    generate_all()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--results", required=True)
+    parser.add_argument("--out-dir", required=True)
+    args = parser.parse_args()
+    generate_all(args.results, args.out_dir)

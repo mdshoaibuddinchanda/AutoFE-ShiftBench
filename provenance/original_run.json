@@ -1,0 +1,47 @@
+{
+  "run_id": "original-main-f265ee118c6e0c07cf3f17e332e8aface6ab7f34",
+  "classification": "historical_original_run",
+  "code_commit": "f265ee118c6e0c07cf3f17e332e8aface6ab7f34",
+  "immutable_policy": "Preserve all files listed here byte-for-byte. Corrected runs use a distinct run_id and output directory; original numerical claims are not corrected-run results.",
+  "ledger_counts_as_observed_before_changes": {
+    "results_stream.jsonl": 560002,
+    "primary_scope_rows_reported_by_original_manuscript": 538972
+  },
+  "checkpoint_database": {
+    "path": "reports/cache.db",
+    "available": false,
+    "note": "No SQLite checkpoint database was present at branch creation."
+  },
+  "files": [
+    {
+      "path": "reports/tables/results_stream.jsonl",
+      "bytes": 457114745,
+      "sha256": "fb1054cc92cc3073cf0e2d1cf4fd87169b23ecf8662c8aaf29784856133116a5"
+    },
+    {
+      "path": "reports/tables/results_stream_backup.jsonl",
+      "bytes": 180269951,
+      "sha256": "b99ab5de08e8261d9304c9cf69aa5639f7be68e0231b09ced28b207cd4856031"
+    },
+    {
+      "path": "reports/tables/q1_tables.md",
+      "bytes": 3211,
+      "sha256": "15e128cc80ba46a86c653743557accf63cc5c1468f2acfb5a011a4ec14454e88"
+    },
+    {
+      "path": "reports/tables/q1_tables_v2.md",
+      "bytes": 3954,
+      "sha256": "ccfc14d7b5dea91132b3938a28e453eeab5c0e3cd67f72f7ace237ebd4a58ab7"
+    },
+    {
+      "path": "results/final_paper_results.md",
+      "bytes": 6475,
+      "sha256": "eed1daf6a2643b46fdaf2b6c329aee8245ee3df22e194bf38800b28bcbaaaf0f"
+    },
+    {
+      "path": "results/q1_tables_v2.md",
+      "bytes": 3954,
+      "sha256": "ccfc14d7b5dea91132b3938a28e453eeab5c0e3cd67f72f7ace237ebd4a58ab7"
+    }
+  ]
+}

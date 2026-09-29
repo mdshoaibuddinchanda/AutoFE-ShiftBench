@@ -15,7 +15,7 @@ if errorlevel 1 (
 echo.
 
 REM Step 2: Download datasets
-echo [2/3] Downloading datasets from OpenML...
+echo [2/3] Downloading configured benchmark datasets...
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
 if errorlevel 1 (
     echo ERROR: Failed to download datasets.
@@ -29,6 +29,6 @@ echo [3/3] Starting benchmark with full parallelization...
 python -m src.pipeline_runner
 echo.
 echo ============================================================
-echo   Benchmark complete! Results in reports/tables/results_stream.jsonl
+echo   Benchmark complete! Corrected run outputs are under corrected_runs by run ID.
 echo ============================================================
 pause

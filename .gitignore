@@ -26,6 +26,7 @@ checkpoints/
 # source-controlled or pushed to GitHub.
 results/
 reports/
+corrected_runs/
 *.jsonl
 *.log
 *.db
