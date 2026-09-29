@@ -122,6 +122,6 @@
     "row_level_fallback_for_group_auc": false,
     "corrected_results": "PENDING CORRECTED RUN"
   },
-  "launch_audit_code_commit": "71e204268a7f0950a2ffe1f1ccde2c56545a49bd",
+  "launch_audit_code_commit": "75c4420008d29fab5171cf9013f3b74ccdc1fc6e",
   "launch_audit_artifact": "provenance/friend_pc_launch_audit.md"
 }
