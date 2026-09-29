@@ -103,7 +103,7 @@ def build_model(
             max_iter=1000,
             dual="auto",
         )
-        return CalibratedClassifierCV(base_svm, cv=3)
+        return CalibratedClassifierCV(base_svm, cv=3, n_jobs=1)
 
     elif normalized == "knn":
         return KNeighborsClassifier(
