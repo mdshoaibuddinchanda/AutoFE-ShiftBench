@@ -10,8 +10,8 @@
   "operator_ablation_manifest_sha256": "6799c1f5dc1ee72a0c5032ecbf795138846fd868d156b059064ddf40557aa7cc",
   "operator_ablation_code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
   "condition_scope_manifest": "provenance/reviewer1_condition_scope_manifest_v1.json",
-  "condition_scope_manifest_sha256": "2f3527ccffc7b9556c1fb334bb333737d2edc665a49137d35c40179d1b010fb0",
-  "condition_protocol_code_commit": "94738872f7f93fe875fd39aa7d1abde35eeae025",
+  "condition_scope_manifest_sha256": "95791d8ef78e0002c23f3d14bba1c9442f06c9c4a37482d475777cf7a3515448",
+  "condition_protocol_code_commit": "71e204268a7f0950a2ffe1f1ccde2c56545a49bd",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32",
@@ -78,18 +78,27 @@
     "result_publication": "fsync temporary envelope, atomic rename, SQLite commit, reconciliation"
   },
   "resource_policy": {
-    "workers_measured": [1, 2, 4],
+    "workers_measured": [
+      1,
+      2,
+      4
+    ],
     "planned_worker_cap": 4,
-    "friend_pc_worker_modes": ["windows_default", "all_available", "p_core_preferred", "os_headroom"],
+    "friend_pc_worker_modes": [
+      "windows_default",
+      "all_available",
+      "p_core_preferred",
+      "os_headroom"
+    ],
     "blas_threads_per_worker": 1,
     "gpu": "optional explicit XGBoost/CatBoost CUDA routing; friend-PC fit/parity measurement required before enabling",
     "launch_host_requirement": "repeat provenance/measure_host.py on the intended friend PC before launch"
   },
   "runtime_estimates_days": {
     "method": "old linear scale projection divided by measured 1-to-4 worker speedup 2.979; cache reuse benefit excluded",
-    "core_row_level": 9.30,
+    "core_row_level": 9.3,
     "core_group_aware": 16.49,
-    "all_14_row_level": 65.10,
+    "all_14_row_level": 65.1,
     "all_14_group_aware": 115.46,
     "all_14_both_policies": 180.56,
     "one_model_all_14_both_policies": 18.06,
@@ -112,5 +121,7 @@
     "split_policies_changed": false,
     "row_level_fallback_for_group_auc": false,
     "corrected_results": "PENDING CORRECTED RUN"
-  }
+  },
+  "launch_audit_code_commit": "71e204268a7f0950a2ffe1f1ccde2c56545a49bd",
+  "launch_audit_artifact": "provenance/friend_pc_launch_audit.md"
 }
