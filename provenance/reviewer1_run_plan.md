@@ -52,7 +52,7 @@ The original corrected grid is `25 datasets × 5 seeds × 5 folds × 14 conditio
 - bounded real-data preflight command recorded after implementation
 - frozen manifest and clean Git status before the long campaign
 
-Baseline evidence: `D:\\Conda\\p12\\python.exe -m pytest -q -rs tests` -> `19 passed, 2 warnings in 27.12s`; `D:\\Conda\\p12\\python.exe -m compileall -q src tests main.py` -> pass. Warnings are Loky physical-core detection and Woodwork `pkg_resources` deprecation. The full suite was run after the Dry Bean downloader change and before the new Reviewer #1 modules are integrated.
+Verification evidence: `D:\\Conda\\p12\\python.exe -m pytest -q -rs tests` -> `42 passed, 7 warnings in 10.40s`; `D:\\Conda\\p12\\python.exe -m compileall -q src tests main.py` -> pass; `D:\\Conda\\p12\\python.exe -m provenance.audit_dataset_schemas` -> `audited=25/25; verified=25/25`; `D:\\Conda\\p12\\python.exe -m provenance.audit_group_folds` -> `25` structural, `23` class/AUC-supported. Warnings are the expected Loky physical-core detection, Woodwork deprecation, and intentional undersupported-class group tests.
 
 Current decision: the bounded preflight passed for `sonar` under both policies. The full group-aware campaign is held because `wine-quality-red` and `kddcup99` cannot support all-fold ROC-AUC under exact-feature grouping; the runner records this as `blocked_group_split_infeasible` and never falls back to row-level folds. Candidate-history logging at the observed preflight rate is estimated at approximately 79.7 GiB compressed for the original 612,500-task grid. No long benchmark is running.
 
