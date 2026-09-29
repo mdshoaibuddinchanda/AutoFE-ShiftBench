@@ -115,6 +115,41 @@ def _condition_name(family: str, severity: float) -> str:
     return family if severity == 0.0 else f"{family}_{severity:.2f}"
 
 
+def _domain_fold_status(
+    splits: list[tuple[np.ndarray, np.ndarray]],
+    y: pd.Series,
+) -> dict[str, Any]:
+    """Summarize class support for a transductive domain partition."""
+    labels = y.astype(str).to_numpy()
+    global_classes = set(labels)
+    fold_support = []
+    for fold_no, (train_idx, test_idx) in enumerate(splits, start=1):
+        train_classes = set(labels[np.asarray(train_idx, dtype=np.int64)])
+        test_classes = set(labels[np.asarray(test_idx, dtype=np.int64)])
+        fold_support.append({
+            "fold": fold_no,
+            "train_class_count": len(train_classes),
+            "test_class_count": len(test_classes),
+            "train_has_all_classes": train_classes == global_classes,
+            "test_has_all_classes": test_classes == global_classes,
+            "test_has_at_least_two_classes": len(test_classes) >= 2,
+        })
+    auc_supported = bool(fold_support) and all(
+        item["train_has_all_classes"]
+        and item["test_has_all_classes"]
+        and item["test_has_at_least_two_classes"]
+        for item in fold_support
+    )
+    return {
+        "fold_class_support": fold_support,
+        "auc_status": "supported" if auc_supported else "infeasible",
+        "auc_reason": (
+            "all_train_and_test_folds_contain_all_classes"
+            if auc_supported else "one_or_more_domain_folds_lacks_class_support_for_auc"
+        ),
+    }
+
+
 def _resolve_target_column(frame: pd.DataFrame, requested: str | None = None) -> str:
     """Resolve a single target explicitly; refuse a silent last-column fallback."""
     if requested and requested in frame.columns:
@@ -531,6 +566,16 @@ def run_experiment(
             "domain partition, feature-availability ablation, or majority-label relabeling"
         )
     experiment_scope = selected_scopes[0]
+    if split_policy == "group_aware" and experiment_scope == "transductive_domain_partition":
+        # PCA/K-means partitions are fitted on the complete target-free feature
+        # table. Applying those row-level partitions here would silently bypass
+        # the group-aware zero-overlap guarantee. A group-constrained
+        # transductive protocol needs its own prespecified assignment rule.
+        raise ValueError(
+            "transductive_domain_partition currently supports row_level only; "
+            "group-aware transductive folds require a separately prespecified "
+            "group-constrained assignment protocol"
+        )
     unknown_pipelines = sorted(set(pipelines).difference(PIPELINE_CONFIGS))
     if unknown_pipelines:
         raise ValueError(f"Unknown pipelines: {unknown_pipelines}")
@@ -725,15 +770,28 @@ def run_experiment(
                 assert_fold_integrity(ordinary_splits, len(frame))
                 split_status = {"split_policy": "row_level", "split_feasible": True}
             domain_splits: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {}
+            domain_metadata: dict[str, dict[str, Any]] = {}
             for family, severity in conditions:
                 if family == "covariate_partition":
-                    splits = domain_splits.setdefault(
-                        family, get_covariate_splits(X, n_splits, seed, target_column=target_column),
-                    )
+                    if family not in domain_splits:
+                        splits, partition_meta = get_covariate_splits(
+                            X, n_splits, seed, target_column=target_column, return_metadata=True,
+                        )
+                        domain_splits[family] = splits
+                        domain_metadata[family] = {
+                            **partition_meta, **_domain_fold_status(splits, y),
+                        }
+                    splits = domain_splits[family]
                 elif family == "population_partition":
-                    splits = domain_splits.setdefault(
-                        family, get_population_splits(X, n_splits, seed, target_column=target_column),
-                    )
+                    if family not in domain_splits:
+                        splits, partition_meta = get_population_splits(
+                            X, n_splits, seed, target_column=target_column, return_metadata=True,
+                        )
+                        domain_splits[family] = splits
+                        domain_metadata[family] = {
+                            **partition_meta, **_domain_fold_status(splits, y),
+                        }
+                    splits = domain_splits[family]
                 else:
                     splits = ordinary_splits
                 assert_fold_integrity(splits, len(frame))
@@ -760,6 +818,9 @@ def run_experiment(
                                 "split_policy": split_policy,
                             }
                             task_key = stable_digest(dict(task, run_id=run_id))
+                            task_split_status = dict(split_status)
+                            if family in domain_metadata:
+                                task_split_status["domain_partition"] = domain_metadata[family]
                             task_manifest = {
                                 **task, "task_key": task_key, "feature_task_key": feature_key,
                                 "dataset_identity": dataset_identity,
@@ -772,7 +833,7 @@ def run_experiment(
                                 "code_fingerprint": source_fingerprint,
                                 "runtime_fingerprint": runtime_fingerprint,
                                 "target_column": target_column,
-                                "split_status": split_status,
+                                "split_status": task_split_status,
                                 "status": "running",
                             }
                             feature_manifest = {
@@ -794,6 +855,38 @@ def run_experiment(
                             feature_cache_fp = cache_fingerprint(feature_manifest)
                             task_manifest["task_fingerprint"] = task_fp
                             task_manifest["cache_fingerprint"] = feature_cache_fp
+                            domain_auc_status = (
+                                domain_metadata.get(family, {}).get("auc_status")
+                                if family in domain_metadata else None
+                            )
+                            if family in domain_metadata and domain_auc_status != "supported":
+                                skip_reason = domain_metadata[family]["auc_reason"]
+                                skipped = dict(
+                                    task_manifest,
+                                    status="skipped",
+                                    skip_reason=skip_reason,
+                                    metric_scope="roc_auc",
+                                )
+                                record_task(
+                                    db_path, run_id=run_id, task_key=task_key,
+                                    phase="phase1", status="skipped", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    manifest_fingerprint=task_fp,
+                                    error_summary=skip_reason,
+                                )
+                                record_task(
+                                    db_path, run_id=run_id, task_key=task_key,
+                                    phase="phase2", status="skipped", dataset=dataset_name,
+                                    seed=seed, fold=fold, condition=condition,
+                                    pipeline=pipeline_name, model=model_name,
+                                    manifest_fingerprint=task_fp,
+                                    error_summary=skip_reason,
+                                )
+                                _safe_result_write(run_dir / "results.jsonl", skipped)
+                                _upsert_outcome(outcomes, skipped)
+                                _save_run_manifest(run_dir, base_manifest, outcomes)
+                                continue
                             scheduler_lease: Lease | None = None
                             if scheduler is not None:
                                 scheduler.register_tasks([
@@ -909,8 +1002,10 @@ def run_experiment(
                                 )
                                 result = {
                                     **task, "run_id": run_id, "task_key": task_key,
-                                    "status": "success", "n_train": len(xtr), "n_test": len(xte),
-                                    "split_policy": split_policy,
+                                     "status": "success", "n_train": len(xtr), "n_test": len(xte),
+                                     "split_policy": split_policy,
+                                     "experiment_scope": experiment_scope,
+                                     "split_status": task_split_status,
                                     "n_original": int(x_test_clean.shape[1]),
                                     "train_time_s": train_time, "infer_time_s": infer_time,
                                     "autofe_gen_time_s": float(fe_meta.get("generation_time_s", 0.0)),

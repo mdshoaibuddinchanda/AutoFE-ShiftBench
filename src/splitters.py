@@ -61,6 +61,8 @@ def get_covariate_splits(
     n_splits: int,
     seed: int,
     target_column: str,
+    *,
+    return_metadata: bool = False,
 ):
     """Target-free, transductive covariate partitions based on global feature PCA.
 
@@ -70,7 +72,18 @@ def get_covariate_splits(
     """
     _assert_target_absent(X, target_column)
     numeric = X.select_dtypes(include=["number", "bool"]).fillna(0)
+    metadata = {
+        "partition_method": "pca_global",
+        "partition_fit_scope": "all_rows_target_free_predictors",
+        "uses_held_out_features": True,
+        "fallback_reason": None,
+    }
     if numeric.shape[1] == 0:
+        metadata.update({
+            "partition_method": "row_level_kfold_fallback",
+            "fallback_reason": "no_numeric_predictors",
+            "uses_held_out_features": False,
+        })
         splits = list(KFold(n_splits=n_splits, shuffle=True, random_state=seed).split(X))
     else:
         scaled = StandardScaler().fit_transform(numeric)
@@ -82,7 +95,7 @@ def get_covariate_splits(
             for i in range(n_splits)
         ]
     assert_fold_integrity(splits, len(X))
-    return splits
+    return (splits, metadata) if return_metadata else splits
 
 
 def get_population_splits(
@@ -90,17 +103,35 @@ def get_population_splits(
     n_splits: int,
     seed: int,
     target_column: str,
+    *,
+    return_metadata: bool = False,
 ):
     """Target-free, transductive feature-cluster partitions for a separate study."""
     _assert_target_absent(X, target_column)
     numeric = X.select_dtypes(include=["number", "bool"]).fillna(0)
+    metadata = {
+        "partition_method": "kmeans_global",
+        "partition_fit_scope": "all_rows_target_free_predictors",
+        "uses_held_out_features": True,
+        "fallback_reason": None,
+    }
     if numeric.shape[1] == 0:
+        metadata.update({
+            "partition_method": "row_level_kfold_fallback",
+            "fallback_reason": "no_numeric_predictors",
+            "uses_held_out_features": False,
+        })
         splits = list(KFold(n_splits=n_splits, shuffle=True, random_state=seed).split(X))
     else:
         scaled = StandardScaler().fit_transform(numeric)
         cluster_ids = KMeans(n_clusters=n_splits, random_state=seed, n_init=10).fit_predict(scaled)
         if len(np.unique(cluster_ids)) != n_splits:
             # Keep the held-out-once invariant if duplicate feature rows collapse a cluster.
+            metadata.update({
+                "partition_method": "row_level_kfold_fallback",
+                "fallback_reason": "kmeans_returned_fewer_than_requested_clusters",
+                "uses_held_out_features": False,
+            })
             splits = list(KFold(n_splits=n_splits, shuffle=True, random_state=seed).split(X))
         else:
             splits = [
@@ -108,4 +139,4 @@ def get_population_splits(
                 for cluster in range(n_splits)
             ]
     assert_fold_integrity(splits, len(X))
-    return splits
+    return (splits, metadata) if return_metadata else splits
