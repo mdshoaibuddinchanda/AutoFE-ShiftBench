@@ -357,8 +357,8 @@ class TaskScheduler:
             expired.append(ExpiredAttempt(row["task_key"], row["attempt_no"], row["worker_id"], row["lease_expires_at"], next_status))
         return expired
 
-    def claim_task(self, worker_id: str, *, now: float | None = None) -> Lease | None:
-        """Atomically claim the oldest ready task, after reconciling crashes."""
+    def claim_task(self, worker_id: str, *, task_key: str | None = None, now: float | None = None) -> Lease | None:
+        """Atomically claim a ready task, optionally requiring a specific key."""
 
         if not worker_id:
             raise ValueError("worker_id must be non-empty")
@@ -370,16 +370,27 @@ class TaskScheduler:
             self._begin(conn)
             try:
                 self._expire_leases_tx(conn, now=timestamp)
-                row = conn.execute(
-                    """
-                    SELECT task_key, run_id, max_attempts
-                    FROM scheduler_tasks
-                    WHERE status='pending' AND available_at <= ?
-                    ORDER BY created_at, task_key
-                    LIMIT 1
-                    """,
-                    (timestamp,),
-                ).fetchone()
+                if task_key is None:
+                    row = conn.execute(
+                        """
+                        SELECT task_key, run_id, max_attempts
+                        FROM scheduler_tasks
+                        WHERE status='pending' AND available_at <= ?
+                        ORDER BY created_at, task_key
+                        LIMIT 1
+                        """,
+                        (timestamp,),
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        """
+                        SELECT task_key, run_id, max_attempts
+                        FROM scheduler_tasks
+                        WHERE task_key=? AND status='pending' AND available_at <= ?
+                        LIMIT 1
+                        """,
+                        (task_key, timestamp),
+                    ).fetchone()
                 if row is None:
                     self._commit(conn)
                     return None
