@@ -48,7 +48,8 @@ def _arithmetic_candidate_counts(
         if operator is None:
             continue
         parents = tuple(str(item) for item in feature.get("parents", ()))
-        identity = (operator, parents)
+        identity_parents = tuple(sorted(parents)) if operator in {"add_numeric", "multiply_numeric"} else parents
+        identity = (operator, identity_parents)
         counts[operator]["generated"] += 1
         if identity in seen_candidates:
             counts[operator]["duplicates"] += 1

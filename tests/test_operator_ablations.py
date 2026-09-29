@@ -85,7 +85,7 @@ def test_candidate_accounting_detects_duplicates_and_rejections():
     })
     generated = [
         {"name": "ADD(a,b)", "primitive": "add_numeric", "parents": ["a", "b"]},
-        {"name": "ADD(a,b)-duplicate", "primitive": "add_numeric", "parents": ["a", "b"]},
+        {"name": "ADD(a,b)-duplicate", "primitive": "add_numeric", "parents": ["b", "a"]},
         {"name": "DIV(a,c)", "primitive": "divide_numeric", "parents": ["a", "c"]},
     ]
     counts = _arithmetic_candidate_counts(generated, raw, ["ADD(a,b)"])
