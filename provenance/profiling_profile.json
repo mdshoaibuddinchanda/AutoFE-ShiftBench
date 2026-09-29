@@ -1,0 +1,350 @@
+{
+  "artifact_type": "bounded_performance_profile",
+  "cache_profile": {
+    "cache_bytes_first": 196934,
+    "cache_bytes_second": 196934,
+    "cache_file_count": 2,
+    "cache_hit_call_s": 0.033471699978690594,
+    "cache_speedup": 35.04481400020594,
+    "dataset": "sonar",
+    "first_call_s": 1.173009500023909,
+    "pipeline": "AutoFE_Baseline",
+    "temporary_cache_removed": true
+  },
+  "environment": {
+    "code_fingerprint": "df9c4f1500a441909dd04b38fdacda27b84098aaf31330a39788eb28a7618cbd",
+    "disk": {
+      "free_bytes": 467628756992,
+      "root": "D:\\DR2\\AutoFE_Submission",
+      "total_bytes": 512092008448,
+      "used_bytes": 44463251456
+    },
+    "git_commit": "6107c9ac6e04322a41f4b2bf9b4b39d42eab12fb",
+    "gpu": {
+      "available": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "NVIDIA GeForce RTX 3050 Laptop GPU, 616.64, 4096, 1452, 6"
+    },
+    "logical_cpu_count": 8,
+    "machine": "AMD64",
+    "packages": {
+      "catboost": "1.2.5",
+      "featuretools": "1.31.0",
+      "lightgbm": "4.3.0",
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "psutil": "5.9.8",
+      "scikit-learn": "1.5.2",
+      "scipy": "1.13.1",
+      "threadpoolctl": "3.6.0",
+      "woodwork": "0.31.0",
+      "xgboost": "2.0.3"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.12.14",
+    "threads": {
+      "environment": {
+        "BLIS_NUM_THREADS": null,
+        "MKL_NUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": null
+      },
+      "threadpoolctl": [
+        {
+          "architecture": "SkylakeX",
+          "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\numpy.libs\\libopenblas64__v0.3.23-293-gc2f4bdbb-gcc_10_3_0-2bde3a66a51006b2b53eb373ff767a3f.dll",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libopenblas",
+          "threading_layer": "pthreads",
+          "user_api": "blas",
+          "version": "0.3.23.dev"
+        },
+        {
+          "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\sklearn\\.libs\\vcomp140.dll",
+          "internal_api": "openmp",
+          "num_threads": 1,
+          "prefix": "vcomp",
+          "user_api": "openmp",
+          "version": null
+        },
+        {
+          "architecture": "SkylakeX",
+          "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\scipy.libs\\libopenblas_v0.3.27--3aa239bc726cfb0bd8e5330d8d4c15c6.dll",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libopenblas",
+          "threading_layer": "pthreads",
+          "user_api": "blas",
+          "version": "0.3.27"
+        }
+      ]
+    }
+  },
+  "generated_utc": "2026-09-29T20:02:24Z",
+  "numerical_parity": {
+    "compared_fields": [
+      "train_matrix_sha256",
+      "test_matrix_sha256",
+      "prediction_sha256"
+    ],
+    "dataset": "sonar",
+    "direct_first": {
+      "prediction_sha256": "5733222bdec8d49faf947f5f8c623ba02ab9bef8700e99451ae4a62db3d24b6d",
+      "test_matrix_sha256": "b1c2fa11fbe20324e7f7ab173a4b2db48efda46656f67f2539944546a9ed8c02",
+      "train_matrix_sha256": "99d4fa4676a675d819313da141979f6a7d4d63efb2092e9710e867d985560b3a"
+    },
+    "direct_repeat_equal": true,
+    "direct_second": {
+      "prediction_sha256": "5733222bdec8d49faf947f5f8c623ba02ab9bef8700e99451ae4a62db3d24b6d",
+      "test_matrix_sha256": "b1c2fa11fbe20324e7f7ab173a4b2db48efda46656f67f2539944546a9ed8c02",
+      "train_matrix_sha256": "99d4fa4676a675d819313da141979f6a7d4d63efb2092e9710e867d985560b3a"
+    },
+    "direct_vs_worker_equal": true,
+    "metric_deltas": {
+      "f1": 0.0,
+      "roc_auc": 0.0
+    },
+    "worker": {
+      "prediction_sha256": "5733222bdec8d49faf947f5f8c623ba02ab9bef8700e99451ae4a62db3d24b6d",
+      "test_matrix_sha256": "b1c2fa11fbe20324e7f7ab173a4b2db48efda46656f67f2539944546a9ed8c02",
+      "train_matrix_sha256": "99d4fa4676a675d819313da141979f6a7d4d63efb2092e9710e867d985560b3a"
+    }
+  },
+  "profile_protocol": "one seed=42, fold=1 of 5, clean condition; complete 8-pipeline x 10-model mix on one dataset",
+  "stage_profiles": [
+    {
+      "dataset": "sonar",
+      "fold": 1,
+      "frame_shape": [
+        208,
+        61
+      ],
+      "n_splits": 5,
+      "rows": [
+        {
+          "condition": "clean",
+          "dataset": "sonar",
+          "f1": 0.7368421052631579,
+          "fit_s": 0.004197500005830079,
+          "fold": 1,
+          "frame_shape": [
+            208,
+            61
+          ],
+          "load_and_split_s": 0.008680000028107315,
+          "model": "logistic_regression",
+          "n_features_test": 60,
+          "n_features_train": 60,
+          "n_generated": 0,
+          "n_retained": 60,
+          "n_test": 42,
+          "n_train": 166,
+          "pipeline": "Raw",
+          "predict_s": 0.0002665999927558005,
+          "prediction_sha256": "5733222bdec8d49faf947f5f8c623ba02ab9bef8700e99451ae4a62db3d24b6d",
+          "preparation_s": 0.011475800012703985,
+          "roc_auc": 0.8,
+          "rss_after_mb": 153.58984375,
+          "rss_before_mb": 152.2578125,
+          "seed": 42,
+          "source_sha256": "3c68a7327e052bc027b5ff59702d959439759023b21baf5fcaee12f081741baf",
+          "status": "success",
+          "test_matrix_sha256": "b1c2fa11fbe20324e7f7ab173a4b2db48efda46656f67f2539944546a9ed8c02",
+          "total_s": 0.023947599984239787,
+          "train_matrix_sha256": "99d4fa4676a675d819313da141979f6a7d4d63efb2092e9710e867d985560b3a"
+        },
+        {
+          "condition": "clean",
+          "dataset": "sonar",
+          "f1": 0.5909090909090909,
+          "fit_s": 0.0882199999759905,
+          "fold": 1,
+          "frame_shape": [
+            208,
+            61
+          ],
+          "load_and_split_s": 0.008680000028107315,
+          "model": "logistic_regression",
+          "n_features_test": 100,
+          "n_features_train": 100,
+          "n_generated": 970,
+          "n_retained": 100,
+          "n_test": 42,
+          "n_train": 166,
+          "pipeline": "AutoFE_Baseline",
+          "predict_s": 0.0002685000072233379,
+          "prediction_sha256": "bf41a57be8a8a249471f76163e96094a7e960f6acb3c812346bf0ff09808f8b2",
+          "preparation_s": 1.278214099991601,
+          "roc_auc": 0.4818181818181818,
+          "rss_after_mb": 175.8515625,
+          "rss_before_mb": 153.69921875,
+          "seed": 42,
+          "source_sha256": "3c68a7327e052bc027b5ff59702d959439759023b21baf5fcaee12f081741baf",
+          "status": "success",
+          "test_matrix_sha256": "f46d06bfca931c0d150f9eed2228215a23cb1eebcdecc27bec1296f22dbbf622",
+          "total_s": 1.381167599989567,
+          "train_matrix_sha256": "e4c4d685e18f8efeed4e04a926601ee76a8e3966dfc465a6700018c46dc8b1f3"
+        }
+      ],
+      "seed": 42,
+      "source_sha256": "3c68a7327e052bc027b5ff59702d959439759023b21baf5fcaee12f081741baf",
+      "target_column": "target"
+    },
+    {
+      "dataset": "airlines",
+      "fold": 1,
+      "frame_shape": [
+        100000,
+        8
+      ],
+      "n_splits": 5,
+      "rows": [
+        {
+          "condition": "clean",
+          "dataset": "airlines",
+          "f1": 0.5537783375314862,
+          "fit_s": 6.275174600013997,
+          "fold": 1,
+          "frame_shape": [
+            100000,
+            8
+          ],
+          "load_and_split_s": 0.12312160001602024,
+          "model": "logistic_regression",
+          "n_features_test": 605,
+          "n_features_train": 605,
+          "n_generated": 0,
+          "n_retained": 605,
+          "n_test": 20000,
+          "n_train": 80000,
+          "pipeline": "Raw",
+          "predict_s": 0.10367569996742532,
+          "prediction_sha256": "d4afabdbe87d39132881a51ec4640c9837c220f1f3996bb0571eda035a6c0de2",
+          "preparation_s": 1.7667125000152737,
+          "roc_auc": 0.6905351641653641,
+          "rss_after_mb": 1337.91015625,
+          "rss_before_mb": 180.6484375,
+          "seed": 42,
+          "source_sha256": "6d2f4f0cb3fc0f56d7361efdbef9284975f081bca1fd0ec76fc32aa88b79ab77",
+          "status": "success",
+          "test_matrix_sha256": "bd6e6a5661d0d0507e5af7fef0331cbdd81ef36e58805144c1bf9555419eadea",
+          "total_s": 8.612888899981044,
+          "train_matrix_sha256": "c10dea7cf2e4ea040132fc3789081d62e80278c920e9fd1f4d7e3be8da434e16"
+        },
+        {
+          "condition": "clean",
+          "dataset": "airlines",
+          "f1": 0.5013093399583697,
+          "fit_s": 19.013952400011476,
+          "fold": 1,
+          "frame_shape": [
+            100000,
+            8
+          ],
+          "load_and_split_s": 0.12312160001602024,
+          "model": "logistic_regression",
+          "n_features_test": 100,
+          "n_features_train": 100,
+          "n_generated": 970,
+          "n_retained": 100,
+          "n_test": 20000,
+          "n_train": 80000,
+          "pipeline": "AutoFE_Baseline",
+          "predict_s": 0.02220319997286424,
+          "prediction_sha256": "2068c3129c4dcc9a156e34af349cff3098e78843e94da403382c3ea5edaff616",
+          "preparation_s": 10.519320900028106,
+          "roc_auc": 0.6700930243420039,
+          "rss_after_mb": 471.40625,
+          "rss_before_mb": 180.67578125,
+          "seed": 42,
+          "source_sha256": "6d2f4f0cb3fc0f56d7361efdbef9284975f081bca1fd0ec76fc32aa88b79ab77",
+          "status": "success",
+          "test_matrix_sha256": "7b4587ebdaad36ca4e96ddf98f508c29e1ff24cf199642c1caefda20c839abdc",
+          "total_s": 29.701078600017354,
+          "train_matrix_sha256": "91c9dfbe10cf6c2314050790cf882904038a562f4b5cd58e96f981d4f5745652"
+        }
+      ],
+      "seed": 42,
+      "source_sha256": "6d2f4f0cb3fc0f56d7361efdbef9284975f081bca1fd0ec76fc32aa88b79ab77",
+      "target_column": "target"
+    }
+  ],
+  "worker_benchmark": {
+    "condition": "clean",
+    "dataset": "sonar",
+    "fold": 1,
+    "models": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "linear_svm",
+      "knn",
+      "gaussian_nb",
+      "mlp",
+      "lightgbm",
+      "xgboost",
+      "catboost"
+    ],
+    "numerical_parity_1_vs_4": {
+      "compared_tasks": 80,
+      "hash_mismatches": [],
+      "missing_from_1": [],
+      "missing_from_4": []
+    },
+    "pipelines": [
+      "Raw",
+      "Raw_Variance",
+      "Raw_MI",
+      "Raw_CapMatched",
+      "AutoFE_Baseline",
+      "AutoFE_MI",
+      "AutoFE_Random",
+      "AutoFE_NoMultiply"
+    ],
+    "runs": [
+      {
+        "elapsed_s": 91.18654490000335,
+        "failure_types": {},
+        "max_rss_after_mb": 228.11328125,
+        "median_task_total_s": 0.4875655499927234,
+        "p95_task_total_s": 3.6219390949874635,
+        "tasks_expected": 80,
+        "tasks_failed": 0,
+        "tasks_success": 80,
+        "throughput_tasks_per_s": 0.8773224173339312,
+        "workers": 1
+      },
+      {
+        "elapsed_s": 46.47358729998814,
+        "failure_types": {},
+        "max_rss_after_mb": 228.94921875,
+        "median_task_total_s": 0.5413259500055574,
+        "p95_task_total_s": 3.1928050049958956,
+        "tasks_expected": 80,
+        "tasks_failed": 0,
+        "tasks_success": 80,
+        "throughput_tasks_per_s": 1.7214078931242827,
+        "workers": 2
+      },
+      {
+        "elapsed_s": 30.614822999981698,
+        "failure_types": {},
+        "max_rss_after_mb": 227.4453125,
+        "median_task_total_s": 0.8516325999808032,
+        "p95_task_total_s": 3.5833807999821112,
+        "tasks_expected": 80,
+        "tasks_failed": 0,
+        "tasks_success": 80,
+        "throughput_tasks_per_s": 2.613113262162183,
+        "workers": 4
+      }
+    ],
+    "seed": 42,
+    "tasks_expected": 80
+  }
+}
