@@ -89,11 +89,21 @@ and test files; Git emitted only its normal LF-to-CRLF working-copy notices.
 
 ## Integration boundary and limitations
 
-The module is `implemented-not-integrated`. Existing runner/checkpoint code was
-left untouched so the scheduler can be reviewed independently. Before a long
-campaign, the lead should map the existing task manifest fields to `TaskSpec`,
-call `reconcile` before claiming work, publish result artifacts through the
-lease, and include scheduler DB/artifact checksums in the run manifest.
+The module is now integrated as an opt-in durable mode in
+`src/pipeline_runner.py` (`durable_scheduler=True` or
+`--durable-scheduler`). The runner maps each immutable task manifest to a
+`TaskSpec`, reconciles on startup, claims by task key, heartbeats before feature
+preparation and model fitting, publishes the JSON-safe result envelope, and
+retains the existing checkpoint ledger for phase accounting. The bounded runner
+test exercises this path and verifies two durable scheduler result artifacts.
+
+The scheduler still cannot infer whether a worker was killed after an external
+side effect. Result payloads must therefore be written only after task side
+effects are complete, and task code should be idempotent or use its own
+transactional resource boundaries. WAL protects SQLite state transitions; it
+does not make arbitrary external filesystems transactional. The durable
+artifact plus reconciliation protocol covers the result publication boundary
+implemented here.
 
 The scheduler cannot infer whether a worker process was killed after an
 external side effect. Result payloads must therefore be written only after the

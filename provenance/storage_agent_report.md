@@ -47,9 +47,10 @@ existing path remains unchanged by this milestone.
   bookkeeping are excluded from cache-byte accounting.
 
 The manager stores bytes and leaves pickle/object serialization to its caller.
-It is intentionally not imported by `pipeline_runner.py`; integration should
-be a separate reviewed change that wraps each feature-cache consumer in a
-lease and moves publication to the ready-state protocol.
+The reviewed integration in `src/pipeline_runner.py` serializes feature payloads
+with pickle, wraps reads in leases, keys artifacts by the immutable feature-task
+identity, and reclaims each artifact after the final compatible model consumer.
+The runner records reconciliation and high-water evidence in its run manifest.
 
 ## Verification
 

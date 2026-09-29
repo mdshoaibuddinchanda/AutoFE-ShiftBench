@@ -1,0 +1,103 @@
+{
+  "artifact_type": "reviewer1_optimization_scope_v1",
+  "status": "frozen_for_gate_review_do_not_launch",
+  "environment": "D:\\Conda\\p12",
+  "optimization_code_commit": "ef98cc8",
+  "optimization_code_commit_full": "ef98cc8ac67f795bf1b477026edd6f5995c16c4b",
+  "parent_scope_manifest": {
+    "path": "provenance/reviewer1_scope_manifest.json",
+    "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32",
+    "frozen_code_commit": "8d0c90093232d4b4afd86a133b94f37052c1928b"
+  },
+  "frozen_data_hashes": {
+    "dataset_list_sha256": "d86874aabd0b885f5e1041b9a166e6b34135d77bbc1cb1ec6ce16a7819fbcaf4",
+    "dataset_schema_audit_sha256": "0a562d590b562ba5996e7011d3a2b23852532b3dbae0bd5c1b1286d102f4e5ad",
+    "group_fold_audit_sha256": "790905fd8737b8e1925d109fe0187b248c51bfd4572c467cb1637f7a3a467067e"
+  },
+  "auc_coverage": {
+    "configured_datasets": 25,
+    "row_level_all_fold_auc": 25,
+    "group_aware_all_fold_auc": 23,
+    "group_aware_skipped": {
+      "wine-quality-red": "one_or_more_test_folds_missing_a_target_class",
+      "kddcup99": "class_support_below_five_splits_and_one_or_more_test_folds_missing_a_target_class"
+    },
+    "row_level_substitution": false
+  },
+  "task_counts": {
+    "seeds": 5,
+    "folds": 5,
+    "models": 10,
+    "primary_conditions": 10,
+    "core_pipelines": 2,
+    "added_ablations": 12,
+    "total_pipelines": 14,
+    "row_level_core": 125000,
+    "group_aware_core_intended": 125000,
+    "group_aware_core_auc_eligible": 115000,
+    "group_aware_core_skipped": 10000,
+    "row_level_added_ablations": 750000,
+    "group_aware_added_ablations_intended": 750000,
+    "group_aware_added_ablations_auc_eligible": 690000,
+    "group_aware_added_ablations_skipped": 60000,
+    "row_level_all_pipelines": 875000,
+    "group_aware_all_pipelines_intended": 875000,
+    "group_aware_all_pipelines_auc_eligible": 805000,
+    "group_aware_all_pipelines_skipped": 70000,
+    "both_policies_intended": 1750000,
+    "both_policies_auc_eligible": 1680000
+  },
+  "cache_policy": {
+    "mode": "bounded_regenerable",
+    "manager": "src/cache_manager.py",
+    "key_scope": "dataset/seed/fold/condition/split-policy/pipeline/cache-fingerprint",
+    "compatible_consumers": "models sharing the same feature task only",
+    "lease_ttl_seconds": 3600,
+    "max_bytes_planned": 8589934592,
+    "cleanup": "after the last model consumer for each feature task and at run reconciliation",
+    "high_water_monitor": true,
+    "safe_cleanup": "ready marker, checksum, per-artifact lock, active/malformed lease protection"
+  },
+  "scheduler_policy": {
+    "enabled_for_launch": true,
+    "backend": "src/task_scheduler.py",
+    "database": "SQLite WAL + synchronous FULL",
+    "lease_seconds": 3600,
+    "heartbeat": "before feature preparation and model fit",
+    "max_attempts": 3,
+    "result_publication": "fsync temporary envelope, atomic rename, SQLite commit, reconciliation"
+  },
+  "resource_policy": {
+    "workers_measured": [1, 2, 4],
+    "planned_worker_cap": 4,
+    "blas_threads_per_worker": 1,
+    "gpu": "inventory only; CPU path is the frozen comparison path",
+    "launch_host_requirement": "repeat provenance/measure_host.py on the intended friend PC before launch"
+  },
+  "runtime_estimates_days": {
+    "method": "old linear scale projection divided by measured 1-to-4 worker speedup 2.979; cache reuse benefit excluded",
+    "core_row_level": 9.30,
+    "core_group_aware": 16.49,
+    "all_14_row_level": 65.10,
+    "all_14_group_aware": 115.46,
+    "all_14_both_policies": 180.56,
+    "one_model_all_14_both_policies": 18.06,
+    "interpretation": "planning scenarios only; not a 14-day claim and not corrected benchmark evidence"
+  },
+  "storage_gate": {
+    "current_local_free_gib": 435.51,
+    "candidate_history_estimate_gib": 79.66,
+    "ancillary_projection_gib": 20.87,
+    "free_after_these_estimates_gib": 334.98,
+    "retained_cache_projection_gib": 47377.68,
+    "bounded_cache_decision": "removes retained-cache projection from durable storage; must be remeasured on launch host",
+    "launch_status": "blocked_pending_friend_host_probe_and_measured_representative_resume_gate"
+  },
+  "scientific_invariance": {
+    "data_hashes_changed": false,
+    "analysis_definitions_changed": false,
+    "split_policies_changed": false,
+    "row_level_fallback_for_group_auc": false,
+    "corrected_results": "PENDING CORRECTED RUN"
+  }
+}

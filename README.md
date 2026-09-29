@@ -31,16 +31,21 @@ python -m src.pipeline_runner --run-id corrected-smoke --max-datasets 1 --max-se
 # Bounded Reviewer #1 gate (existing p12 environment; no full campaign)
 python -m provenance.reviewer1_preflight
 python -m provenance.reviewer1_scale_preflight
+python provenance/measure_host.py
+python -m provenance.profile_runner --stage-datasets sonar airlines --mix-dataset sonar --workers 1 2 4
 ~~~
 
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
 
-For a full corrected grid, download the configured datasets and provide every pipeline and classifier explicitly:
+For a future full corrected grid, after the versioned optimization gates in
+`provenance/reviewer1_optimization_plan_v1.md` pass, download the configured
+datasets and provide every pipeline and classifier explicitly. The bounded
+cache and durable scheduler flags are required launch settings:
 
 ~~~
 conda activate p12
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
+python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --cache-policy bounded --cache-max-gib 8 --durable-scheduler --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
 ~~~
 
 Failed dataset downloads stop the run with an error. Missing configured CSVs also stop the run before any tasks start; a partial run is not reported as complete.
