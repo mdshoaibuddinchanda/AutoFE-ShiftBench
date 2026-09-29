@@ -32,6 +32,24 @@ Row-level folds are retained for legacy comparability. Group-aware folds use det
 
 Primary inference will summarize each dataset first, use datasets as the independent unit, report paired contrasts, confidence intervals, exact valid dataset/task denominators, and Holm-adjusted p-values within prespecified families. Fold/seed/model/condition repetitions are not independent datasets, and winner selection on the same folds is exploratory unless nested selection is added.
 
+## Condition-accounting prelaunch checklist
+
+| Gate | Status | Evidence |
+|---|---|---|
+| All 14 original conditions accounted for | **PASS** | [`reviewer1_condition_crosswalk.md`](reviewer1_condition_crosswalk.md) |
+| Every condition classified by estimand | **PASS** | Crosswalk; `README.md`; `src/pipeline_runner.py` scope enforcement |
+| No target or held-out leakage in corrected primary protocol | **PASS** | [`audit_report.md`](audit_report.md); `tests/test_leakage_controls.py`; `tests/test_condition_protocol.py` |
+| Zero duplicate-feature group overlap in group-aware folds | **PASS** | [`group_fold_audit.md`](group_fold_audit.md); `src/group_splits.py` |
+| 23/25 group-aware ROC-AUC eligibility and two explicit skips | **PASS** | [`reviewer1_scope_manifest.json`](reviewer1_scope_manifest.json); [`group_fold_audit.json`](group_fold_audit.json) |
+| Operator truth table and result identities | **PASS** | [`reviewer1_operator_ablation_manifest_v1.json`](reviewer1_operator_ablation_manifest_v1.json); `tests/test_operator_ablations.py` |
+| Primary contrasts, dataset statistical unit, and Holm correction | **PASS** | `src/reviewer1_analysis.py`; [`corrected_results_note.md`](corrected_results_note.md) |
+| Dataset hashes, source identities, seeds, code, task manifest, split checksums | **PASS** | [`reviewer1_scope_manifest.json`](reviewer1_scope_manifest.json); [`reviewer1_optimization_scope_v1.json`](reviewer1_optimization_scope_v1.json) |
+| Full tests, bounded preflight, forced interruption, new-process resume | **PASS** | [`performance_recovery_report.md`](performance_recovery_report.md); latest `p12` test gate below |
+| Friend-PC hardware, free disk, peak RAM/storage, and throughput | **PENDING** | [`host_measurement.json`](host_measurement.json) is local evidence; friend-PC measurement is not recorded |
+| Runtime and storage fit the launch budget | **PENDING** | Current optimized estimate is 180.56 planning days and the retained-cache projection is 47,377.68 GiB; both fail a 14-day/local-storage gate pending friend-PC measurement and redesign |
+
+The last two resource gates remain pending until measurements are taken on the intended friend PC. They do not authorize launch. The condition crosswalk records the four separate sensitivity tracks and their exact planned cell counts without changing the frozen 1,750,000-cell primary manifest.
+
 ## Frozen AUC policy, scope, and resource gate
 
 The group-aware primary ROC-AUC denominator contains all 25 configured datasets. `wine-quality-red` is recorded as skipped because one or more test folds miss a target class. `kddcup99` is recorded as skipped because a target class has fewer rows/groups than five splits and at least one test fold misses a class. These two datasets remain visible with their reasons; no row-level folds are substituted. The row-level track retains all 25 datasets. The resulting all-pipeline counts are 875,000 intended tasks per policy, 1,750,000 across both policies, with 70,000 group-policy tasks explicitly skipped for AUC infeasibility and 1,680,000 group/row task cells AUC-eligible. The core Raw/AutoFE-Baseline scope is 125,000 tasks per policy; its group track has 115,000 eligible and 10,000 explicitly skipped cells.
@@ -45,6 +63,7 @@ The frozen source identity is commit `8d0c90093232d4b4afd86a133b94f37052c1928b` 
 ## Required durable outputs
 
 - `reviewer1_change_catalog.md`: one entry per Reviewer #1 concern, with implementation/evidence/status and dated decision log.
+- `reviewer1_condition_crosswalk.md` and `reviewer1_condition_scope_manifest_v1.json`: complete 14-condition accounting and separate sensitivity task/resource plan.
 - `reviewer1_response_draft.md`: point-by-point journal response; every unavailable corrected value is `PENDING CORRECTED RUN`.
 - `corrected_results_note.md`: machine-checked result record with run ID, commit, hashes, split policy, denominators, estimates, intervals, adjusted p-values, coverage, failures, and row/group differences. Historical ledger is a separate labeled section.
 - `dataset_schema_audit.{json,md}`: current source/schema/hash/duplicate-overlap evidence.
@@ -72,5 +91,7 @@ The original retain-all cache gate remains rejected, and its 47,377.68 GiB proje
 The bounded profile measured a complete 80-task Sonar mix at 1/2/4 workers in 91.1865/46.4736/30.6148 seconds, with zero one-versus-four prediction-hash mismatches. Applying the observed 2.979x speedup to the prior linear projections gives planning scenarios of 9.30 days (core row), 16.49 days (core group), 65.10 days (all-14 row), 115.46 days (all-14 group), and 180.56 days (both policies); cache-reuse benefit is not assumed. These are not a 14-day claim. The friend-PC host probe, representative large-task interruption/resume, and final storage-margin checks remain launch blockers.
 
 The operator truth table and candidate-validity policy are frozen in [`reviewer1_operator_ablation_manifest_v1.json`](reviewer1_operator_ablation_manifest_v1.json). It confirms that the existing 14-pipeline scope is unchanged: `AutoFE_Baseline` is the full arithmetic reference, `AutoFE_NoMultiply` remains the historical joint multiplication-and-division removal, and multiplication/division isolate and leave-one-out variants are separately executable. The bounded smoke and full p12 suite verify code behavior only; operator performance effects remain **PENDING CORRECTED RUN**.
+
+The condition crosswalk is frozen in [`reviewer1_condition_crosswalk.md`](reviewer1_condition_crosswalk.md). It accounts for the four historical conditions outside the primary ten: target-exposed historical PCA/K-means partitions are invalidated for corrected inference and reimplemented as target-free transductive row-level sensitivities; feature removal is reimplemented as a training feature-availability sensitivity; and class-prior shift is reimplemented as majority-label relabeling. A group-aware transductive request fails closed until a group-constrained assignment rule exists. Domain fold metadata records global target-free fit scope, all-categorical fallback, class support, and AUC status; unsupported domain AUC cells are explicitly skipped rather than written as successful NaNs. Corrected condition effects remain **PENDING CORRECTED RUN**.
 
 \r\n

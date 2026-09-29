@@ -53,7 +53,18 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Limitations: Manuscript source still contains historical OpenML and shift-language statements.
 - Status: `implemented-not-run`.
 
-## R5. Baseline fairness
+## R5. Condition accounting and terminology
+
+- Exact concern: the original 14-condition design was reduced to a 10-condition corrected primary grid without a complete accounting of the four excluded conditions, and partition experiments were easy to misdescribe as deployment shift.
+- Decision and rationale: reconstruct all 14 original condition IDs, preserve the historical ledger, keep the 10-condition training-corruption grid frozen, and place the four outside conditions in explicitly labeled sensitivity scopes. Do not silently add their cells to the primary run.
+- Relevant files: [`provenance/reviewer1_condition_crosswalk.md`](reviewer1_condition_crosswalk.md), `src/pipeline_runner.py`, `src/splitters.py`, `src/shift_generator.py`, `tests/test_condition_protocol.py`, `tests/test_leakage_controls.py`.
+- Findings: historical `covariate_shift` and `population_shift` passed the full dataframe into PCA/K-means, exposing the numeric target and held-out predictors. Historical `class_prior_shift` actually relabeled training labels, and `feature_removal_0.2` randomly removed training columns despite its documentation. Their historical rows remain immutable but cannot support the corrected estimands.
+- Correction: current partitioners receive target-excluded `X`, record global target-free fit scope, distinguish PCA/K-means from all-categorical KFold fallback, check fold class support/AUC feasibility, and skip unsupported domain metric cells explicitly. Group-aware transductive requests fail closed rather than bypassing zero shared groups. Training feature availability and majority-label relabeling use training rows/labels only and remain separate sensitivity tracks.
+- Counts: primary remains 875,000 intended cells per policy and 1,750,000 across both policies. Separate planning is 175,000 row-level cells for both domain conditions, 175,000 both-policy cells for feature availability, and 175,000 both-policy cells for label relabeling. No sensitivity cells were added to the frozen manifest.
+- Tests and commands: condition protocol suite passed 7 tests; targeted leakage/condition tests passed 11 tests; corrected effects remain **PENDING CORRECTED RUN**.
+- Status: `verified-code-and-bounded-smoke`; no long run launched.
+
+## R6. Baseline fairness
 
 - Exact concern: Raw and AutoFE dimensionality/selection caps were not matched.
 - Decision and rationale: retain the original Raw baseline, add a cap-matched Raw comparator and full-dimensional Raw comparator, and report pre/post-synthesis caps, selected counts, and cost.
@@ -65,7 +76,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Limitations: Matched-cap results cannot be inferred from historical results.
 - Status: `implemented-not-run`.
 
-## R6. Individual operator effects
+## R7. Individual operator effects
 
 - Exact concern: `AutoFE_NoMultiply` excludes multiplication and division, and does not isolate individual operator effects.
 - Decision and rationale: preserve its historical meaning; add isolate-one-operator and justified leave-one-out configurations with shared budgets and finite-value rules.
@@ -98,7 +109,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - Limitations: Featuretools can produce different candidate counts for noncommutative versus commutative operators; counts are reported, not padded. No scientific performance conclusion is made.
 - Status: `verified-code-and-bounded-smoke`.
 
-## R7. Incomplete runs and stopping
+## R8. Incomplete runs and stopping
 
 - Exact concern: missing tasks and stopped blocks could be mistaken for zeroes or complete evidence.
 - Decision and rationale: every task must have success, failed, skipped-with-reason, timed-out, or pending status with resumable identity and coverage by all design dimensions.
@@ -110,7 +121,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - Limitations: unknown outcomes cannot support a causal or confirmatory claim.
 - Status: `implemented-not-run`.
 
-## R8. Reproducibility
+## R9. Reproducibility
 
 - Exact concern: stable seeds, source identity, cache/run identity, and final artifacts must be independently reproducible.
 - Decision and rationale: use canonical SHA-256 identities, source/sidecar checksums, runtime/package fingerprints, immutable task manifests, and explicit resume commands.
@@ -122,7 +133,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - Limitations: historical Dry Bean input is unavailable and historical scores cannot be reconstructed.
 - Status: `implemented-not-run`.
 
-## R9. Confirmatory analysis now
+## R10. Confirmatory analysis now
 
 - Exact concern: major fixes must be made and protocol frozen before the expensive run.
 - Decision and rationale: do not launch until both split policies, common core, ablations, resource estimates, and result schemas are frozen and preflighted.
@@ -147,7 +158,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - 2026-09-30: Bounded profiling measured 80 Sonar pipeline/model tasks at 1/2/4 workers with 0/0/0 failures and zero one-versus-four prediction-hash mismatches. Lease-aware bounded cache and durable scheduler integration committed in `906e4cd` and `ef98cc8`; full p12 suite passed 68 tests, including retained-versus-bounded parity and interrupted new-process runner resume. The optimized versioned scope retains the original AUC denominator, data hashes, analysis definitions, and 1,750,000 intended task cells. Friend-PC host probe remains required before launch.
 - 2026-09-30: Operator audit completed in `c6e1b32` after truth-table milestone `db29aec`, with final raw-baseline metadata correction in `0f272f4`: all ten arithmetic ablation variants plus the four other frozen-scope names were smoke-tested. Multiplication-only, division-only, without-multiplication, and without-division paths were separately verified; historical `AutoFE_NoMultiply` remains the joint multiplication-and-division removal. Candidate validity accounting and result-note operator metadata were added; no pipeline-count change.
 
-## R10. Performance, storage, and crash recovery before launch
+## R11. Performance, storage, and crash recovery before launch
 
 - Exact concern: retained feature caches, unbounded worker behavior, and process loss could make a long run exceed storage or produce ambiguous task outcomes.
 - Decision and rationale: use bounded regenerable feature caches keyed by immutable feature-task identity; limit worker count to the measured 1–4 range with one BLAS/OpenMP thread per worker; use durable leases, heartbeats, retry classification, atomic result envelopes, and reconciliation.

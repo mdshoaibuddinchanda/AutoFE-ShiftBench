@@ -1,0 +1,115 @@
+{
+  "artifact_type": "reviewer1_condition_scope_manifest_v1",
+  "status": "condition_audit_complete_corrected_effects_pending",
+  "environment": "D:\\Conda\\p12",
+  "code_commit": "1f3a4ed5f5329a4124323efd5ddce6b2278f4bf3",
+  "condition_crosswalk": {
+    "path": "provenance/reviewer1_condition_crosswalk.md",
+    "sha256": "940dc149276c6f4a8ce862bb5ea8e673281faa980c5c1da4bbadad78a25bf1ea"
+  },
+  "parent_scope_manifest": {
+    "path": "provenance/reviewer1_scope_manifest.json",
+    "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32",
+    "superseded": false,
+    "reason": "The corrected primary estimand and 1,750,000-cell launch manifest are unchanged; this manifest records excluded historical conditions and separate sensitivity planning without appending tasks."
+  },
+  "historical_condition_grid": {
+    "original_condition_count": 14,
+    "historical_code_commit": "f265ee118c6e0c07cf3f17e332e8aface6ab7f34",
+    "historical_ledger": "reports/tables/results_stream.jsonl",
+    "observed_rows_by_condition": {
+      "clean": 39950,
+      "gaussian_noise_0.01": 39896,
+      "gaussian_noise_0.05": 39882,
+      "gaussian_noise_0.1": 39974,
+      "missing_values_0.05": 39886,
+      "missing_values_0.1": 39872,
+      "missing_values_0.2": 39838,
+      "label_noise_0.05": 39925,
+      "label_noise_0.1": 40070,
+      "label_noise_0.2": 40012,
+      "covariate_shift": 40484,
+      "feature_removal_0.2": 39816,
+      "population_shift": 40367,
+      "class_prior_shift": 40030
+    },
+    "historical_results_status": "immutable_historical_only"
+  },
+  "primary_grid": {
+    "condition_count": 10,
+    "conditions": [
+      "clean",
+      "gaussian_noise_0.01",
+      "gaussian_noise_0.05",
+      "gaussian_noise_0.10",
+      "missing_values_0.05",
+      "missing_values_0.10",
+      "missing_values_0.20",
+      "label_noise_0.05",
+      "label_noise_0.10",
+      "label_noise_0.20"
+    ],
+    "pipelines": 14,
+    "models": 10,
+    "datasets": 25,
+    "seeds": 5,
+    "folds": 5,
+    "intended_tasks_per_policy": 875000,
+    "intended_tasks_both_policies": 1750000,
+    "group_auc_eligible_both_policies": 1680000,
+    "group_auc_skipped_both_policies": 70000,
+    "group_auc_skips": {
+      "wine-quality-red": "one_or_more_test_folds_missing_a_target_class",
+      "kddcup99": "class_support_below_five_splits_and_one_or_more_test_folds_missing_a_target_class"
+    }
+  },
+  "separate_sensitivity_tracks": {
+    "transductive_domain_partition": {
+      "conditions": [
+        "covariate_partition",
+        "population_partition"
+      ],
+      "row_level_intended_tasks": 175000,
+      "group_aware_tasks": 175000,
+      "group_aware_status": "blocked_until_group_constrained_transductive_assignment_is_prespecified",
+      "additional_runtime_days_planning": 18.06,
+      "candidate_history_gib_planning": 7.97,
+      "retained_cache_gib_historical_policy_planning": 4737.77,
+      "launch_status": "not_launched"
+    },
+    "feature_availability_ablation": {
+      "conditions": [
+        "feature_availability_ablation_0.20"
+      ],
+      "row_level_intended_tasks": 87500,
+      "group_aware_intended_tasks": 87500,
+      "group_auc_eligible_tasks": 80500,
+      "group_auc_skipped_tasks": 7000,
+      "both_policy_intended_tasks": 175000,
+      "additional_runtime_days_planning": 18.06,
+      "candidate_history_gib_planning": 7.97,
+      "retained_cache_gib_historical_policy_planning": 4737.77,
+      "launch_status": "not_launched"
+    },
+    "majority_label_relabeling": {
+      "conditions": [
+        "majority_label_relabeling"
+      ],
+      "row_level_intended_tasks": 87500,
+      "group_aware_intended_tasks": 87500,
+      "group_auc_eligible_tasks": 80500,
+      "group_auc_skipped_tasks": 7000,
+      "both_policy_intended_tasks": 175000,
+      "additional_runtime_days_planning": 18.06,
+      "candidate_history_gib_planning": 7.97,
+      "retained_cache_gib_historical_policy_planning": 4737.77,
+      "launch_status": "not_launched"
+    }
+  },
+  "scientific_invariance": {
+    "primary_estimand_changed": false,
+    "primary_task_manifest_changed": false,
+    "sensitivity_tasks_appended_to_primary": false,
+    "corrected_effects": "PENDING CORRECTED RUN"
+  }
+}
