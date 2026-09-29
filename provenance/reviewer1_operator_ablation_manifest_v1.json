@@ -19,6 +19,30 @@
   },
   "variants": [
     {
+      "name": "Raw",
+      "enabled_operators": [],
+      "excluded_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "status": "existing core; no feature synthesis"
+    },
+    {
+      "name": "Raw_CapMatched",
+      "enabled_operators": [],
+      "excluded_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "status": "existing frozen fairness baseline; no feature synthesis"
+    },
+    {
+      "name": "AutoFE_MI",
+      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "excluded_operators": [],
+      "status": "existing frozen added variant; all arithmetic"
+    },
+    {
+      "name": "AutoFE_Random",
+      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "excluded_operators": [],
+      "status": "existing frozen added variant; all arithmetic"
+    },
+    {
       "name": "AutoFE_Baseline",
       "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
       "excluded_operators": [],

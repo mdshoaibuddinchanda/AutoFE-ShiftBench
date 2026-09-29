@@ -137,6 +137,9 @@ def test_each_operator_variant_smoke_and_stable_metadata(tmp_path):
         observed[name] = first["operator_candidate_counts"]
     assert observed["AutoFE_LeaveOut_Multiply"][OPS["divide"]]["generated"] > 0
     assert observed["AutoFE_LeaveOut_Divide"][OPS["multiply"]]["generated"] > 0
+    _, _, raw_metadata = expand_features_with_dfs(x.iloc[:40], x.iloc[40:], y.iloc[:40], PIPELINE_CONFIGS["Raw"])
+    assert raw_metadata["operator_configuration"]["enabled_operators"] == []
+    assert all(value["generated"] == 0 for value in raw_metadata["operator_configuration"]["candidate_counts"].values())
 
 
 def test_all_operator_variants_write_distinct_result_rows(tmp_path):

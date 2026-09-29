@@ -74,6 +74,10 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 
 | Actual runner pipeline | Add | Subtract | Multiply | Divide | Status |
 |---|:---:|:---:|:---:|:---:|---|
+| `Raw` | No | No | No | No | existing core; no synthesis |
+| `Raw_CapMatched` | No | No | No | No | existing frozen added baseline; no synthesis |
+| `AutoFE_MI` | Yes | Yes | Yes | Yes | existing frozen added; all arithmetic |
+| `AutoFE_Random` | Yes | Yes | Yes | Yes | existing frozen added; all arithmetic |
 | `AutoFE_Baseline` | Yes | Yes | Yes | Yes | existing full reference |
 | `AutoFE_NoMultiply` | Yes | Yes | No | No | existing historical joint removal |
 | `AutoFE_Isolate_Add` | Yes | No | No | No | existing added; verified |
@@ -84,6 +88,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 | `AutoFE_LeaveOut_Subtract` | Yes | No | Yes | Yes | existing added; verified |
 | `AutoFE_LeaveOut_Multiply` | Yes | Yes | No | Yes | existing added; division retained |
 | `AutoFE_LeaveOut_Divide` | Yes | Yes | Yes | No | existing added; multiplication retained |
+
+The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis); these utility configurations are outside the frozen 14-pipeline Reviewer #1 manifest and are not added to the task grid.
 
 - Tests and commands: `tests/test_operator_ablations.py` covers the truth table, operand ordering, zero/near-zero/nonfinite division, duplicate/rejected candidates, identity separation, repeated metadata stability, all ten bounded operator configurations, and result-note operator auditing. Focused operator tests pass; corrected performance effects remain pending.
 - Commit hash: `db29aec4ec07a7b913670a199a6c582f6ee2fdce`.

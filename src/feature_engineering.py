@@ -53,6 +53,8 @@ def _arithmetic_candidate_counts(
         counts[operator]["generated"] += 1
         if identity in seen_candidates:
             counts[operator]["duplicates"] += 1
+            counts[operator]["rejected"] += 1
+            continue
         seen_candidates.add(identity)
         values = pd.to_numeric(raw_train_feature_matrix[str(feature["name"])], errors="coerce").to_numpy(dtype=float)
         if np.isfinite(values).all():
@@ -199,8 +201,8 @@ def expand_features_with_dfs(
             "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
             "feature_metadata": [{"name": c, "primitive": "raw", "parents": [], "depth": 0} for c in selected],
             "operator_configuration": {
-                "enabled_operators": list(enabled_operators),
-                "excluded_operators": [item for item in ARITHMETIC_PRIMITIVES if item not in enabled_operators],
+                "enabled_operators": [],
+                "excluded_operators": list(ARITHMETIC_PRIMITIVES),
                 "candidate_counts": {item: {"generated": 0, "rejected": 0, "eligible": 0, "selected": 0, "duplicates": 0} for item in ARITHMETIC_PRIMITIVES},
             },
         }
@@ -248,16 +250,26 @@ def expand_features_with_dfs(
     # matrices, but an invalid candidate must not become selectable merely
     # because its missing values were imputed to zero.
     invalid_candidate_names: set[str] = set()
+    duplicate_candidate_names: set[str] = set()
+    seen_candidate_identities: set[tuple[str, tuple[str, ...]]] = set()
     for feature in generated_features:
         operator = _PRIMITIVE_ALIASES.get(str(feature.get("primitive", "")).lower())
         if operator is None:
             continue
         name = str(feature["name"])
+        parents = tuple(str(item) for item in feature.get("parents", ()))
+        identity_parents = tuple(sorted(parents)) if operator in {"add_numeric", "multiply_numeric"} else parents
+        identity = (operator, identity_parents)
+        if identity in seen_candidate_identities:
+            duplicate_candidate_names.add(name)
+            continue
+        seen_candidate_identities.add(identity)
         raw_values = pd.to_numeric(raw_train_feature_matrix[name], errors="coerce").to_numpy(dtype=float)
         if not np.isfinite(raw_values).all():
             invalid_candidate_names.add(name)
-    train_for_selection = train_feature_matrix.drop(columns=sorted(invalid_candidate_names), errors="ignore")
-    test_for_selection = test_feature_matrix.drop(columns=sorted(invalid_candidate_names), errors="ignore")
+    rejected_candidate_names = invalid_candidate_names | duplicate_candidate_names
+    train_for_selection = train_feature_matrix.drop(columns=sorted(rejected_candidate_names), errors="ignore")
+    test_for_selection = test_feature_matrix.drop(columns=sorted(rejected_candidate_names), errors="ignore")
     train_out, test_out, selected_cols = _limit_features(train_for_selection, test_for_selection, y_train, cfg)
     
     retained_meta = [g for g in generated_features if g["name"] in selected_cols]
@@ -292,8 +304,9 @@ def expand_features_with_dfs(
             with np.errstate(all="ignore"):
                 score = float(np.nanvar(values)) if np.isfinite(values).any() else None
             score_status = "finite" if score is not None and np.isfinite(score) else "undefined"
-            admissible = bool(np.isfinite(raw_values).all())
-            rejection_reason = None if admissible else "nonfinite_candidate_value"
+            duplicate = feature["name"] in duplicate_candidate_names
+            admissible = bool(np.isfinite(raw_values).all()) and not duplicate
+            rejection_reason = "duplicate_candidate" if duplicate else (None if admissible else "nonfinite_candidate_value")
             if not admissible:
                 score = None
                 score_status = "undefined"
