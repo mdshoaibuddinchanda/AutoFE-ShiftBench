@@ -46,7 +46,7 @@ For planning only, applying the observed 2.979x 1-to-4-worker speedup to the ori
 
 `src/task_scheduler.py` provides immutable task registration, WAL/FULL SQLite state, worker leases, heartbeats, expiry, retry classification, and atomic result envelopes.  The runner can enable it with `durable_scheduler=True` or `--durable-scheduler`; it publishes a scheduler result only after task computation, uses task-key-specific claims, and reconciles artifacts on startup.  A task may retry transient worker/I/O failures up to three attempts; deterministic input/programming failures are terminal.  The process-boundary fault-injection suite verifies recovery after a crash before rename and after rename before the SQLite commit.
 
-The bounded runner test exercises both the bounded cache cleanup and the durable scheduler in a fresh run.  The 59-test p12 suite, compile check, and diff check passed after integration.  No full benchmark or corrected result ledger has been created.
+The bounded runner tests exercise cache cleanup and the durable scheduler, compare retained versus bounded prediction/matrix hashes, and interrupt then resume the runner in a new process.  The 61-test p12 suite, compile check, and diff check passed after integration.  No full benchmark or corrected result ledger has been created.
 
 ## Launch checklist
 
