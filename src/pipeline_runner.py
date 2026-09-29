@@ -919,6 +919,12 @@ def run_experiment(
                                     "n_retained": int(fe_meta.get("n_retained", x_train_fe.shape[1])),
                                     "ram_used_mb": float(fe_meta.get("ram_used_mb", 0.0)),
                                     "operator_counts": fe_meta.get("operator_counts", {}),
+                                    "operator_candidate_counts": fe_meta.get("operator_candidate_counts", {}),
+                                    "operator_configuration": fe_meta.get("operator_configuration", {
+                                        "enabled_operators": list(PIPELINE_CONFIGS[pipeline_name].trans_primitives)
+                                        if PIPELINE_CONFIGS[pipeline_name].enable_dfs else [],
+                                        "excluded_operators": [],
+                                    }),
                                     "candidate_history": fe_meta.get("candidate_history", {
                                         "enabled": False, "records_written": 0, "score_scope": "train",
                                     }),

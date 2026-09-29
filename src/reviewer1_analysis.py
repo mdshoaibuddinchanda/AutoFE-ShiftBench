@@ -93,6 +93,38 @@ def _status_counts(frame: pd.DataFrame, expected: int) -> dict[str, int]:
     return counts
 
 
+def _operator_ablation_audit(frame: pd.DataFrame, pipelines: list[str]) -> dict[str, Any]:
+    """Summarize operator configuration/count metadata without estimating effects."""
+    audit: dict[str, Any] = {}
+    for pipeline in pipelines:
+        rows = frame[frame["pipeline"].astype(str) == str(pipeline)].to_dict(orient="records")
+        configs: dict[str, dict[str, Any]] = {}
+        aggregate: dict[str, dict[str, int]] = {}
+        rows_with_metadata = 0
+        for row in rows:
+            config = row.get("operator_configuration")
+            counts = row.get("operator_candidate_counts")
+            if not isinstance(config, dict):
+                continue
+            rows_with_metadata += 1
+            config_key = json.dumps(config, sort_keys=True, separators=(",", ":"))
+            configs[config_key] = config
+            if isinstance(counts, dict):
+                for operator, values in counts.items():
+                    if not isinstance(values, dict):
+                        continue
+                    target = aggregate.setdefault(operator, {})
+                    for field in ("generated", "rejected", "eligible", "selected", "duplicates"):
+                        target[field] = target.get(field, 0) + int(values.get(field, 0) or 0)
+        audit[str(pipeline)] = {
+            "rows_with_operator_metadata": rows_with_metadata,
+            "configurations": list(configs.values()),
+            "candidate_counts": aggregate,
+            "effects_status": "PENDING CORRECTED RUN",
+        }
+    return audit
+
+
 def build_corrected_result_note(
     results_path: str | Path,
     *,
@@ -232,6 +264,7 @@ def build_corrected_result_note(
         },
         "dataset_scores": dataset_scores, "contrasts": contrast_rows,
         "row_group_side_by_side": side_by_side,
+        "operator_ablation_audit": _operator_ablation_audit(frame, config["pipelines"]),
     }
     if output_path is not None:
         output = Path(output_path)

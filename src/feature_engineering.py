@@ -17,6 +17,52 @@ import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
 
 
+ARITHMETIC_PRIMITIVES: tuple[str, ...] = (
+    "add_numeric",
+    "subtract_numeric",
+    "multiply_numeric",
+    "divide_numeric",
+)
+_PRIMITIVE_ALIASES = {
+    "add": "add_numeric", "add_numeric": "add_numeric",
+    "subtract": "subtract_numeric", "subtract_numeric": "subtract_numeric",
+    "multiply": "multiply_numeric", "multiply_numeric": "multiply_numeric",
+    "divide": "divide_numeric", "divide_numeric": "divide_numeric",
+}
+
+
+def _arithmetic_candidate_counts(
+    generated_features: list[dict[str, Any]],
+    raw_train_feature_matrix: pd.DataFrame,
+    selected_cols: list[str],
+) -> dict[str, dict[str, int]]:
+    """Count generated, duplicate, finite-eligible, rejected, and selected candidates."""
+    counts = {
+        operator: {"generated": 0, "rejected": 0, "eligible": 0, "selected": 0, "duplicates": 0}
+        for operator in ARITHMETIC_PRIMITIVES
+    }
+    selected_set = set(selected_cols)
+    seen_candidates: set[tuple[str, tuple[str, ...]]] = set()
+    for feature in generated_features:
+        operator = _PRIMITIVE_ALIASES.get(str(feature.get("primitive", "")).lower())
+        if operator is None:
+            continue
+        parents = tuple(str(item) for item in feature.get("parents", ()))
+        identity = (operator, parents)
+        counts[operator]["generated"] += 1
+        if identity in seen_candidates:
+            counts[operator]["duplicates"] += 1
+        seen_candidates.add(identity)
+        values = pd.to_numeric(raw_train_feature_matrix[str(feature["name"])], errors="coerce").to_numpy(dtype=float)
+        if np.isfinite(values).all():
+            counts[operator]["eligible"] += 1
+            if str(feature["name"]) in selected_set:
+                counts[operator]["selected"] += 1
+        else:
+            counts[operator]["rejected"] += 1
+    return counts
+
+
 @dataclass(slots=True)
 class DFSConfig:
     """Configuration for DFS feature generation and ablations."""
@@ -117,6 +163,12 @@ def expand_features_with_dfs(
     candidate_history_writer: Any | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     cfg = config or DFSConfig()
+    enabled_operators = tuple(str(item) for item in cfg.trans_primitives)
+    unknown_operators = sorted(set(enabled_operators).difference(ARITHMETIC_PRIMITIVES))
+    if unknown_operators:
+        raise ValueError(f"Unsupported arithmetic primitives: {unknown_operators}")
+    if len(set(enabled_operators)) != len(enabled_operators):
+        raise ValueError("trans_primitives must not contain duplicate operators")
     
     ram_before = _get_process_ram_mb() if cfg.monitor_ram else None
 
@@ -144,7 +196,12 @@ def expand_features_with_dfs(
             "n_generated": 0,
             "n_retained": len(selected),
             "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
-            "feature_metadata": [{"name": c, "primitive": "raw", "parents": [], "depth": 0} for c in selected]
+            "feature_metadata": [{"name": c, "primitive": "raw", "parents": [], "depth": 0} for c in selected],
+            "operator_configuration": {
+                "enabled_operators": list(enabled_operators),
+                "excluded_operators": [item for item in ARITHMETIC_PRIMITIVES if item not in enabled_operators],
+                "candidate_counts": {item: {"generated": 0, "rejected": 0, "eligible": 0, "selected": 0, "duplicates": 0} for item in ARITHMETIC_PRIMITIVES},
+            },
         }
         return train_out, test_out, metadata
 
@@ -185,7 +242,22 @@ def expand_features_with_dfs(
             depth = 1
         generated_features.append({"name": f.get_name(), "primitive": prim, "parents": parents, "depth": depth})
 
-    train_out, test_out, selected_cols = _limit_features(train_feature_matrix, test_feature_matrix, y_train, cfg)
+    # Reject arithmetic candidates with non-finite training values before
+    # selection.  Filling NaNs with zero is retained for valid downstream
+    # matrices, but an invalid candidate must not become selectable merely
+    # because its missing values were imputed to zero.
+    invalid_candidate_names: set[str] = set()
+    for feature in generated_features:
+        operator = _PRIMITIVE_ALIASES.get(str(feature.get("primitive", "")).lower())
+        if operator is None:
+            continue
+        name = str(feature["name"])
+        raw_values = pd.to_numeric(raw_train_feature_matrix[name], errors="coerce").to_numpy(dtype=float)
+        if not np.isfinite(raw_values).all():
+            invalid_candidate_names.add(name)
+    train_for_selection = train_feature_matrix.drop(columns=sorted(invalid_candidate_names), errors="ignore")
+    test_for_selection = test_feature_matrix.drop(columns=sorted(invalid_candidate_names), errors="ignore")
+    train_out, test_out, selected_cols = _limit_features(train_for_selection, test_for_selection, y_train, cfg)
     
     retained_meta = [g for g in generated_features if g["name"] in selected_cols]
 
@@ -207,13 +279,7 @@ def expand_features_with_dfs(
         selected_set = set(selected_cols)
         for iteration, feature in enumerate(generated_features):
             primitive = str(feature.get("primitive", "")).lower()
-            primitive_map = {
-                "add": "add_numeric", "add_numeric": "add_numeric",
-                "subtract": "subtract_numeric", "subtract_numeric": "subtract_numeric",
-                "multiply": "multiply_numeric", "multiply_numeric": "multiply_numeric",
-                "divide": "divide_numeric", "divide_numeric": "divide_numeric",
-            }
-            operator = primitive_map.get(primitive)
+            operator = _PRIMITIVE_ALIASES.get(primitive)
             if operator is None:
                 continue
             parents = tuple(str(item) for item in feature.get("parents", ()))
@@ -254,15 +320,22 @@ def expand_features_with_dfs(
             history_operator_counts[operator] = history_operator_counts.get(operator, 0) + 1
             history_score_status[score_status] += 1
 
+    candidate_counts = _arithmetic_candidate_counts(
+        generated_features, raw_train_feature_matrix, selected_cols,
+    )
+
     metadata = {
         "n_generated": len(feature_defs),
         "n_retained": len(selected_cols),
         "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
         "feature_metadata": retained_meta,
         "generated_feature_metadata_count": len(generated_features),
-        "operator_counts": {
-            primitive: sum(1 for item in generated_features if item.get("primitive") == primitive)
-            for primitive in sorted({str(item.get("primitive")) for item in generated_features})
+        "operator_counts": {operator: counts["generated"] for operator, counts in candidate_counts.items()},
+        "operator_candidate_counts": candidate_counts,
+        "operator_configuration": {
+            "enabled_operators": list(enabled_operators),
+            "excluded_operators": [item for item in ARITHMETIC_PRIMITIVES if item not in enabled_operators],
+            "candidate_counts": candidate_counts,
         },
         "candidate_history": {
             "enabled": candidate_history_writer is not None,
