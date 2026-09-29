@@ -7,7 +7,7 @@
   "documentation_freeze_commit": "abfc3fc3bb5ec6074235b9c521a342d084c9fdac",
   "final_gate_commit": "df20a53d14a4d914dcf20f030fd5fdd4f0cc88d6",
   "operator_ablation_manifest": "provenance/reviewer1_operator_ablation_manifest_v1.json",
-  "operator_ablation_manifest_sha256": "afc90506c0c1427a6464a754fb406ab533af359c68ace71d5b9a423651c79768",
+  "operator_ablation_manifest_sha256": "63b2ab2f8296537d9bbe2528b78156ba8d5b0261d22b54bb9f67fadbf0964773",
   "operator_ablation_code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
