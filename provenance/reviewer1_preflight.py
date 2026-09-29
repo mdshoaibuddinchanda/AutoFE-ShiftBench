@@ -63,6 +63,9 @@ def main() -> None:
     x_train = X.iloc[: min(100, len(X))].reset_index(drop=True)
     x_test = X.iloc[min(100, len(X)): min(130, len(X))].reset_index(drop=True)
     history_path = output_root / "candidate_history_preflight.jsonl.gz"
+    # A preflight artifact represents one bounded pass; avoid appending to a
+    # prior measurement when the gate is rerun.
+    history_path.unlink(missing_ok=True)
     with CandidateHistoryWriter(history_path) as writer:
         _, _, metadata = expand_features_with_dfs(
             x_train, x_test, y.iloc[: len(x_train)],

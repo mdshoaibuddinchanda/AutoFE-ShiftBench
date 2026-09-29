@@ -4,13 +4,13 @@
   "dataset": "sonar",
   "n_splits": 5,
   "seed": 42,
-  "code_commit": "74f7712a038e8ae6fac7b62c102483e0db6408de",
+  "code_commit": "d4a897ac4eae908aa5d64a1c3bdc922971948830",
   "code_fingerprint": "08c6f6234231d9fbbb093f1c02191340035443c1c5c4c84e5c3f0985a840bd11",
   "runs": [
     {
       "run_id": "sonar-row_level",
       "split_policy": "row_level",
-      "elapsed_s": 1.776952899992466,
+      "elapsed_s": 0.4022455000085756,
       "status": "complete",
       "counts": {
         "failed": 0,
@@ -30,7 +30,7 @@
     {
       "run_id": "sonar-group_aware",
       "split_policy": "group_aware",
-      "elapsed_s": 1.581315400020685,
+      "elapsed_s": 0.5640123999910429,
       "status": "complete",
       "counts": {
         "failed": 0,
