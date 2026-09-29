@@ -10,7 +10,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Decision and rationale: define a feature-map Jacobian only for supported arithmetic primitives; record undefined/non-finite cases; treat associations as evidence consistent with a mechanism, not proof of causality.
 - Implementation: arithmetic Jacobian/finite-difference checks, scaled local norms, candidate-history schema, storage estimator, and optional Featuretools candidate logging are implemented. The runner does not enable full-grid history by default because the bounded estimate is large.
 - Tests and commands: `D:\Conda\p12\python.exe -m pytest -q tests/test_mechanism_audit.py` -> 14 passed; bounded real-data preflight wrote 950 training-only candidate records with all four operators and finite scores.
-- Commit hash: integration milestone pending.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: preflight `provenance/reviewer1_preflight_manifest.json`; full corrected values remain `PENDING CORRECTED RUN`.
 - Limitations: Featuretools internals may not expose every generated expression or derivative boundary.
 - Status: `implemented-not-run`.
@@ -36,7 +36,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Decision and rationale: retain row-level folds as legacy-comparable sensitivity; add group-aware folds using deterministic canonical target-excluded raw predictors and assert zero shared groups. Never silently fall back or discard infeasible datasets.
 - Implementation: deterministic typed canonicalization, SHA-256 group IDs with collision checks, `StratifiedGroupKFold`, zero-shared-group assertions, runner split-policy identity, and explicit infeasibility manifests are implemented.
 - Tests and commands: `python -m provenance.audit_group_folds` -> 25/25 structural group splits, 23/25 all-fold class/AUC support; `wine-quality-red` and `kddcup99` are explicitly infeasible for all-fold AUC; targeted group tests pass 7 tests. Row-level overlap examples include PhishingWebsites 65.42% and KDDCup99 67.01%.
-- Commit hash: integration milestone pending.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: `provenance/group_fold_audit.json` and `.md`; corrected performance remains `PENDING CORRECTED RUN`.
 - Limitations: Grouping removes duplicate-vector overlap, not semantic target proxies or deployment shift.
 - Status: `implemented-not-run`.
@@ -60,7 +60,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Relevant files: `src/pipeline_runner.py`, `src/feature_engineering.py`, result schema (planned).
 - Implementation: `Raw_CapMatched` and full-dimensional `Raw` are explicit; isolate-one and leave-one-out operator configs share depth/base/output/variance budgets. Preflight ran Raw, cap-matched Raw, and AutoFE baseline under both policies.
 - Tests and commands: bounded preflight completed in 1.52–1.80 seconds per three-task policy run on `sonar`; result/cache sizes are recorded in `provenance/reviewer1_preflight_manifest.json`.
-- Commit hash: pending.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
 - Limitations: Matched-cap results cannot be inferred from historical results.
 - Status: `implemented-not-run`.
@@ -72,7 +72,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Relevant files: `src/feature_engineering.py`, `src/pipeline_runner.py`, `src/shift_generator.py` (planned integration).
 - Implementation: `AutoFE_Isolate_{Add,Subtract,Multiply,Divide}` and `AutoFE_LeaveOut_{Add,Subtract,Multiply,Divide}` configs are wired with matched budgets; historical `AutoFE_NoMultiply` remains explicitly addition/subtraction-only.
 - Tests and commands: mechanism tests pass; operator-generation benchmark values remain pending.
-- Commit hash: pending.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
 - Limitations: Division-by-zero behavior and Featuretools expression naming require explicit validation.
 - Status: `implemented-not-run`.
