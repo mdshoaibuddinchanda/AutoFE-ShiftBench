@@ -14,7 +14,7 @@
     "eligible": "all training-fold candidate values finite",
     "rejected": "any nonfinite training-fold candidate value, including division by zero or overflow",
     "near_zero_denominator": "finite large values remain eligible unless the output overflows",
-    "duplicate": "same operator plus ordered parent tuple counted as a duplicate and never treated as a new candidate",
+    "duplicate": "same operator plus parent tuple counted as a duplicate and never treated as a new candidate; parent order is canonicalized for commutative add_numeric and multiply_numeric, and preserved for ordered subtract_numeric and divide_numeric",
     "selection": "invalid arithmetic columns are removed before feature selection; held-out values are never used for selection"
   },
   "variants": [
