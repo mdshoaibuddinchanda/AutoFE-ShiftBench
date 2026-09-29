@@ -965,6 +965,7 @@ def run_experiment(
                                     "expected_consumers": len(models),
                                     "consumer_task_keys": [],
                                     "terminal_consumer_task_keys": [],
+                                    "pending_or_retryable_consumer_task_keys": [],
                                     "build_count": 0,
                                     "hit_count": 0,
                                     "regeneration_count": 0,
@@ -1278,6 +1279,11 @@ def run_experiment(
                                             if CacheManager._digest(record["cache_key"]) in deleted:
                                                 record["deletion_observed"] = True
                                                 record["deletion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                                elif cache_audit and audit_record is not None:
+                                    audit_record["pending_or_retryable_consumer_task_keys"] = [
+                                        key for key in feature_consumer_task_keys
+                                        if key not in audit_record["terminal_consumer_task_keys"]
+                                    ]
     if cache_manager is not None:
         cache_reconciled = cache_manager.reconcile()
         scheduler_pending = False
