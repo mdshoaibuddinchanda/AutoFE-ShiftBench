@@ -45,7 +45,7 @@ cache and durable scheduler flags are required launch settings:
 ~~~
 conda activate p12
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --cache-policy bounded --cache-max-gib 8 --durable-scheduler --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
+python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --cache-policy bounded --cache-max-gib 8 --durable-scheduler --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply AutoFE_Isolate_Add AutoFE_Isolate_Subtract AutoFE_Isolate_Multiply AutoFE_Isolate_Divide AutoFE_LeaveOut_Add AutoFE_LeaveOut_Subtract AutoFE_LeaveOut_Multiply AutoFE_LeaveOut_Divide --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
 ~~~
 
 Failed dataset downloads stop the run with an error. Missing configured CSVs also stop the run before any tasks start; a partial run is not reported as complete.
