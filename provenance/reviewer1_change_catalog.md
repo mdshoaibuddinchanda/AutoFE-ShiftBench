@@ -70,12 +70,27 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: `AutoFE_NoMultiply` excludes multiplication and division, and does not isolate individual operator effects.
 - Decision and rationale: preserve its historical meaning; add isolate-one-operator and justified leave-one-out configurations with shared budgets and finite-value rules.
 - Relevant files: `src/feature_engineering.py`, `src/pipeline_runner.py`, `src/shift_generator.py` (planned integration).
-- Implementation: `AutoFE_Isolate_{Add,Subtract,Multiply,Divide}` and `AutoFE_LeaveOut_{Add,Subtract,Multiply,Divide}` configs are wired with matched budgets; historical `AutoFE_NoMultiply` remains explicitly addition/subtraction-only.
-- Tests and commands: mechanism tests pass; operator-generation benchmark values remain pending.
-- Commit hash: `d4a897a` integration milestone.
-- Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
-- Limitations: Division-by-zero behavior and Featuretools expression naming require explicit validation.
-- Status: `implemented-not-run`.
+- Implementation: the existing `AutoFE_Baseline` is the full arithmetic reference; no duplicate all-operator runner ID was added. `AutoFE_NoMultiply` is preserved as the historical joint removal of multiplication and division. The isolate-one and leave-one-out variants already existed in the 14-pipeline scope and are now verified end to end. Invalid arithmetic columns are rejected before selection, and result rows record generated/rejected/eligible/selected/duplicate counts by operator.
+
+| Actual runner pipeline | Add | Subtract | Multiply | Divide | Status |
+|---|:---:|:---:|:---:|:---:|---|
+| `AutoFE_Baseline` | Yes | Yes | Yes | Yes | existing full reference |
+| `AutoFE_NoMultiply` | Yes | Yes | No | No | existing historical joint removal |
+| `AutoFE_Isolate_Add` | Yes | No | No | No | existing added; verified |
+| `AutoFE_Isolate_Subtract` | No | Yes | No | No | existing added; verified |
+| `AutoFE_Isolate_Multiply` | No | No | Yes | No | existing added; separately verified |
+| `AutoFE_Isolate_Divide` | No | No | No | Yes | existing added; separately verified |
+| `AutoFE_LeaveOut_Add` | No | Yes | Yes | Yes | existing added; verified |
+| `AutoFE_LeaveOut_Subtract` | Yes | No | Yes | Yes | existing added; verified |
+| `AutoFE_LeaveOut_Multiply` | Yes | Yes | No | Yes | existing added; division retained |
+| `AutoFE_LeaveOut_Divide` | Yes | Yes | Yes | No | existing added; multiplication retained |
+
+- Tests and commands: `tests/test_operator_ablations.py` covers the truth table, operand ordering, zero/near-zero/nonfinite division, duplicate/rejected candidates, identity separation, repeated metadata stability, all ten bounded operator configurations, and result-note operator auditing. Focused operator tests pass; corrected performance effects remain pending.
+- Commit hash: `db29aec4ec07a7b913670a199a6c582f6ee2fdce`.
+- Configuration artifact: `provenance/reviewer1_operator_ablation_manifest_v1.json`.
+- Benchmark artifact IDs / observed values: bounded synthetic smoke only; ROC-AUC effects are **PENDING CORRECTED RUN**.
+- Limitations: Featuretools can produce different candidate counts for noncommutative versus commutative operators; counts are reported, not padded. No scientific performance conclusion is made.
+- Status: `verified-code-and-bounded-smoke`.
 
 ## R7. Incomplete runs and stopping
 
@@ -107,7 +122,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Decision and rationale: do not launch until both split policies, common core, ablations, resource estimates, and result schemas are frozen and preflighted.
 - Relevant files: `provenance/reviewer1_run_plan.md`, `provenance/corrected_results_note.md`, frozen manifest (planned).
 - Implementation: plan, change catalog, response draft, corrected-result schema, small and large bounded preflights, exact task-count manifest, and storage/runtime gate are present. The long campaign is deliberately not launched: two configured datasets cannot support all-fold group-aware AUC, retained feature caches project to about 47,378 GiB for the full two-track ablation scope, and ten-model runtime projects far beyond 14 days.
-- Tests and commands: bounded row/group preflight completed on `sonar`; large `airlines` scale preflight completed under both policies; the post-optimization full-suite gate passed 61 tests; only the pre-existing notebook execution-count edit remains outside the audit commits.
+- Tests and commands: bounded row/group preflight completed on `sonar`; large `airlines` scale preflight completed under both policies; the post-optimization full-suite gate passed 68 tests; only the pre-existing notebook execution-count edit remains outside the audit commits.
 - Commit hash: `e3ed283` integrated audit milestone.
 - Benchmark artifact IDs / observed values: none; no long run is running.
 - Limitations: corrected numerical results are unavailable.
@@ -123,7 +138,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - 2026-09-29: Bounded `sonar` preflight completed under both policies with Raw, cap-matched Raw, and AutoFE baseline; no full campaign was started. Candidate-history preflight wrote 950 training-only records and estimated approximately 79.7 GiB compressed for the full grid.
 - 2026-09-29: Final post-integration gate in `p12`: 42 tests passed, compileall passed, schema audit 25/25, and compact group audit 25/25 structural with 23/25 AUC-supported.
 - 2026-09-29: Large-dataset `airlines` scale gate measured 57.45 s for three row-level tasks, 101.89 s for three group-aware tasks, and about 0.87 GB of feature caches per three-task run. Frozen scope manifest records 1,750,000 intended two-policy tasks and a storage/runtime `DO_NOT_LAUNCH` decision under current retention.
-- 2026-09-30: Bounded profiling measured 80 Sonar pipeline/model tasks at 1/2/4 workers with 0/0/0 failures and zero one-versus-four prediction-hash mismatches. Lease-aware bounded cache and durable scheduler integration committed in `906e4cd` and `ef98cc8`; full p12 suite passed 61 tests, including retained-versus-bounded parity and interrupted new-process runner resume. The optimized versioned scope retains the original AUC denominator, data hashes, analysis definitions, and 1,750,000 intended task cells. Friend-PC host probe remains required before launch.
+- 2026-09-30: Bounded profiling measured 80 Sonar pipeline/model tasks at 1/2/4 workers with 0/0/0 failures and zero one-versus-four prediction-hash mismatches. Lease-aware bounded cache and durable scheduler integration committed in `906e4cd` and `ef98cc8`; full p12 suite passed 68 tests, including retained-versus-bounded parity and interrupted new-process runner resume. The optimized versioned scope retains the original AUC denominator, data hashes, analysis definitions, and 1,750,000 intended task cells. Friend-PC host probe remains required before launch.
+- 2026-09-30: Operator audit completed in `db29aec`: all ten actual arithmetic ablation variants were smoke-tested. Multiplication-only, division-only, without-multiplication, and without-division paths were separately verified; historical `AutoFE_NoMultiply` remains the joint multiplication-and-division removal. Candidate validity accounting and result-note operator metadata were added; no pipeline-count change.
 
 ## R10. Performance, storage, and crash recovery before launch
 
@@ -132,3 +148,4 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Relevant files: `src/cache_manager.py`, `src/task_scheduler.py`, `src/pipeline_runner.py`, `provenance/profile_runner.py`, `provenance/reviewer1_optimization_plan_v1.md`, `provenance/performance_recovery_report.md`.
 - Evidence: cache manager 9 tests; scheduler 7 tests including process-boundary fault injection; bounded runner parity/resume tests; complete suite 61 passed; Sonar 80-task worker profile all successful; `airlines` stage profile and both-policy scale preflight recorded.
 - Status: **implemented-not-run** for the corrected campaign; launch remains **blocked** pending the intended host probe, representative large-task resume, and final storage margin.
+
