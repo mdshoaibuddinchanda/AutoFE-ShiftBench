@@ -87,6 +87,8 @@
   },
   "storage_gate": {
     "current_local_free_gib": 435.51,
+    "ignored_generated_preflight_files": 39,
+    "ignored_generated_preflight_bytes": 1745156485,
     "candidate_history_estimate_gib": 79.66,
     "ancillary_projection_gib": 20.87,
     "free_after_these_estimates_gib": 334.98,
