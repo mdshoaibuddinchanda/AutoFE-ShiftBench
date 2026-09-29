@@ -107,11 +107,11 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Decision and rationale: do not launch until both split policies, common core, ablations, resource estimates, and result schemas are frozen and preflighted.
 - Relevant files: `provenance/reviewer1_run_plan.md`, `provenance/corrected_results_note.md`, frozen manifest (planned).
 - Implementation: plan, change catalog, response draft, corrected-result schema, group audit, and bounded real-data preflight are present. The long campaign is deliberately not launched: two configured datasets cannot support all-fold group-aware AUC, and candidate-history storage is estimated at about 79.7 GiB compressed for the original 612,500-task grid at the observed preflight rate.
-- Tests and commands: bounded row/group preflight completed; final full-suite and clean-commit review remain.
-- Commit hash: `a6a8e3b` plan and baseline milestone.
+- Tests and commands: bounded row/group preflight completed; final full-suite gate passed; only the pre-existing notebook execution-count edit remains outside the audit commits.
+- Commit hash: `e3ed283` integrated audit milestone.
 - Benchmark artifact IDs / observed values: none; no long run is running.
 - Limitations: corrected numerical results are unavailable.
-- Status: `open`.
+- Status: `blocked`.
 
 ## Dated decision log
 
@@ -121,3 +121,4 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - 2026-09-29: Reviewer #1 run plan frozen provisionally; group-aware feasibility, mechanism measurement, operator isolation, and final resource gate remain open.
 - 2026-09-29: Group audit completed in `p12`: all 25 group partitions construct, 23 support all-fold class/AUC metrics; `wine-quality-red` and `kddcup99` are recorded as infeasible rather than substituted.
 - 2026-09-29: Bounded `sonar` preflight completed under both policies with Raw, cap-matched Raw, and AutoFE baseline; no full campaign was started. Candidate-history preflight wrote 950 training-only records and estimated approximately 79.7 GiB compressed for the full grid.
+- 2026-09-29: Final post-integration gate in `p12`: 42 tests passed, compileall passed, schema audit 25/25, and compact group audit 25/25 structural with 23/25 AUC-supported.
