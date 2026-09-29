@@ -149,3 +149,4 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Evidence: cache manager 9 tests; scheduler 7 tests including process-boundary fault injection; bounded runner parity/resume tests; complete suite 61 passed; Sonar 80-task worker profile all successful; `airlines` stage profile and both-policy scale preflight recorded.
 - Status: **implemented-not-run** for the corrected campaign; launch remains **blocked** pending the intended host probe, representative large-task resume, and final storage margin.
 
+\r\n

@@ -68,3 +68,4 @@ The retained-cache design is replaced by a lease-aware bounded regenerable manag
 
 The historical ledger and manuscript values are preserved as historical evidence. They are not merged into corrected estimates and cannot be used to infer the missing row-level/group-aware comparison.
 
+\r\n

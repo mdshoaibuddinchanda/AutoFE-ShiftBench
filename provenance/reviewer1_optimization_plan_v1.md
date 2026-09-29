@@ -58,3 +58,4 @@ Before any long run:
 4. Freeze this manifest, all source/data/analysis hashes, worker/thread settings, run ID, and final code commit with a clean worktree except the pre-existing notebook execution-count change.
 5. Keep corrected performance, Jacobian associations, operator effects, and statistical conclusions marked **PENDING CORRECTED RUN** until the ledger is complete and reconciled.
 
+\r\n

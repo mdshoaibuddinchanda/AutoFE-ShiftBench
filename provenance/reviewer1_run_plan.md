@@ -73,3 +73,4 @@ The bounded profile measured a complete 80-task Sonar mix at 1/2/4 workers in 91
 
 The operator truth table and candidate-validity policy are frozen in [`reviewer1_operator_ablation_manifest_v1.json`](reviewer1_operator_ablation_manifest_v1.json). It confirms that the existing 14-pipeline scope is unchanged: `AutoFE_Baseline` is the full arithmetic reference, `AutoFE_NoMultiply` remains the historical joint multiplication-and-division removal, and multiplication/division isolate and leave-one-out variants are separately executable. The bounded smoke and full p12 suite verify code behavior only; operator performance effects remain **PENDING CORRECTED RUN**.
 
+\r\n
