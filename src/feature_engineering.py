@@ -160,7 +160,9 @@ def expand_features_with_dfs(
         verbose=False,
     )
     
-    train_feature_matrix = train_feature_matrix.drop(columns=["__row_id"], errors="ignore").reset_index(drop=True).fillna(0.0)
+    train_feature_matrix = train_feature_matrix.drop(columns=["__row_id"], errors="ignore").reset_index(drop=True)
+    raw_train_feature_matrix = train_feature_matrix.copy()
+    train_feature_matrix = train_feature_matrix.fillna(0.0)
 
     test_entityset = _build_entityset(test_base, entityset_id="test_es")
     test_feature_matrix = ft.calculate_feature_matrix(
@@ -218,12 +220,16 @@ def expand_features_with_dfs(
             candidate_id = hashlib.sha256(json.dumps({
                 "name": feature["name"], "parents": parents, "operator": operator,
             }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:24]
+            raw_values = pd.to_numeric(raw_train_feature_matrix[feature["name"]], errors="coerce").to_numpy(dtype=float)
             values = pd.to_numeric(train_feature_matrix[feature["name"]], errors="coerce").to_numpy(dtype=float)
             with np.errstate(all="ignore"):
                 score = float(np.nanvar(values)) if np.isfinite(values).any() else None
             score_status = "finite" if score is not None and np.isfinite(score) else "undefined"
-            admissible = bool(np.isfinite(values).all())
+            admissible = bool(np.isfinite(raw_values).all())
             rejection_reason = None if admissible else "nonfinite_candidate_value"
+            if not admissible:
+                score = None
+                score_status = "undefined"
             if not admissible:
                 decision = "rejected"
             elif feature["name"] in selected_set:

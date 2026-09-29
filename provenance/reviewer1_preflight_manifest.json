@@ -4,13 +4,13 @@
   "dataset": "sonar",
   "n_splits": 5,
   "seed": 42,
-  "code_commit": "d4a897ac4eae908aa5d64a1c3bdc922971948830",
-  "code_fingerprint": "08c6f6234231d9fbbb093f1c02191340035443c1c5c4c84e5c3f0985a840bd11",
+  "code_commit": "49fe831bc4a8a11f7ad7013351cedcddcea1cf61",
+  "code_fingerprint": "7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7",
   "runs": [
     {
       "run_id": "sonar-row_level",
       "split_policy": "row_level",
-      "elapsed_s": 0.4022455000085756,
+      "elapsed_s": 1.8613105000113137,
       "status": "complete",
       "counts": {
         "failed": 0,
@@ -24,13 +24,13 @@
         "timed_out": 0
       },
       "expected_tasks": 3,
-      "result_bytes": 4540,
+      "result_bytes": 4541,
       "cache_bytes": 380691
     },
     {
       "run_id": "sonar-group_aware",
       "split_policy": "group_aware",
-      "elapsed_s": 0.5640123999910429,
+      "elapsed_s": 1.5409542999695987,
       "status": "complete",
       "counts": {
         "failed": 0,
@@ -44,7 +44,7 @@
         "timed_out": 0
       },
       "expected_tasks": 3,
-      "result_bytes": 4596,
+      "result_bytes": 4582,
       "cache_bytes": 380633
     }
   ],

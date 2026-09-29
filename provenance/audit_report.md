@@ -2,7 +2,7 @@
 
 ## Outcome and scope
 
-The corrected implementation is on branch `revision/fix-leakage-provenance`. Historical result files were not rewritten. The current source fingerprint for the audited implementation is `08c6f6234231d9fbbb093f1c02191340035443c1c5c4c84e5c3f0985a840bd11`.
+The corrected implementation is on branch `revision/fix-leakage-provenance`. Historical result files were not rewritten. The current source fingerprint for the audited implementation is `7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7`.
 
 The six local historical ledgers/tables checked in `original_run.json` still match their recorded byte counts and SHA-256 hashes. The primary `results_stream.jsonl` has 560,002 rows. The manuscript's 538,972-row number is a historical reported subset count, not a corrected count. `reports/cache.db` was absent. I downloaded and inspected all 25 configured datasets into git-ignored `data/raw/`; 24 are from OpenML and Dry Bean is from UCI. All 25 CSV hashes and sidecar schemas match. The inspection exposed an existing source mapping error: OpenML data ID 42585 contains a different dataset (penguin measurements), not Dry Bean. The downloader now fetches [UCI Dry Bean ID 602](https://archive.ics.uci.edu/dataset/602/dry+bean+dataset); the saved data has 13,611 rows, 16 features, and seven classes.
 

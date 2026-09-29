@@ -23,7 +23,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Decision and rationale: dataset is the primary independent unit; prespecified paired contrasts, intervals, exact denominators, and Holm correction are required. Winner selection on shared folds remains exploratory unless nested selection is added.
 - Implementation: `src/reviewer1_analysis.py` now emits expected-cell coverage, finite-metric denominators, paired dataset bootstrap intervals (10,000 replicates, seed 20260929), Holm family metadata, and row/group side-by-side schema. No corrected campaign ledger has been analyzed.
 - Tests and commands: focused post-integration suite passed 42 tests; full suite gate remains to be rerun after final documentation commit.
-- Commit hash: `a6a8e3b` baseline provenance milestone.
+- Commit hash: `d4a897a` integration milestone; integrated source fingerprint `7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7` is recorded in the schema audit.
 - Benchmark artifact IDs / observed values: historical values remain separate; corrected values are `PENDING CORRECTED RUN`.
 - Limitations: No corrected benchmark estimates exist yet.
 - Status: `implemented-not-run`.
@@ -48,7 +48,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Relevant files: `src/pipeline_runner.py`, `src/shift_generator.py`, `README.md`, `provenance/reviewer1_run_plan.md`.
 - Implementation: primary/transductive/availability/relabeling scopes already fail closed when mixed; runner now persists `experiment_scope` and `split_policy` in manifests and task rows. Manuscript phrase checklist remains pending.
 - Tests and commands: `tests/test_leakage_controls.py` condition semantics test passed in baseline suite.
-- Commit hash: `a6a8e3b` baseline provenance milestone.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: none; corrected values `PENDING CORRECTED RUN`.
 - Limitations: Manuscript source still contains historical OpenML and shift-language statements.
 - Status: `implemented-not-run`.
@@ -84,7 +84,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Relevant files: `src/checkpoint.py`, `src/pipeline_runner.py`, `src/check_progress.py`, `provenance/corrected_results_note.md`.
 - Implementation: checkpoint schema accepts success/failed/skipped/timed_out/pending; manifests publish expected, terminal, pending, phase, and status counts while retaining legacy `counts` compatibility.
 - Tests and commands: failure/resume tests and result-note accounting tests pass; a long-run ledger is not available.
-- Commit hash: `a6a8e3b` baseline provenance milestone.
+- Commit hash: `d4a897a` integration milestone.
 - Benchmark artifact IDs / observed values: no corrected run; historical ledger remains separately labeled.
 - Limitations: unknown outcomes cannot support a causal or confirmatory claim.
 - Status: `implemented-not-run`.
@@ -97,7 +97,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Implementation: baseline reproducibility controls and UCI Dry Bean correction are committed in `a6a8e3b`; split policy, group digests, task fingerprints, and preflight artifacts are now included.
 - Tests and commands: focused post-integration suite passed 42 tests; compileall, full suite, schema/hash audit, and group audit are final gates.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
-- Benchmark artifact IDs / observed values: source fingerprint `d46c872632bcfe45a8e15b415f0ac4cc2ebbf403f25610a6f277fc057d77cbab` before new modules; corrected run `PENDING CORRECTED RUN`.
+- Benchmark artifact IDs / observed values: integrated source fingerprint `7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7`; corrected run `PENDING CORRECTED RUN`.
 - Limitations: historical Dry Bean input is unavailable and historical scores cannot be reconstructed.
 - Status: `implemented-not-run`.
 
