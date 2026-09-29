@@ -2,7 +2,7 @@
   "artifact_type": "reviewer1_operator_ablation_manifest_v1",
   "status": "verified_code_and_bounded_smoke; corrected_effects_pending",
   "environment": "D:\\Conda\\p12",
-  "code_commit": "db29aec4ec07a7b913670a199a6c582f6ee2fdce",
+  "code_commit": "292c330009e8ea805dfbf068689f98c4dcf33e32",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32"
