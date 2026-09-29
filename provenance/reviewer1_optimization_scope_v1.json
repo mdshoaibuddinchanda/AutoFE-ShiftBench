@@ -7,7 +7,7 @@
   "documentation_freeze_commit": "abfc3fc3bb5ec6074235b9c521a342d084c9fdac",
   "final_gate_commit": "df20a53d14a4d914dcf20f030fd5fdd4f0cc88d6",
   "operator_ablation_manifest": "provenance/reviewer1_operator_ablation_manifest_v1.json",
-  "operator_ablation_manifest_sha256": "6799c1f5dc1ee72a0c5032ecbf795138846fd868d156b059064ddf40557aa7cc",
+  "operator_ablation_manifest_sha256": "0f1941358194c1e179fc4ff0bb1966b701d6cf5dde4015454f5962b5f470680d",
   "operator_ablation_code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
   "condition_scope_manifest": "provenance/reviewer1_condition_scope_manifest_v1.json",
   "condition_scope_manifest_sha256": "6ed6433eddf5e772b61ce018c41c2a6bf6b328e462f1f50f788ca50c2ee537bd",
@@ -122,6 +122,6 @@
     "row_level_fallback_for_group_auc": false,
     "corrected_results": "PENDING CORRECTED RUN"
   },
-  "launch_audit_code_commit": "75c4420008d29fab5171cf9013f3b74ccdc1fc6e",
+  "launch_audit_code_commit": "3072b14c1aca8ff440322bf75473b7df623a68c8",
   "launch_audit_artifact": "provenance/friend_pc_launch_audit.md"
 }

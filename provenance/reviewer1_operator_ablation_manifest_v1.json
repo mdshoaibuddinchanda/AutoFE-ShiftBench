@@ -2,7 +2,7 @@
   "artifact_type": "reviewer1_operator_ablation_manifest_v1",
   "status": "verified_code_and_bounded_smoke; corrected_effects_pending",
   "environment": "D:\\Conda\\p12",
-  "code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
+  "code_commit": "3072b14c1aca8ff440322bf75473b7df623a68c8",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32"
@@ -21,85 +21,164 @@
     {
       "name": "Raw",
       "enabled_operators": [],
-      "excluded_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "excluded_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "status": "existing core; no feature synthesis"
     },
     {
       "name": "Raw_CapMatched",
       "enabled_operators": [],
-      "excluded_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "excluded_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "status": "existing frozen fairness baseline; no feature synthesis"
     },
     {
       "name": "AutoFE_MI",
-      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "excluded_operators": [],
       "status": "existing frozen added variant; all arithmetic"
     },
     {
       "name": "AutoFE_Random",
-      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "excluded_operators": [],
       "status": "existing frozen added variant; all arithmetic"
     },
     {
       "name": "AutoFE_Baseline",
-      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "excluded_operators": [],
       "status": "existing; full arithmetic reference; no duplicate all-operator pipeline added"
     },
     {
       "name": "AutoFE_NoMultiply",
-      "enabled_operators": ["add_numeric", "subtract_numeric"],
-      "excluded_operators": ["multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric"
+      ],
+      "excluded_operators": [
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "status": "existing historical ID preserved; explicitly joint multiplication-and-division removal"
     },
     {
       "name": "AutoFE_Isolate_Add",
-      "enabled_operators": ["add_numeric"],
-      "excluded_operators": ["subtract_numeric", "multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "add_numeric"
+      ],
+      "excluded_operators": [
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "status": "existing added ablation; verified"
     },
     {
       "name": "AutoFE_Isolate_Subtract",
-      "enabled_operators": ["subtract_numeric"],
-      "excluded_operators": ["add_numeric", "multiply_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "subtract_numeric"
+      ],
+      "excluded_operators": [
+        "add_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
       "status": "existing added ablation; verified"
     },
     {
       "name": "AutoFE_Isolate_Multiply",
-      "enabled_operators": ["multiply_numeric"],
-      "excluded_operators": ["add_numeric", "subtract_numeric", "divide_numeric"],
+      "enabled_operators": [
+        "multiply_numeric"
+      ],
+      "excluded_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "divide_numeric"
+      ],
       "status": "existing added ablation; separately verified"
     },
     {
       "name": "AutoFE_Isolate_Divide",
-      "enabled_operators": ["divide_numeric"],
-      "excluded_operators": ["add_numeric", "subtract_numeric", "multiply_numeric"],
+      "enabled_operators": [
+        "divide_numeric"
+      ],
+      "excluded_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric"
+      ],
       "status": "existing added ablation; separately verified"
     },
     {
       "name": "AutoFE_LeaveOut_Add",
-      "enabled_operators": ["subtract_numeric", "multiply_numeric", "divide_numeric"],
-      "excluded_operators": ["add_numeric"],
+      "enabled_operators": [
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
+      "excluded_operators": [
+        "add_numeric"
+      ],
       "status": "existing added ablation; verified"
     },
     {
       "name": "AutoFE_LeaveOut_Subtract",
-      "enabled_operators": ["add_numeric", "multiply_numeric", "divide_numeric"],
-      "excluded_operators": ["subtract_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ],
+      "excluded_operators": [
+        "subtract_numeric"
+      ],
       "status": "existing added ablation; verified"
     },
     {
       "name": "AutoFE_LeaveOut_Multiply",
-      "enabled_operators": ["add_numeric", "subtract_numeric", "divide_numeric"],
-      "excluded_operators": ["multiply_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "divide_numeric"
+      ],
+      "excluded_operators": [
+        "multiply_numeric"
+      ],
       "status": "existing added ablation; verified; division retained"
     },
     {
       "name": "AutoFE_LeaveOut_Divide",
-      "enabled_operators": ["add_numeric", "subtract_numeric", "multiply_numeric"],
-      "excluded_operators": ["divide_numeric"],
+      "enabled_operators": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric"
+      ],
+      "excluded_operators": [
+        "divide_numeric"
+      ],
       "status": "existing added ablation; verified; multiplication retained"
     }
   ],
