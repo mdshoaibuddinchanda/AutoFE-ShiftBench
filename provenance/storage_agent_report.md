@@ -3,7 +3,7 @@
 Date: 2026-09-30  
 Environment: `D:\Conda\p12`  
 Scope: isolated storage module and targeted tests; no full benchmark was run.  
-Milestone commit: `c9cf4b5`
+Milestone commit: `5826839`
 
 ## Existing cache lifecycle
 
