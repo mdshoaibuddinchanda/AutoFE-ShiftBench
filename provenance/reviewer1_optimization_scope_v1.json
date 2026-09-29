@@ -8,7 +8,7 @@
   "final_gate_commit": "df20a53d14a4d914dcf20f030fd5fdd4f0cc88d6",
   "operator_ablation_manifest": "provenance/reviewer1_operator_ablation_manifest_v1.json",
   "operator_ablation_manifest_sha256": "afc90506c0c1427a6464a754fb406ab533af359c68ace71d5b9a423651c79768",
-  "operator_ablation_code_commit": "c6e1b3201a2e6808816dc40db9b50802f98b916f",
+  "operator_ablation_code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32",
