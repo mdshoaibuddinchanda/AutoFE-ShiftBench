@@ -1,0 +1,59 @@
+{
+  "artifact_type": "reviewer1_scale_preflight",
+  "environment": "D:\\Conda\\p12",
+  "dataset": "airlines",
+  "rows": 100000,
+  "seed": 42,
+  "requested_fold": 1,
+  "n_splits": 5,
+  "condition": "clean",
+  "pipelines": [
+    "Raw",
+    "Raw_CapMatched",
+    "AutoFE_Baseline"
+  ],
+  "models": [
+    "logistic_regression"
+  ],
+  "code_commit": "6284e32fb0f0c6d6b98662c544e33a855fd68825",
+  "code_fingerprint": "7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7",
+  "runs": [
+    {
+      "run_id": "airlines-row_level",
+      "split_policy": "row_level",
+      "elapsed_s": 57.450843399972655,
+      "status": "complete",
+      "expected_tasks": 3,
+      "counts_by_status": {
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "success": 3,
+        "timed_out": 0
+      },
+      "results_bytes": 4608,
+      "manifest_bytes": 14791,
+      "checkpoint_bytes": 12288,
+      "cache_bytes": 871432146
+    },
+    {
+      "run_id": "airlines-group_aware",
+      "split_policy": "group_aware",
+      "elapsed_s": 101.8871089000022,
+      "status": "complete",
+      "expected_tasks": 3,
+      "counts_by_status": {
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "success": 3,
+        "timed_out": 0
+      },
+      "results_bytes": 4656,
+      "manifest_bytes": 28190,
+      "checkpoint_bytes": 12288,
+      "cache_bytes": 872730205
+    }
+  ],
+  "full_campaign_started": false
+}

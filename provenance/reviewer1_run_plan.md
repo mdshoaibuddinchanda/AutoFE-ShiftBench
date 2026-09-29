@@ -32,9 +32,13 @@ Row-level folds are retained for legacy comparability. Group-aware folds use det
 
 Primary inference will summarize each dataset first, use datasets as the independent unit, report paired contrasts, confidence intervals, exact valid dataset/task denominators, and Holm-adjusted p-values within prespecified families. Fold/seed/model/condition repetitions are not independent datasets, and winner selection on the same folds is exploratory unless nested selection is added.
 
-## Expected size and resource gate
+## Frozen AUC policy, scope, and resource gate
 
-The original corrected grid is `25 datasets × 5 seeds × 5 folds × 14 conditions × 7 pipelines × 10 models = 612,500 task records` before failures. A two-track common core at the same seed/fold/model settings approximately doubles the split-policy workload; mechanism and operator scopes add further tasks. Exact runtime/storage estimates must be measured by the bounded real-data preflight, including the slowest large datasets, cache matrices, candidate histories, and compressed result/checkpoint artifacts. The 14-day estimate is not an authorization to launch without margin.
+The group-aware primary ROC-AUC denominator contains all 25 configured datasets. `wine-quality-red` is recorded as skipped because one or more test folds miss a target class. `kddcup99` is recorded as skipped because a target class has fewer rows/groups than five splits and at least one test fold misses a class. These two datasets remain visible with their reasons; no row-level folds are substituted. The row-level track retains all 25 datasets. The resulting all-pipeline counts are 875,000 intended tasks per policy, 1,750,000 across both policies, with 70,000 group-policy tasks explicitly skipped for AUC infeasibility and 1,680,000 group/row task cells AUC-eligible. The core Raw/AutoFE-Baseline scope is 125,000 tasks per policy; its group track has 115,000 eligible and 10,000 explicitly skipped cells.
+
+The large-dataset scale preflight on 100,000-row `airlines` took 57.45 seconds for three row-level tasks and 101.89 seconds for three group-aware tasks. Linear planning extrapolation gives approximately 27.7 days for the two-pipeline row core with ten models, 49.1 days for the group core, and 537.9 days for all 14 pipelines under both policies. These are resource projections, not corrected performance results.
+
+The `D:` volume had 437.14 GiB free. The 79.66 GiB compressed candidate-history estimate alone leaves 357.48 GiB, and projected results/manifests/checkpoints add about 20.87 GiB. However, the measured `airlines` feature-cache rate projects to about 47,378 GiB for all 14 pipelines and both policies, or about 6,768 GiB for the core alone, under the current retention policy. Storage therefore fails with the current cache design. The long run remains blocked until caches are streamed/deleted or a larger storage target is provisioned. Exact values are frozen in [`reviewer1_scope_manifest.json`](reviewer1_scope_manifest.json) and [`reviewer1_scale_preflight_manifest.json`](reviewer1_scale_preflight_manifest.json).
 
 ## Required durable outputs
 
@@ -50,10 +54,11 @@ The original corrected grid is `25 datasets × 5 seeds × 5 folds × 14 conditio
 - `D:\Conda\p12\python.exe -m provenance.audit_dataset_schemas`
 - `D:\Conda\p12\python.exe -m provenance.audit_group_folds`
 - bounded real-data preflight command recorded after implementation
+- `D:\Conda\p12\python.exe -m provenance.reviewer1_scale_preflight`
 - frozen manifest and clean Git status before the long campaign
 
 Verification evidence: `D:\\Conda\\p12\\python.exe -m pytest -q -rs tests` -> `42 passed, 7 warnings in 10.40s`; `D:\\Conda\\p12\\python.exe -m compileall -q src tests main.py` -> pass; `D:\\Conda\\p12\\python.exe -m provenance.audit_dataset_schemas` -> `audited=25/25; verified=25/25`; `D:\\Conda\\p12\\python.exe -m provenance.audit_group_folds` -> `25` structural, `23` class/AUC-supported. Warnings are the expected Loky physical-core detection, Woodwork deprecation, and intentional undersupported-class group tests.
 
-Current decision: the bounded preflight passed for `sonar` under both policies. The full group-aware campaign is held because `wine-quality-red` and `kddcup99` cannot support all-fold ROC-AUC under exact-feature grouping; the runner records this as `blocked_group_split_infeasible` and never falls back to row-level folds. Candidate-history logging at the observed preflight rate is estimated at approximately 79.7 GiB compressed for the original 612,500-task grid. No long benchmark is running.
+Current decision: the bounded preflight passed for `sonar` and the large-dataset scale preflight passed for `airlines` under both policies. The full campaign is **DO NOT LAUNCH**: two datasets are explicitly AUC-infeasible under group folds, the retained-cache projection exceeds available space by orders of magnitude, and the ten-model runtime projection is far beyond 14 days. The runner records group infeasibility as `blocked_group_split_infeasible` and never falls back to row-level folds. No long benchmark is running.
 
-Preflight artifact: [`reviewer1_preflight_manifest.json`](reviewer1_preflight_manifest.json). It records 1.80 s for the row-level three-task smoke and 1.52 s for the group-aware three-task smoke, with zero failures and explicit cache/result byte counts. These timings are a gate measurement, not a projection for the 14-day campaign.
+Preflight artifacts: [`reviewer1_preflight_manifest.json`](reviewer1_preflight_manifest.json) and [`reviewer1_scale_preflight_manifest.json`](reviewer1_scale_preflight_manifest.json). They record zero failures and explicit cache/result byte counts. These timings are gate measurements used only for the transparent planning projections above.

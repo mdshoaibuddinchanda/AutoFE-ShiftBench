@@ -54,7 +54,7 @@ Response: The baseline correction uses canonical SHA-256 seeds, source CSV and s
 
 Reviewer point: major fixes should be resolved before the expensive corrected campaign.
 
-Response: We froze a preflight plan and did not launch the long campaign. Both split tracks pass on the bounded `sonar` smoke; the complete group-aware design is blocked for two datasets by explicit AUC infeasibility, and candidate-history storage is estimated at approximately 79.7 GiB compressed at the observed preflight rate for the original grid. No corrected benchmark has been launched. Run ID and final numerical values: **PENDING CORRECTED RUN**.
+Response: We froze the AUC denominator and resource gate before launch. The row-level track retains all 25 datasets. The group-aware track retains all 25 in the intended denominator, records `wine-quality-red` and `kddcup99` as explicitly skipped for their class-support/AUC reasons, and never substitutes row-level folds. The all-pipeline two-policy scope contains 1,750,000 intended task cells; 70,000 group-policy cells are explicitly infeasible. The 100,000-row `airlines` scale preflight measured 57.45 seconds for three row-level tasks and 101.89 seconds for three group-aware tasks. Although 437.14 GiB was free and the 79.66 GiB history estimate alone fits, retained feature caches project to approximately 47,378 GiB for the full scope under the current policy, so the decision is **DO NOT LAUNCH** until cache retention/storage and scope are redesigned. No corrected benchmark has been launched. Run ID and final numerical values: **PENDING CORRECTED RUN**.
 
 ## Historical evidence boundary
 

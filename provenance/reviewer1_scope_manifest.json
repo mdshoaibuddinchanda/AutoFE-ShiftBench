@@ -1,0 +1,80 @@
+{
+  "artifact_type": "reviewer1_frozen_scope_manifest",
+  "status": "blocked_before_long_run",
+  "environment": "D:\\Conda\\p12",
+  "source_commit_for_scale_preflight": "6284e32fb0f0c6d6b98662c544e33a855fd68825",
+  "code_fingerprint": "7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7",
+  "datasets": {
+    "configured": 25,
+    "group_auc_supported": 23,
+    "group_auc_infeasible": [
+      {"dataset": "wine-quality-red", "reason": "one_or_more_test_folds_missing_a_target_class"},
+      {"dataset": "kddcup99", "reason": "a_target_class_has_fewer_rows_than_splits; a_target_class_occurs_in_fewer_groups_than_splits; one_or_more_test_folds_missing_a_target_class"}
+    ],
+    "group_policy": "The two infeasible datasets remain in the intended denominator and are recorded as skipped with these reasons; no row-level substitution is permitted."
+  },
+  "design": {
+    "seeds": 5,
+    "folds": 5,
+    "models": 10,
+    "primary_conditions": 10,
+    "core_pipelines": ["Raw", "AutoFE_Baseline"],
+    "added_pipelines": [
+      "Raw_CapMatched", "AutoFE_MI", "AutoFE_Random", "AutoFE_NoMultiply",
+      "AutoFE_Isolate_Add", "AutoFE_Isolate_Subtract", "AutoFE_Isolate_Multiply", "AutoFE_Isolate_Divide",
+      "AutoFE_LeaveOut_Add", "AutoFE_LeaveOut_Subtract", "AutoFE_LeaveOut_Multiply", "AutoFE_LeaveOut_Divide"
+    ],
+    "total_pipelines": 14
+  },
+  "task_counts": {
+    "cells_per_dataset_pipeline": 2500,
+    "row_level_core": 125000,
+    "group_aware_core_intended": 125000,
+    "group_aware_core_auc_eligible": 115000,
+    "group_aware_core_skipped_infeasible": 10000,
+    "row_level_added_ablations": 750000,
+    "group_aware_added_ablations_intended": 750000,
+    "group_aware_added_ablations_auc_eligible": 690000,
+    "group_aware_added_ablations_skipped_infeasible": 60000,
+    "row_level_all_14_pipelines": 875000,
+    "group_aware_all_14_pipelines_intended": 875000,
+    "group_aware_all_14_pipelines_auc_eligible": 805000,
+    "group_aware_all_14_pipelines_skipped_infeasible": 70000,
+    "both_policies_all_14_pipelines_intended": 1750000,
+    "both_policies_all_14_pipelines_auc_eligible": 1680000,
+    "both_policies_all_14_pipelines_skipped_infeasible": 70000
+  },
+  "scale_preflight": {
+    "artifact": "provenance/reviewer1_scale_preflight_manifest.json",
+    "dataset": "airlines",
+    "rows": 100000,
+    "one_seed_one_fold_one_clean_condition": true,
+    "pipelines": ["Raw", "Raw_CapMatched", "AutoFE_Baseline"],
+    "row_level_seconds": 57.450843399972655,
+    "group_aware_seconds": 101.8871089000022,
+    "row_level_cache_bytes": 871432146,
+    "group_aware_cache_bytes": 872730205,
+    "runtime_projection_method": "linear planning extrapolation by pipeline count, ten models, datasets, seeds, folds, and ten primary conditions; it is not a corrected performance result"
+  },
+  "runtime_projection_days": {
+    "core_row_level_10_models": 27.705846547054712,
+    "core_group_aware_10_models": 49.13537273341155,
+    "all_14_row_level_10_models": 193.94092582938302,
+    "all_14_group_aware_10_models": 343.9476091338809,
+    "all_14_both_policies_10_models": 537.8885342672619,
+    "one_model_all_14_both_policies": 53.78885342672639
+  },
+  "storage_gate": {
+    "drive": "D:",
+    "free_gib_at_measurement": 437.14,
+    "candidate_history_original_estimate_gib": 79.66125849634409,
+    "free_after_history_only_gib": 357.4787415036559,
+    "ancillary_results_manifest_checkpoint_projection_gib": 20.86733002215624,
+    "retained_feature_cache_projection_all_14_both_policies_gib": 47377.68499568726,
+    "retained_feature_cache_projection_core_both_policies_gib": 6768.240713669608,
+    "decision": "FAIL_WITH_CURRENT_RETENTION_POLICY",
+    "reason": "The history estimate alone fits, but measured large-dataset feature caches make both the core and full ablation scope exceed available space by orders of magnitude. Caches must be streamed/deleted or a larger storage target must be provisioned before launch."
+  },
+  "launch_decision": "DO_NOT_LAUNCH",
+  "full_campaign_started": false
+}

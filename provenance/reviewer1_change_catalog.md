@@ -106,8 +106,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: major fixes must be made and protocol frozen before the expensive run.
 - Decision and rationale: do not launch until both split policies, common core, ablations, resource estimates, and result schemas are frozen and preflighted.
 - Relevant files: `provenance/reviewer1_run_plan.md`, `provenance/corrected_results_note.md`, frozen manifest (planned).
-- Implementation: plan, change catalog, response draft, corrected-result schema, group audit, and bounded real-data preflight are present. The long campaign is deliberately not launched: two configured datasets cannot support all-fold group-aware AUC, and candidate-history storage is estimated at about 79.7 GiB compressed for the original 612,500-task grid at the observed preflight rate.
-- Tests and commands: bounded row/group preflight completed; final full-suite gate passed; only the pre-existing notebook execution-count edit remains outside the audit commits.
+- Implementation: plan, change catalog, response draft, corrected-result schema, small and large bounded preflights, exact task-count manifest, and storage/runtime gate are present. The long campaign is deliberately not launched: two configured datasets cannot support all-fold group-aware AUC, retained feature caches project to about 47,378 GiB for the full two-track ablation scope, and ten-model runtime projects far beyond 14 days.
+- Tests and commands: bounded row/group preflight completed on `sonar`; large `airlines` scale preflight completed under both policies; final full-suite gate passed; only the pre-existing notebook execution-count edit remains outside the audit commits.
 - Commit hash: `e3ed283` integrated audit milestone.
 - Benchmark artifact IDs / observed values: none; no long run is running.
 - Limitations: corrected numerical results are unavailable.
@@ -122,3 +122,4 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - 2026-09-29: Group audit completed in `p12`: all 25 group partitions construct, 23 support all-fold class/AUC metrics; `wine-quality-red` and `kddcup99` are recorded as infeasible rather than substituted.
 - 2026-09-29: Bounded `sonar` preflight completed under both policies with Raw, cap-matched Raw, and AutoFE baseline; no full campaign was started. Candidate-history preflight wrote 950 training-only records and estimated approximately 79.7 GiB compressed for the full grid.
 - 2026-09-29: Final post-integration gate in `p12`: 42 tests passed, compileall passed, schema audit 25/25, and compact group audit 25/25 structural with 23/25 AUC-supported.
+- 2026-09-29: Large-dataset `airlines` scale gate measured 57.45 s for three row-level tasks, 101.89 s for three group-aware tasks, and about 0.87 GB of feature caches per three-task run. Frozen scope manifest records 1,750,000 intended two-policy tasks and a storage/runtime `DO_NOT_LAUNCH` decision under current retention.

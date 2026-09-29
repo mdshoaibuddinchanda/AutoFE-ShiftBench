@@ -30,6 +30,7 @@ python -m src.pipeline_runner --run-id corrected-smoke --max-datasets 1 --max-se
 
 # Bounded Reviewer #1 gate (existing p12 environment; no full campaign)
 python -m provenance.reviewer1_preflight
+python -m provenance.reviewer1_scale_preflight
 ~~~
 
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.

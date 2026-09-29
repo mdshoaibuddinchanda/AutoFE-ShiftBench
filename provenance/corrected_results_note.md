@@ -1,6 +1,6 @@
 # Corrected results note
 
-Status: **PENDING CORRECTED RUN**. No full corrected campaign has been launched. A bounded `sonar` preflight passed under both split policies; its artifact is `provenance/reviewer1_preflight_manifest.json`.
+Status: **PENDING CORRECTED RUN**. No full corrected campaign has been launched. A bounded `sonar` preflight and a large `airlines` scale preflight passed under both split policies; exact AUC policy, task counts, runtime projections, and storage gate are frozen in `provenance/reviewer1_scope_manifest.json`.
 
 This file is reserved for the machine-checked result record. It must be generated from a frozen run manifest and explicit result ledger, never from the historical ledger.
 
@@ -12,7 +12,7 @@ This file is reserved for the machine-checked result record. It must be generate
 - Dataset source/version, CSV checksum, sidecar checksum: `PENDING CORRECTED RUN`
 - Split policies: `row_level` legacy-comparable and `group_aware` exact raw-feature groups
 - Canonical grouping rule: target-excluded, unperturbed raw predictors; type/missing/numeric/categorical canonicalization and collision checks recorded in the group audit
-- Conditions/pipelines/models/seeds/folds: `PENDING FROZEN MANIFEST` (bounded preflight used one clean condition, seed 42, requested fold 1, three pipelines, and logistic regression)
+- Conditions/pipelines/models/seeds/folds: frozen scope manifest records 10 primary conditions, 14 pipelines (2 core plus 12 added ablation/fairness pipelines), 5 seeds, 5 folds, and 10 models; intended two-policy denominator is 1,750,000 task cells.
 - Task denominator: `PENDING FROZEN MANIFEST`
 - Interval method and confidence level: `PENDING FROZEN ANALYSIS`
 - Multiplicity families and adjustment: dataset-level paired contrasts with prespecified Holm families
@@ -38,7 +38,7 @@ Per-dataset values must be preserved below the aggregate table so reversals and 
 
 ## Mechanism/operator and coverage sections
 
-Candidate/Jacobian summaries and operator-isolation benchmark values remain `PENDING CORRECTED RUN`. The bounded preflight recorded 950 training-only candidate-history records and estimated approximately 79.7 GiB compressed for the original 612,500-task grid at that rate. Full task coverage, failures, retries, timeouts, complete-case analysis, and missingness sensitivity remain pending.
+Candidate/Jacobian summaries and operator-isolation benchmark values remain `PENDING CORRECTED RUN`. The bounded preflight recorded 950 training-only candidate-history records and estimated approximately 79.7 GiB compressed for the original planning grid. The large-dataset cache gate projects approximately 47,378 GiB for the full two-policy ablation scope under current retention, so full task coverage, failures, retries, timeouts, complete-case analysis, and missingness sensitivity remain pending.
 
 ## Historical ledger (separate)
 
