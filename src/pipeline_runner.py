@@ -1002,10 +1002,10 @@ def run_experiment(
                                 )
                                 result = {
                                     **task, "run_id": run_id, "task_key": task_key,
-                                     "status": "success", "n_train": len(xtr), "n_test": len(xte),
-                                     "split_policy": split_policy,
-                                     "experiment_scope": experiment_scope,
-                                     "split_status": task_split_status,
+                                    "status": "success", "n_train": len(xtr), "n_test": len(xte),
+                                    "split_policy": split_policy,
+                                    "experiment_scope": experiment_scope,
+                                    "split_status": task_split_status,
                                     "n_original": int(x_test_clean.shape[1]),
                                     "train_time_s": train_time, "infer_time_s": infer_time,
                                     "autofe_gen_time_s": float(fe_meta.get("generation_time_s", 0.0)),
