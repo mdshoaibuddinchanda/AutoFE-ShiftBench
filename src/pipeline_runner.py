@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pickle
 import platform
 import sys
 import time
@@ -25,6 +26,8 @@ import sklearn
 from sklearn.preprocessing import LabelEncoder
 
 from src.checkpoint import has_success, init_db, record_task
+from src.cache_manager import CacheManager, CacheNotReadyError
+from src.task_scheduler import Lease, TaskScheduler, TaskSpec
 from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
 from src.evaluation import compute_classification_metrics
 from src.feature_engineering import DFSConfig, expand_features_with_dfs
@@ -283,6 +286,47 @@ def _load_or_create_feature_cache(
     return payload
 
 
+def _bounded_cache_key(feature_task_key: str, pipeline_name: str, cache_fingerprint_value: str) -> str:
+    """Stable cache identity for the lease-aware bounded cache."""
+    return f"{feature_task_key}/{pipeline_name}/{cache_fingerprint_value}"
+
+
+def _load_or_create_bounded_feature_cache(
+    manager: CacheManager,
+    *,
+    feature_task_key: str,
+    pipeline_name: str,
+    expected_manifest: dict[str, Any],
+    make_payload: Callable[[], tuple[Any, ...]],
+) -> tuple[tuple[Any, ...], bool]:
+    """Read/create a lease-validated cache and return ``(payload, cache_hit)``.
+
+    The lease covers the complete serialized read.  The caller may then delete
+    the artifact after all compatible classifier consumers have reached a
+    durable terminal state; no worker can observe a partially written file.
+    """
+    expected_manifest = dict(expected_manifest)
+    expected_manifest["cache_fingerprint"] = cache_fingerprint(expected_manifest)
+    cache_fp = str(expected_manifest["cache_fingerprint"])
+    key = _bounded_cache_key(feature_task_key, pipeline_name, cache_fp)
+    try:
+        with manager.lease(key, owner=f"pid:{os.getpid()}") as lease:
+            payload = pickle.loads(lease.read_bytes())
+        if not isinstance(payload, tuple):
+            raise ValueError("bounded feature cache payload must be a tuple")
+        return payload, True
+    except CacheNotReadyError:
+        payload = make_payload()
+        encoded = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
+        manager.put_bytes(key, encoded, metadata={
+            "pipeline": pipeline_name,
+            "cache_fingerprint": cache_fp,
+            "protocol_version": PROTOCOL_VERSION,
+            "expected_manifest": expected_manifest,
+        })
+        return payload, False
+
+
 def _safe_result_write(path: Path, row: dict[str, Any]) -> None:
     def json_safe(value: Any) -> Any:
         if isinstance(value, dict):
@@ -299,6 +343,21 @@ def _safe_result_write(path: Path, row: dict[str, Any]) -> None:
     with path.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(json_safe(row), sort_keys=True, allow_nan=False, default=str) + "\n")
         stream.flush()
+
+
+def _scheduler_payload(row: dict[str, Any]) -> dict[str, Any]:
+    """Return a JSON-safe task result for durable scheduler publication."""
+    def json_safe(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(key): json_safe(child) for key, child in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [json_safe(child) for child in value]
+        if isinstance(value, np.generic):
+            value = value.item()
+        if isinstance(value, float) and not np.isfinite(value):
+            return None
+        return value
+    return json_safe(row)
 
 
 def _record_failure(
@@ -432,11 +491,25 @@ def run_experiment(
     models: tuple[str, ...] = ("logistic_regression",),
     n_splits: int = 5,
     split_policy: str = "row_level",
+    cache_policy: str = "retain",
+    cache_max_bytes: int | None = None,
+    cache_lease_ttl_seconds: float = 3600.0,
+    durable_scheduler: bool = False,
+    scheduler_lease_seconds: float = 3600.0,
+    scheduler_max_attempts: int = 3,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
     if split_policy not in {"row_level", "group_aware"}:
         raise ValueError("split_policy must be 'row_level' or 'group_aware'")
+    if cache_policy not in {"retain", "bounded"}:
+        raise ValueError("cache_policy must be 'retain' or 'bounded'")
+    if cache_policy == "bounded" and cache_max_bytes is not None and cache_max_bytes <= 0:
+        raise ValueError("cache_max_bytes must be positive when supplied")
+    if scheduler_lease_seconds <= 0:
+        raise ValueError("scheduler_lease_seconds must be positive")
+    if scheduler_max_attempts < 1:
+        raise ValueError("scheduler_max_attempts must be positive")
     seeds = seeds or [42, 123, 456, 789, 2025]
     folds = folds or list(range(1, n_splits + 1))
     selected_families = {family for family, _severity in conditions}
@@ -496,6 +569,11 @@ def run_experiment(
         "pipelines": list(pipelines), "models": list(models), "seeds": seeds,
         "folds": folds, "n_splits": n_splits,
         "split_policy": split_policy,
+        "cache_policy": cache_policy,
+        "cache_max_bytes": cache_max_bytes,
+        "durable_scheduler": durable_scheduler,
+        "scheduler_lease_seconds": scheduler_lease_seconds,
+        "scheduler_max_attempts": scheduler_max_attempts,
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
     config_fingerprint = stable_digest(config_data)
@@ -523,6 +601,25 @@ def run_experiment(
     run_dir.mkdir(parents=True, exist_ok=True)
     db_path = run_dir / "checkpoints.sqlite"
     init_db(db_path)
+    cache_manager = (
+        CacheManager(
+            run_dir / "cache_bounded",
+            lease_ttl_seconds=cache_lease_ttl_seconds,
+            max_bytes=cache_max_bytes,
+        )
+        if cache_policy == "bounded" else None
+    )
+    scheduler = (
+        TaskScheduler(
+            run_dir / "scheduler.sqlite",
+            artifact_dir=run_dir / "scheduler_results",
+            lease_seconds=scheduler_lease_seconds,
+        )
+        if durable_scheduler else None
+    )
+    scheduler_worker_id = f"runner-pid-{os.getpid()}"
+    if scheduler is not None:
+        scheduler.reconcile()
     base_manifest = {
         "run_id": run_id, "protocol_version": PROTOCOL_VERSION,
         "created_utc": (existing_manifest or {}).get(
@@ -536,6 +633,8 @@ def run_experiment(
         "primary_conditions": ["clean", "gaussian_noise_*", "missing_values_*", "label_noise_*"],
         "experiment_scope": experiment_scope,
         "split_policy": split_policy,
+        "cache_policy": cache_policy,
+        "durable_scheduler": durable_scheduler,
         "partition_uses_held_out_features": False,
         "datasets": list((existing_manifest or {}).get("datasets", [])),
     }
@@ -654,7 +753,7 @@ def run_experiment(
                         "condition": condition, "dataset_checksum": task_checksum,
                     })[:20]
                     for pipeline_name in pipelines:
-                        for model_name in models:
+                        for model_position, model_name in enumerate(models):
                             task = {
                                 "dataset": dataset_name, "seed": seed, "fold": fold,
                                 "condition": condition, "pipeline": pipeline_name, "model": model_name,
@@ -695,26 +794,66 @@ def run_experiment(
                             feature_cache_fp = cache_fingerprint(feature_manifest)
                             task_manifest["task_fingerprint"] = task_fp
                             task_manifest["cache_fingerprint"] = feature_cache_fp
+                            scheduler_lease: Lease | None = None
+                            if scheduler is not None:
+                                scheduler.register_tasks([
+                                    TaskSpec(
+                                        task_key=task_key,
+                                        run_id=run_id,
+                                        payload=task_manifest,
+                                        max_attempts=scheduler_max_attempts,
+                                    )
+                                ])
+                                scheduler_state = scheduler.task_state(task_key)
+                                if scheduler_state and scheduler_state.get("status") == "success":
+                                    if has_success(db_path, run_id, task_key, "phase2", task_fp):
+                                        _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
+                                        _save_run_manifest(run_dir, base_manifest, outcomes)
+                                        continue
+                                    raise RuntimeError(
+                                        f"Scheduler marks {task_key} successful but checkpoint is incomplete"
+                                    )
                             if (has_success(db_path, run_id, task_key, "phase2", task_fp)
                                     and has_success(db_path, run_id, task_key, "phase1", task_fp)):
                                 _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
+                            if scheduler is not None:
+                                scheduler_lease = scheduler.claim_task(scheduler_worker_id, task_key=task_key)
+                                if scheduler_lease is None:
+                                    raise RuntimeError(f"Unable to claim durable scheduler task {task_key}")
                             try:
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 if failure_hook:
                                     failure_hook("phase1", task)
-                                cache_path, cache_manifest_path = _cache_paths(run_dir, feature_key, pipeline_name)
-                                cache_was_present = cache_path.exists() and cache_manifest_path.exists()
-                                payload = _load_or_create_feature_cache(
-                                    run_dir, feature_key, pipeline_name, feature_manifest,
-                                    lambda: _prepare_matrices(
-                                        x_train, y_train, x_test,
-                                        family=family, severity=severity,
-                                        perturbation_seed=perturb_seed,
+                                if cache_manager is None:
+                                    cache_path, cache_manifest_path = _cache_paths(run_dir, feature_key, pipeline_name)
+                                    cache_was_present = cache_path.exists() and cache_manifest_path.exists()
+                                    payload = _load_or_create_feature_cache(
+                                        run_dir, feature_key, pipeline_name, feature_manifest,
+                                        lambda: _prepare_matrices(
+                                            x_train, y_train, x_test,
+                                            family=family, severity=severity,
+                                            perturbation_seed=perturb_seed,
+                                            pipeline_name=pipeline_name,
+                                            config=PIPELINE_CONFIGS[pipeline_name],
+                                        ),
+                                    )
+                                else:
+                                    payload, cache_was_present = _load_or_create_bounded_feature_cache(
+                                        cache_manager,
+                                        feature_task_key=feature_key,
                                         pipeline_name=pipeline_name,
-                                        config=PIPELINE_CONFIGS[pipeline_name],
-                                    ),
-                                )
+                                        expected_manifest=feature_manifest,
+                                        make_payload=lambda: _prepare_matrices(
+                                            x_train, y_train, x_test,
+                                            family=family, severity=severity,
+                                            perturbation_seed=perturb_seed,
+                                            pipeline_name=pipeline_name,
+                                            config=PIPELINE_CONFIGS[pipeline_name],
+                                        ),
+                                    )
                                 (x_train_fe, x_test_fe, y_train_enc, encoder,
                                  fe_meta, x_test_clean) = payload
                                 record_task(
@@ -725,6 +864,8 @@ def run_experiment(
                                     manifest_fingerprint=task_fp,
                                 )
                             except Exception as exc:
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
                                 failure = _record_failure(
                                     run_dir=run_dir, db_path=db_path, run_id=run_id,
                                     task_key=task_key, phase="phase1", dataset=dataset_name,
@@ -736,6 +877,8 @@ def run_experiment(
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
                             try:
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 if failure_hook:
                                     failure_hook("phase2", task)
                                 xtr = np.nan_to_num(x_train_fe.to_numpy(dtype=np.float32), nan=0.0,
@@ -792,6 +935,8 @@ def run_experiment(
                                     **test_metrics,
                                 }
                                 _safe_result_write(run_dir / "results.jsonl", result)
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler.publish_result(scheduler_lease, _scheduler_payload(result))
                                 record_task(
                                     db_path, run_id=run_id, task_key=task_key,
                                     phase="phase2", status="success", dataset=dataset_name,
@@ -801,6 +946,8 @@ def run_experiment(
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, status="success"))
                             except Exception as exc:
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
                                 failure = _record_failure(
                                     run_dir=run_dir, db_path=db_path, run_id=run_id,
                                     task_key=task_key, phase="phase2", dataset=dataset_name,
@@ -810,6 +957,24 @@ def run_experiment(
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
                             _save_run_manifest(run_dir, base_manifest, outcomes)
+                            if cache_manager is not None and model_position == len(models) - 1:
+                                # All compatible classifiers for this
+                                # feature-task have reached a terminal phase.
+                                # Lease-aware cleanup can now reclaim the
+                                # regenerated artifact without affecting
+                                # resumption or any active reader.
+                                cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+    if cache_manager is not None:
+        cache_reconciled = cache_manager.reconcile()
+        cache_cleanup = cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+        base_manifest["cache_storage"] = {
+            "policy": "bounded_regenerable",
+            "root": str(cache_manager.root),
+            "reconciled_before_final_cleanup": cache_reconciled,
+            "final_cleanup": cache_cleanup,
+            "high_water": cache_cleanup.get("high_water"),
+            "durable_cache_policy": "feature artifacts may be regenerated from frozen identities after all current consumers terminate",
+        }
     _save_run_manifest(run_dir, base_manifest, outcomes)
     return json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
 
@@ -826,6 +991,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--pipelines", nargs="+", default=["Raw", "AutoFE_Baseline"])
     parser.add_argument("--models", nargs="+", default=["logistic_regression"])
     parser.add_argument("--split-policy", choices=["row_level", "group_aware"], default="row_level")
+    parser.add_argument("--cache-policy", choices=["retain", "bounded"], default="retain")
+    parser.add_argument("--cache-max-gib", type=float)
+    parser.add_argument("--durable-scheduler", action="store_true")
+    parser.add_argument("--scheduler-lease-seconds", type=float, default=3600.0)
+    parser.add_argument("--scheduler-max-attempts", type=int, default=3)
     args = parser.parse_args(argv)
 
     names = load_dataset_names("config/dataset_list.yaml")
@@ -842,6 +1012,11 @@ def main(argv: list[str] | None = None) -> None:
         folds=list(range(1, args.max_folds + 1)) if args.max_folds else None,
         conditions=conditions, pipelines=tuple(args.pipelines), models=tuple(args.models),
         split_policy=args.split_policy,
+        cache_policy=args.cache_policy,
+        cache_max_bytes=(int(args.cache_max_gib * 1024**3) if args.cache_max_gib is not None else None),
+        durable_scheduler=args.durable_scheduler,
+        scheduler_lease_seconds=args.scheduler_lease_seconds,
+        scheduler_max_attempts=args.scheduler_max_attempts,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 
