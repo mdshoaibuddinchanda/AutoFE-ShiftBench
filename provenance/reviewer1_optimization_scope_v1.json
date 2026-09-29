@@ -10,7 +10,7 @@
   "operator_ablation_manifest_sha256": "6799c1f5dc1ee72a0c5032ecbf795138846fd868d156b059064ddf40557aa7cc",
   "operator_ablation_code_commit": "0f272f4f52998f003a9ead8c17e702e5c406d09d",
   "condition_scope_manifest": "provenance/reviewer1_condition_scope_manifest_v1.json",
-  "condition_scope_manifest_sha256": "95791d8ef78e0002c23f3d14bba1c9442f06c9c4a37482d475777cf7a3515448",
+  "condition_scope_manifest_sha256": "6ed6433eddf5e772b61ce018c41c2a6bf6b328e462f1f50f788ca50c2ee537bd",
   "condition_protocol_code_commit": "94738872f7f93fe875fd39aa7d1abde35eeae025",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
