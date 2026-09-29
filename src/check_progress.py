@@ -36,6 +36,8 @@ def check_progress(run_dir: str | Path) -> dict[str, Any]:
     task_counts["remaining"] = max(expected - len(unique_tasks), 0)
 
     phases: dict[str, dict[str, int]] = {}
+    scheduler_states: dict[str, int] = {}
+    scheduler_recovered = 0
     db_path = root / "checkpoints.sqlite"
     if db_path.exists():
         with sqlite3.connect(db_path) as connection:
@@ -43,6 +45,13 @@ def check_progress(run_dir: str | Path) -> dict[str, Any]:
                 "SELECT phase, status, COUNT(*) FROM task_state GROUP BY phase, status"
             ):
                 phases.setdefault(phase, {})[status] = count
+    scheduler_path = root / "scheduler.sqlite"
+    if scheduler_path.exists():
+        with sqlite3.connect(scheduler_path) as connection:
+            for status, count in connection.execute("SELECT status, COUNT(*) FROM scheduler_tasks GROUP BY status"):
+                scheduler_states[str(status)] = int(count)
+            row = connection.execute("SELECT COUNT(*) FROM scheduler_results WHERE recovered=1").fetchone()
+            scheduler_recovered = int(row[0] if row else 0)
 
     results_path = root / "results.jsonl"
     result_rows = 0
@@ -54,7 +63,9 @@ def check_progress(run_dir: str | Path) -> dict[str, Any]:
         "run_id": manifest.get("run_id"), "status": manifest.get("status"),
         "experiment_scope": manifest.get("experiment_scope"),
         "expected_tasks": expected, "task_counts": task_counts,
-        "phase_states": phases, "result_rows": result_rows,
+        "phase_states": phases, "scheduler_states": scheduler_states,
+        "scheduler_recovered_results": scheduler_recovered,
+        "result_rows": result_rows,
     }
     print(json.dumps(summary, indent=2))
     return summary

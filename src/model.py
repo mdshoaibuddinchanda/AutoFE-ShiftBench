@@ -66,6 +66,8 @@ def build_model(
         )
         if use_gpu:
             params["device"] = "cuda"
+        else:
+            params["device"] = "cpu"
         return XGBClassifier(**params)
 
     elif normalized == "lightgbm":
@@ -89,6 +91,8 @@ def build_model(
         if use_gpu:
             params["task_type"] = "GPU"
             params["devices"] = "0"
+        else:
+            params["task_type"] = "CPU"
         return CatBoostClassifier(**params)
 
     elif normalized == "linear_svm":

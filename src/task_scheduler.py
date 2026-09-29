@@ -1,8 +1,7 @@
 """Durable task leases and crash recovery for corrected benchmark runs.
 
-This module is intentionally independent of ``src.checkpoint`` and the
-benchmark runner.  It provides a small, WAL-backed scheduler that can be
-integrated after the lifecycle contract has been reviewed:
+The runner integrates this WAL-backed scheduler alongside its phase
+checkpoint ledger:
 
 * tasks are claimed with a renewable lease and an attempt token;
 * a worker can publish a result through an atomic file rename followed by a
@@ -640,6 +639,55 @@ class TaskScheduler:
                 expired = self._expire_leases_tx(conn, now=timestamp)
                 self._commit(conn)
                 return expired
+            except Exception:
+                self._rollback(conn)
+                raise
+
+    def reclaim_foreign_leases(self, worker_id: str, *, now: float | None = None) -> list[ExpiredAttempt]:
+        """Reclaim live leases owned by a prior process on this single-host run.
+
+        The corrected runner has one coordinator per run directory.  On a new
+        process after a forced termination, a prior lease may still have time
+        remaining even though its worker no longer exists.  This explicit
+        startup operation converts only leases owned by a different worker ID
+        to the same pending/timed-out state used by expiry; it is intentionally
+        not a multi-host coordination primitive.
+        """
+        if not worker_id:
+            raise ValueError("worker_id must be non-empty")
+        timestamp = time.time() if now is None else float(now)
+        with self._connection() as conn:
+            self._begin(conn)
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT a.task_key, a.attempt_no, a.worker_id, a.lease_expires_at,
+                           t.max_attempts
+                    FROM scheduler_attempts AS a
+                    JOIN scheduler_tasks AS t ON t.task_key=a.task_key
+                    WHERE a.status='running' AND a.worker_id <> ?
+                    ORDER BY a.task_key, a.attempt_no
+                    """,
+                    (worker_id,),
+                ).fetchall()
+                reclaimed: list[ExpiredAttempt] = []
+                for row in rows:
+                    next_status = "pending" if row["attempt_no"] < row["max_attempts"] else "timed_out"
+                    conn.execute(
+                        "UPDATE scheduler_attempts SET status='timed_out', finished_at=?, retryable=1, error_type='WorkerReplaced', error_summary=? WHERE task_key=? AND attempt_no=? AND status='running'",
+                        (timestamp, "Prior runner process was replaced before result publication", row["task_key"], row["attempt_no"]),
+                    )
+                    conn.execute(
+                        "UPDATE scheduler_tasks SET status=?, available_at=?, updated_at=? WHERE task_key=? AND status='running'",
+                        (next_status, timestamp, timestamp, row["task_key"]),
+                    )
+                    self._event(
+                        conn, now=timestamp, task_key=row["task_key"], attempt_no=row["attempt_no"],
+                        event_type="worker_reclaimed", details={"next_status": next_status, "worker_id": row["worker_id"]},
+                    )
+                    reclaimed.append(ExpiredAttempt(row["task_key"], row["attempt_no"], row["worker_id"], row["lease_expires_at"], next_status))
+                self._commit(conn)
+                return reclaimed
             except Exception:
                 self._rollback(conn)
                 raise

@@ -127,7 +127,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - Decision and rationale: use canonical SHA-256 identities, source/sidecar checksums, runtime/package fingerprints, immutable task manifests, and explicit resume commands.
 - Relevant files: `src/provenance.py`, `src/data_loader.py`, `src/pipeline_runner.py`, `requirements.txt`, `provenance/dataset_schema_audit.*`.
 - Implementation: baseline reproducibility controls and UCI Dry Bean correction are committed in `a6a8e3b`; split policy, group digests, task fingerprints, and preflight artifacts are now included.
-- Tests and commands: focused post-integration suite passed 42 tests; the final full `p12` suite passed 75 tests; compileall, schema/hash audit, and group audit also passed.
+- Tests and commands: focused post-integration suite passed 42 tests; the condition-accounting suite passed 75 tests; the final launch-audit full `p12` suite passed 83 tests; compileall, schema/hash audit, and group audit also passed.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
 - Benchmark artifact IDs / observed values: integrated source fingerprint `7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7`; corrected run `PENDING CORRECTED RUN`.
 - Limitations: historical Dry Bean input is unavailable and historical scores cannot be reconstructed.
@@ -157,14 +157,23 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - 2026-09-29: Large-dataset `airlines` scale gate measured 57.45 s for three row-level tasks, 101.89 s for three group-aware tasks, and about 0.87 GB of feature caches per three-task run. Frozen scope manifest records 1,750,000 intended two-policy tasks and a storage/runtime `DO_NOT_LAUNCH` decision under current retention.
 - 2026-09-30: Bounded profiling measured 80 Sonar pipeline/model tasks at 1/2/4 workers with 0/0/0 failures and zero one-versus-four prediction-hash mismatches. Lease-aware bounded cache and durable scheduler integration committed in `906e4cd` and `ef98cc8`; full p12 suite passed 68 tests, including retained-versus-bounded parity and interrupted new-process runner resume. The optimized versioned scope retains the original AUC denominator, data hashes, analysis definitions, and 1,750,000 intended task cells. Friend-PC host probe remains required before launch.
 - 2026-09-30: Operator audit completed in `c6e1b32` after truth-table milestone `db29aec`, with final raw-baseline metadata correction in `0f272f4`: all ten arithmetic ablation variants plus the four other frozen-scope names were smoke-tested. Multiplication-only, division-only, without-multiplication, and without-division paths were separately verified; historical `AutoFE_NoMultiply` remains the joint multiplication-and-division removal. Candidate validity accounting and result-note operator metadata were added; no pipeline-count change.
-- 2026-09-30: Condition-accounting audit completed in `8a19bfe`, with final result-metadata identity pinned in `e5e06c4`: all 14 historical conditions are crosswalked; target-exposed historical partitions are excluded from corrected inference; transductive group-aware requests fail closed; domain AUC support and all-categorical fallbacks are explicit. Final p12 suite passed 75 tests; no primary task count changed.
+- 2026-09-30: Condition-accounting audit completed in `8a19bfe`, with final result-metadata identity pinned in `e5e06c4`: all 14 historical conditions are crosswalked; target-exposed historical partitions are excluded from corrected inference; transductive group-aware requests fail closed; domain AUC support and all-categorical fallbacks are explicit. The launch-audit additions then passed 82 p12 tests; no primary task count changed.
 
 ## R11. Performance, storage, and crash recovery before launch
 
 - Exact concern: retained feature caches, unbounded worker behavior, and process loss could make a long run exceed storage or produce ambiguous task outcomes.
 - Decision and rationale: use bounded regenerable feature caches keyed by immutable feature-task identity; limit worker count to the measured 1–4 range with one BLAS/OpenMP thread per worker; use durable leases, heartbeats, retry classification, atomic result envelopes, and reconciliation.
 - Relevant files: `src/cache_manager.py`, `src/task_scheduler.py`, `src/pipeline_runner.py`, `provenance/profile_runner.py`, `provenance/reviewer1_optimization_plan_v1.md`, `provenance/performance_recovery_report.md`.
-- Evidence: cache manager 9 tests; scheduler 7 tests including process-boundary fault injection; bounded runner parity/resume tests; complete `p12` suite 75 passed; Sonar 80-task worker profile all successful; `airlines` stage profile and both-policy scale preflight recorded.
+- Evidence: cache manager build-once/admission tests; scheduler lease/recovery tests; bounded ten-consumer fan-out, publication-boundary, parity, and resume tests; complete `p12` suite 82 passed; Sonar 80-task worker profile all successful; `airlines` stage profile and both-policy scale preflight recorded. Friend-PC throughput remains unmeasured.
 - Status: **implemented-not-run** for the corrected campaign; launch remains **blocked** pending the intended host probe, representative large-task resume, and final storage margin.
+
+## R12. Friend-PC launch audit and cache/recovery gates
+
+- Exact concern: the local Sonar profile and earlier local disk measurement were not evidence for the friend PC, and cache/scheduler behavior lacked auditable fan-out and restart evidence.
+- Decision and rationale: keep the frozen 1,680,000-cell executable scope; require a host-specific probe and sustained representative throughput before launch. Use opt-in cache audit evidence so normal manifests remain compact.
+- Relevant files: `src/cache_manager.py`, `src/task_scheduler.py`, `src/pipeline_runner.py`, `provenance/measure_host.py`, `provenance/profile_runner.py`, `provenance/friend_pc_launch_audit.md`, `tests/test_bounded_runner_cache.py`, `tests/test_cache_manager.py`, `tests/test_task_scheduler.py`, `tests/test_model_factory.py`.
+- Implementation: build-once cache admission is locked and double-checked; reader leases, terminal-consumer checks, retry-safe deletion deferral, per-run result-key indexing, foreign-lease reclamation, scheduler-artifact checkpoint repair, explicit XGBoost/CatBoost GPU routing, and host disk/topology probing were added. The existing notebook execution-count change is untouched.
+- Evidence: bounded ten-model fan-out reports one build/nine hits; mid-group forced termination and new-process resume report no refit and no duplicate logical task. These are code-verification smokes only. The friend-PC probe and 10-day throughput evidence are not available in this session.
+- Status: **UNKNOWN / DO NOT LAUNCH** pending friend-PC host measurement, representative both-policy throughput, storage margin, and restart preflight.
 
 \r\n

@@ -9,6 +9,8 @@ Example::
 
     set OMP_NUM_THREADS=1
     set MKL_NUM_THREADS=1
+    set OPENBLAS_NUM_THREADS=1
+    set NUMEXPR_NUM_THREADS=1
     python -m provenance.profile_runner
 
 The command prints one JSON document to stdout.  No profile artifacts are
@@ -165,6 +167,31 @@ def _gpu_inventory() -> dict[str, Any]:
         return {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
 
 
+def _cpu_topology_inventory() -> dict[str, Any]:
+    """Best-effort Windows hybrid-core inventory; unknown fields stay explicit."""
+    try:
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors,ThreadCount | ConvertTo-Json -Compress"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        raw = completed.stdout.strip()
+    except Exception as exc:
+        return {"status": "unknown", "reason": f"{type(exc).__name__}: {exc}"}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        value = raw
+    return {
+        "status": "unknown",
+        "p_cores": None,
+        "e_cores": None,
+        "logical_processors": os.cpu_count(),
+        "windows_processor_record": value,
+        "reason": "Windows WMI record does not expose reliable heterogeneous-core counts",
+    }
+
+
 def environment_inventory() -> dict[str, Any]:
     usage = shutil.disk_usage(ROOT)
     return {
@@ -173,6 +200,7 @@ def environment_inventory() -> dict[str, Any]:
         "machine": __import__("platform").machine(),
         "processor": __import__("platform").processor(),
         "logical_cpu_count": os.cpu_count(),
+        "cpu_topology": _cpu_topology_inventory(),
         "packages": _package_versions(),
         "threads": _thread_inventory(),
         "gpu": _gpu_inventory(),
@@ -217,6 +245,7 @@ def _task_payload(
     context: dict[str, Any], pipeline: str, model: str,
     *, condition: str = DEFAULT_CONDITION,
     severity: float = 0.0,
+    use_gpu: bool = False,
 ) -> dict[str, Any]:
     return {
         "dataset": context["name"],
@@ -229,6 +258,7 @@ def _task_payload(
         "condition": condition,
         "severity": severity,
         "seed": DEFAULT_SEED,
+        "use_gpu": bool(use_gpu),
     }
 
 
@@ -252,7 +282,7 @@ def _execute_task(payload: dict[str, Any]) -> dict[str, Any]:
         preparation_s = _now() - prep_started
         xtr = np.nan_to_num(x_train_fe.to_numpy(dtype=np.float32), nan=0.0, posinf=1e10, neginf=-1e10)
         xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0, posinf=1e10, neginf=-1e10)
-        model = build_model(payload["model"], random_state=payload["seed"], use_gpu=False)
+        model = build_model(payload["model"], random_state=payload["seed"], use_gpu=payload.get("use_gpu", False))
         fit_started = _now()
         model.fit(xtr, y_train_enc)
         fit_s = _now() - fit_started
@@ -315,11 +345,11 @@ def _run_pool(payloads: list[dict[str, Any]], workers: int) -> list[dict[str, An
         return list(executor.map(_execute_task, payloads))
 
 
-def worker_benchmark(dataset_name: str, workers: tuple[int, ...]) -> dict[str, Any]:
+def worker_benchmark(dataset_name: str, workers: tuple[int, ...], *, use_gpu: bool = False) -> dict[str, Any]:
     context = _dataset_context(dataset_name)
     pipelines = tuple(name for name in DEFAULT_PIPELINES if name in PIPELINE_CONFIGS)
     models = tuple(name for name in DEFAULT_MODELS)
-    payloads = [_task_payload(context, pipeline, model) for pipeline in pipelines for model in models]
+    payloads = [_task_payload(context, pipeline, model, use_gpu=use_gpu) for pipeline in pipelines for model in models]
     runs: list[dict[str, Any]] = []
     digest_by_workers: dict[str, dict[str, str]] = {}
     for worker_count in workers:
@@ -442,7 +472,8 @@ def parity_check(dataset_name: str) -> dict[str, Any]:
 def run_profile(
     stage_datasets: tuple[str, ...] = ("sonar", "airlines"),
     mix_dataset: str = "sonar",
-    workers: tuple[int, ...] = (1, 2, 4),
+    workers: tuple[int, ...] = (1, 2, 3, 4),
+    use_gpu: bool = False,
 ) -> dict[str, Any]:
     return {
         "artifact_type": "bounded_performance_profile",
@@ -450,7 +481,14 @@ def run_profile(
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "environment": environment_inventory(),
         "stage_profiles": [stage_profile(name, ("Raw", "AutoFE_Baseline")) for name in stage_datasets],
-        "worker_benchmark": worker_benchmark(mix_dataset, workers),
+        "worker_benchmark": worker_benchmark(mix_dataset, workers, use_gpu=use_gpu),
+        "gpu_mode": bool(use_gpu),
+        "scheduling_modes": [
+            {"mode": "windows_default", "status": "measured", "worker_counts": list(workers)},
+            {"mode": "all_available", "status": "measured_only_for_requested_workers", "worker_counts": list(workers)},
+            {"mode": "p_core_preferred", "status": "pending_friend_pc", "reason": "No affinity applied until hybrid topology is measured"},
+            {"mode": "os_headroom", "status": "pending_friend_pc", "reason": "Worker/RAM reservation must be selected from host probe"},
+        ],
         "cache_profile": cache_profile("sonar", "AutoFE_Baseline"),
         "numerical_parity": parity_check("sonar"),
     }
@@ -460,11 +498,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage-datasets", nargs="+", default=["sonar", "airlines"])
     parser.add_argument("--mix-dataset", default="sonar")
-    parser.add_argument("--workers", nargs="+", type=int, default=[1, 2, 4])
+    parser.add_argument("--workers", nargs="+", type=int, default=[1, 2, 3, 4])
+    parser.add_argument("--use-gpu", action="store_true", help="Enable CUDA routing for XGBoost/CatBoost during this bounded profile")
     args = parser.parse_args(argv)
-    if any(worker < 1 or worker > 4 for worker in args.workers):
-        raise SystemExit("--workers values must be between 1 and 4 for bounded profiling")
-    result = run_profile(tuple(args.stage_datasets), args.mix_dataset, tuple(args.workers))
+    if any(worker < 1 or worker > (os.cpu_count() or 1) for worker in args.workers):
+        raise SystemExit(f"--workers values must be between 1 and {os.cpu_count() or 1} for bounded profiling")
+    result = run_profile(tuple(args.stage_datasets), args.mix_dataset, tuple(args.workers), args.use_gpu)
     print(json.dumps(_safe(result), indent=2, sort_keys=True, allow_nan=False))
 
 

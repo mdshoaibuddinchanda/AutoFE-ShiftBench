@@ -31,8 +31,9 @@ python -m src.pipeline_runner --run-id corrected-smoke --max-datasets 1 --max-se
 # Bounded Reviewer #1 gate (existing p12 environment; no full campaign)
 python -m provenance.reviewer1_preflight
 python -m provenance.reviewer1_scale_preflight
-python provenance/measure_host.py
-python -m provenance.profile_runner --stage-datasets sonar airlines --mix-dataset sonar --workers 1 2 4
+python provenance/measure_host.py --output provenance/friend_pc_host_manifest.json --probe-root D:\\DR2\\AutoFE_Submission --probe-mib 64
+python -m provenance.profile_runner --stage-datasets sonar airlines --mix-dataset sonar --workers 1 2 3 4
+# Run the same bounded profile with --use-gpu only after the host probe confirms CUDA/backend support.
 ~~~
 
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
@@ -45,7 +46,7 @@ cache and durable scheduler flags are required launch settings:
 ~~~
 conda activate p12
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --cache-policy bounded --cache-max-gib 8 --durable-scheduler --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply AutoFE_Isolate_Add AutoFE_Isolate_Subtract AutoFE_Isolate_Multiply AutoFE_Isolate_Divide AutoFE_LeaveOut_Add AutoFE_LeaveOut_Subtract AutoFE_LeaveOut_Multiply AutoFE_LeaveOut_Divide --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
+python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --cache-policy bounded --cache-max-gib 8 --durable-scheduler --cache-audit --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply AutoFE_Isolate_Add AutoFE_Isolate_Subtract AutoFE_Isolate_Multiply AutoFE_Isolate_Divide AutoFE_LeaveOut_Add AutoFE_LeaveOut_Subtract AutoFE_LeaveOut_Multiply AutoFE_LeaveOut_Divide --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
 ~~~
 
 Failed dataset downloads stop the run with an error. Missing configured CSVs also stop the run before any tasks start; a partial run is not reported as complete.

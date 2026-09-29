@@ -1,10 +1,9 @@
 """Bounded, lease-aware storage for run-scoped feature-cache artifacts.
 
-The current runner owns its cache read/write path.  This module is an isolated
-storage layer for a future integration: it gives writers atomic temp/ready
-states, consumers explicit leases, reconciliation of interrupted writes, and
-bounded cleanup with high-water accounting.  It intentionally does not edit
-or call ``pipeline_runner``.
+The corrected runner uses this layer for its bounded policy. It gives writers
+atomic temp/ready states, consumers explicit leases, reconciliation of
+interrupted writes, build-once publication, and bounded cleanup with high-water
+accounting.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from pathlib import Path
 import re
 import secrets
 import time
-from typing import Any, Iterator, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 
 class CacheError(RuntimeError):
@@ -260,47 +259,99 @@ class CacheManager:
             metadata=manifest,
         )
 
+    def _put_bytes_locked(
+        self,
+        key: str,
+        payload: bytes,
+        metadata: Mapping[str, Any] | None = None,
+        *,
+        enforce_limit: bool = False,
+    ) -> CacheRecord:
+        """Publish while the caller holds the per-artifact lock."""
+        digest, payload_path, manifest_path, ready_path = self._paths(key)
+        now = _now_seconds()
+        if enforce_limit and self.max_bytes is not None:
+            existing_bytes = sum(
+                path.stat().st_size for path in (payload_path, manifest_path, ready_path) if path.exists()
+            )
+            projected = self._usage_bytes() - existing_bytes + len(payload)
+            if projected > self.max_bytes:
+                # Admission control is checked before writing. The caller
+                # must reclaim unleased artifacts before retrying; an in-use
+                # group is never evicted to make room for a new one.
+                raise CacheBusyError(
+                    f"Cache admission denied for {key}: projected {projected} bytes exceeds limit {self.max_bytes}"
+                )
+        base = dict(metadata or {})
+        base.update({
+            "key": key, "digest": digest, "state": "ready", "schema_version": 1,
+            "payload_bytes": len(payload), "payload_sha256": _sha256_bytes(payload),
+            "created_epoch": now, "created_at": _utc_now(),
+            "last_access_epoch": now, "last_access_at": _utc_now(),
+        })
+        temp_payload = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.payload.tmp"
+        temp_manifest = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.manifest.tmp"
+        temp_ready = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.ready.tmp"
+        try:
+            with temp_payload.open("wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            with temp_manifest.open("wb") as stream:
+                stream.write((json.dumps(base, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"))
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_payload, payload_path)
+            os.replace(temp_manifest, manifest_path)
+            ready = {"state": "ready", "key": key, "digest": digest, "manifest_sha256": _sha256_bytes(manifest_path.read_bytes())}
+            temp_ready.write_text(json.dumps(ready, sort_keys=True) + "\n", encoding="utf-8")
+            with temp_ready.open("r+b") as stream:
+                os.fsync(stream.fileno())
+            os.replace(temp_ready, ready_path)
+        finally:
+            temp_payload.unlink(missing_ok=True)
+            temp_manifest.unlink(missing_ok=True)
+            temp_ready.unlink(missing_ok=True)
+        return self._read_record(key)
+
     def put_bytes(self, key: str, payload: bytes, metadata: Mapping[str, Any] | None = None) -> CacheRecord:
         """Atomically publish one ready artifact, refusing replacement while leased."""
         if not isinstance(payload, bytes):
             raise TypeError("put_bytes requires bytes; serialize objects before calling it")
-        digest, payload_path, manifest_path, ready_path = self._paths(key)
-        now = _now_seconds()
+        digest, _, _, _ = self._paths(key)
         with self._artifact_lock(digest):
-            active, invalid = self._active_lease_files(digest, now)
+            active, invalid = self._active_lease_files(digest, _now_seconds())
             if active or invalid:
                 raise CacheBusyError(f"Cannot replace leased cache artifact: {key}")
-            base = dict(metadata or {})
-            base.update({
-                "key": key, "digest": digest, "state": "ready", "schema_version": 1,
-                "payload_bytes": len(payload), "payload_sha256": _sha256_bytes(payload),
-                "created_epoch": now, "created_at": _utc_now(),
-                "last_access_epoch": now, "last_access_at": _utc_now(),
-            })
-            temp_payload = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.payload.tmp"
-            temp_manifest = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.manifest.tmp"
-            temp_ready = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.ready.tmp"
+            return self._put_bytes_locked(key, payload, metadata)
+
+    def get_or_create_bytes(
+        self,
+        key: str,
+        make_payload: Callable[[], bytes],
+        metadata: Mapping[str, Any] | None = None,
+    ) -> tuple[bytes, bool]:
+        """Build once under the artifact lock and return ``(payload, hit)``.
+
+        The ready artifact is checked again while holding the lock, so two
+        processes missing the same key cannot both publish a replacement.
+        The factory runs while this key is locked; callers should keep it
+        scoped to one feature group and use the bounded admission policy.
+        """
+        digest, payload_path, _, _ = self._paths(key)
+        with self._artifact_lock(digest):
             try:
-                with temp_payload.open("wb") as stream:
-                    stream.write(payload)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                with temp_manifest.open("wb") as stream:
-                    stream.write((json.dumps(base, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"))
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                os.replace(temp_payload, payload_path)
-                os.replace(temp_manifest, manifest_path)
-                ready = {"state": "ready", "key": key, "digest": digest, "manifest_sha256": _sha256_bytes(manifest_path.read_bytes())}
-                temp_ready.write_text(json.dumps(ready, sort_keys=True) + "\n", encoding="utf-8")
-                with temp_ready.open("r+b") as stream:
-                    os.fsync(stream.fileno())
-                os.replace(temp_ready, ready_path)
-            finally:
-                temp_payload.unlink(missing_ok=True)
-                temp_manifest.unlink(missing_ok=True)
-                temp_ready.unlink(missing_ok=True)
-        return self._read_record(key)
+                record = self._read_record(key)
+                return record.payload_path.read_bytes(), True
+            except CacheNotReadyError:
+                payload = make_payload()
+                if not isinstance(payload, bytes):
+                    raise TypeError("get_or_create_bytes factory must return bytes")
+                active, invalid = self._active_lease_files(digest, _now_seconds())
+                if active or invalid:
+                    raise CacheBusyError(f"Cannot create leased cache artifact: {key}")
+                self._put_bytes_locked(key, payload, metadata, enforce_limit=True)
+                return payload, False
 
     def put_text(self, key: str, text: str, metadata: Mapping[str, Any] | None = None) -> CacheRecord:
         return self.put_bytes(key, text.encode("utf-8"), metadata)

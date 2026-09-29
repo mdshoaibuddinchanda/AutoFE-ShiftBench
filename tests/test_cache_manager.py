@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 
 import pytest
@@ -119,3 +120,41 @@ def test_dry_run_reports_without_deleting(tmp_path):
     assert record.digest in result["deleted_digests"]
     assert record.payload_path.exists()
 
+
+def test_get_or_create_builds_once_across_concurrent_consumers(tmp_path):
+    manager = CacheManager(tmp_path / "cache")
+    calls = {"count": 0}
+    guard = threading.Lock()
+
+    def factory():
+        with guard:
+            calls["count"] += 1
+        time.sleep(0.02)
+        return b"shared-payload"
+
+    results = []
+
+    def consume():
+        results.append(manager.get_or_create_bytes("fanout", factory))
+
+    threads = [threading.Thread(target=consume) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert calls["count"] == 1
+    assert sorted(hit for _payload, hit in results) == [False, True, True, True]
+    assert {payload for payload, _hit in results} == {b"shared-payload"}
+
+
+def test_admission_control_does_not_evict_an_in_use_artifact(tmp_path):
+    manager = CacheManager(tmp_path / "cache", max_bytes=200)
+    manager.put_text("in-use", "x" * 40)
+    lease = manager.acquire("in-use", owner="consumer")
+    try:
+        with pytest.raises(CacheBusyError):
+            manager.get_or_create_bytes("next", lambda: b"y" * 40)
+        assert manager.reconcile()["active_lease_count"] == 1
+        assert manager._paths("in-use")[1].exists()
+    finally:
+        lease.release()

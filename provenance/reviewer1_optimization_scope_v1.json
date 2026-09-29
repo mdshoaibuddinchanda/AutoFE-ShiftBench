@@ -63,6 +63,8 @@
     "lease_ttl_seconds": 3600,
     "max_bytes_planned": 8589934592,
     "cleanup": "after the last model consumer for each feature task and at run reconciliation",
+    "admission_control": "reject a new artifact before write when projected live bytes exceed max_bytes; never evict leased artifacts",
+    "fanout_audit": "opt-in cache_audit records one build, hits, consumer IDs, reader history, terminal completion, and deletion",
     "high_water_monitor": true,
     "safe_cleanup": "ready marker, checksum, per-artifact lock, active/malformed lease protection"
   },
@@ -71,15 +73,16 @@
     "backend": "src/task_scheduler.py",
     "database": "SQLite WAL + synchronous FULL",
     "lease_seconds": 3600,
-    "heartbeat": "before feature preparation and model fit",
+    "heartbeat": "before and after feature preparation, fit, and inference; replacement process reclaims foreign leases",
     "max_attempts": 3,
     "result_publication": "fsync temporary envelope, atomic rename, SQLite commit, reconciliation"
   },
   "resource_policy": {
     "workers_measured": [1, 2, 4],
     "planned_worker_cap": 4,
+    "friend_pc_worker_modes": ["windows_default", "all_available", "p_core_preferred", "os_headroom"],
     "blas_threads_per_worker": 1,
-    "gpu": "inventory only; CPU path is the frozen comparison path",
+    "gpu": "optional explicit XGBoost/CatBoost CUDA routing; friend-PC fit/parity measurement required before enabling",
     "launch_host_requirement": "repeat provenance/measure_host.py on the intended friend PC before launch"
   },
   "runtime_estimates_days": {

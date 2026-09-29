@@ -146,6 +146,18 @@ s.publish_result(lease, {{'metric': 1.0}}, now=100.0, fault_stage='after_temp')
     assert scheduler.task_state("task-1")["status"] == "success"
 
 
+def test_new_process_reclaims_foreign_live_lease(tmp_path):
+    scheduler = _scheduler(tmp_path, lease_seconds=3600.0)
+    scheduler.register_tasks([_spec()], now=0.0)
+    lease = scheduler.claim_task("old-process", now=100.0)
+    assert lease is not None
+    reclaimed = scheduler.reclaim_foreign_leases("new-process", now=101.0)
+    assert len(reclaimed) == 1
+    assert scheduler.task_state("task-1")["status"] == "pending"
+    replacement = scheduler.claim_task("new-process", now=102.0)
+    assert replacement is not None and replacement.attempt_no == 2
+
+
 def test_reconciliation_reports_invalid_artifact_without_adopting(tmp_path):
     scheduler = _scheduler(tmp_path)
     scheduler.register_tasks([_spec()], now=0.0)

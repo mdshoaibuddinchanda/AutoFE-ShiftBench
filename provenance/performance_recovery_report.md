@@ -48,3 +48,9 @@ The scheduler uses SQLite WAL with `synchronous=FULL`, immutable task specificat
 ## Interpretation and remaining gates
 
 The measured 4-worker speedup supports a planning scenario, not a guarantee for every dataset or the full grid.  Aggregate memory can approach four times the per-child RSS, and the friend's hardware remains unmeasured.  The optimized scope retains the original 1,750,000 intended task cells, AUC denominator, split policies, data hashes, and analysis definitions.  Runtime scenarios and storage margin must be rechecked on the launch host, followed by a new-process interrupted preflight/resume.  Until those gates pass, corrected performance, Jacobian associations, operator effects, and statistical conclusions remain **PENDING CORRECTED RUN**.
+
+## Launch-audit update (2026-09-30)
+
+The bounded runner now records optional per-feature cache build/hit/reader/terminal/deletion evidence. A ten-model fan-out smoke reports one build and nine hits, and a forced mid-group process kill followed by a new-process resume reports no completed-task refit or duplicate logical task. Cache admission is checked before writing when the bounded limit is active; retryable scheduler consumers defer deletion. Startup reclaims foreign single-host leases and repairs a missing checkpoint from a verified scheduler result artifact. These are bounded code checks.
+
+`provenance/measure_host.py` now records the executing interpreter, best-effort hybrid topology, power plan, GPU backend visibility, and a bounded sequential disk probe. No friend-PC output was available for this audit. The current launch verdict is **UNKNOWN / DO NOT LAUNCH**: the 1,680,000 executable cells still require a measured sustained rate above 7,000 valid cells/hour with margin, representative large-dataset tails under both split policies, candidate-history/checkpoint/cache I/O, and friend-PC RAM/GPU/thermal evidence. The local host measurements are not substituted for that evidence.

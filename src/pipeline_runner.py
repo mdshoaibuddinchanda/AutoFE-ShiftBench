@@ -333,6 +333,7 @@ def _load_or_create_bounded_feature_cache(
     pipeline_name: str,
     expected_manifest: dict[str, Any],
     make_payload: Callable[[], tuple[Any, ...]],
+    audit_callback: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[tuple[Any, ...], bool]:
     """Read/create a lease-validated cache and return ``(payload, cache_hit)``.
 
@@ -344,25 +345,51 @@ def _load_or_create_bounded_feature_cache(
     expected_manifest["cache_fingerprint"] = cache_fingerprint(expected_manifest)
     cache_fp = str(expected_manifest["cache_fingerprint"])
     key = _bounded_cache_key(feature_task_key, pipeline_name, cache_fp)
-    try:
-        with manager.lease(key, owner=f"pid:{os.getpid()}") as lease:
-            payload = pickle.loads(lease.read_bytes())
-        if not isinstance(payload, tuple):
-            raise ValueError("bounded feature cache payload must be a tuple")
-        return payload, True
-    except CacheNotReadyError:
-        payload = make_payload()
-        encoded = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
-        manager.put_bytes(key, encoded, metadata={
+    encoded, cache_hit = manager.get_or_create_bytes(
+        key,
+        lambda: pickle.dumps(make_payload(), protocol=pickle.HIGHEST_PROTOCOL),
+        metadata={
             "pipeline": pipeline_name,
             "cache_fingerprint": cache_fp,
             "protocol_version": PROTOCOL_VERSION,
             "expected_manifest": expected_manifest,
-        })
-        return payload, False
+        },
+    )
+    with manager.lease(key, owner=f"pid:{os.getpid()}") as lease:
+        if audit_callback is not None:
+            audit_callback("reader_acquired", {
+                "cache_key": key, "active_readers": manager.reconcile().get("active_lease_count", 0),
+            })
+        payload = pickle.loads(lease.read_bytes())
+    if not isinstance(payload, tuple):
+        raise ValueError("bounded feature cache payload must be a tuple")
+    if audit_callback is not None:
+        audit_callback("hit" if cache_hit else "build", {"cache_key": key})
+    return payload, cache_hit
 
 
-def _safe_result_write(path: Path, row: dict[str, Any]) -> None:
+def _initialize_result_index(index_path: Path, results_path: Path) -> None:
+    """Rebuild a compact task-key index once at process startup."""
+    import sqlite3
+
+    with sqlite3.connect(index_path) as connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS result_keys (task_key TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY(task_key, status))")
+        if results_path.exists():
+            with results_path.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    key = row.get("task_key")
+                    if key:
+                        connection.execute(
+                            "INSERT OR IGNORE INTO result_keys(task_key, status) VALUES (?, ?)",
+                            (str(key), str(row.get("status", "unknown"))),
+                        )
+
+
+def _safe_result_write(path: Path, row: dict[str, Any], *, index_path: Path | None = None) -> None:
     def json_safe(value: Any) -> Any:
         if isinstance(value, dict):
             return {str(key): json_safe(child) for key, child in value.items()}
@@ -375,6 +402,32 @@ def _safe_result_write(path: Path, row: dict[str, Any]) -> None:
         return value
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    task_key = row.get("task_key")
+    if index_path is not None and task_key:
+        import sqlite3
+
+        status = str(row.get("status", "unknown"))
+        with sqlite3.connect(index_path) as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM result_keys WHERE task_key=? AND status=?", (str(task_key), status)
+            ).fetchone()
+        if exists:
+            return
+        # Append first, then index.  If the process dies between these two
+        # operations, the next startup scan repairs the index before resume.
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(json_safe(row), sort_keys=True, allow_nan=False, default=str) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        with sqlite3.connect(index_path) as connection:
+            inserted = connection.execute(
+                "INSERT OR IGNORE INTO result_keys(task_key, status) VALUES (?, ?)", (str(task_key), status)
+            ).rowcount
+        if inserted == 0:
+            # A duplicate append can only occur after a crash; leave the
+            # append-only evidence intact and let analysis use the unique key.
+            return
+        return
     with path.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(json_safe(row), sort_keys=True, allow_nan=False, default=str) + "\n")
         stream.flush()
@@ -395,10 +448,25 @@ def _scheduler_payload(row: dict[str, Any]) -> dict[str, Any]:
     return json_safe(row)
 
 
+def _recover_scheduler_payload(scheduler: TaskScheduler, task_key: str) -> dict[str, Any] | None:
+    """Read a verified scheduler result for checkpoint repair on resume."""
+    state = scheduler.result_state(task_key)
+    if not state:
+        return None
+    path = Path(state["artifact_path"])
+    try:
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    payload = envelope.get("payload")
+    return payload if isinstance(payload, dict) and payload.get("task_key") == task_key else None
+
+
 def _record_failure(
     *, run_dir: Path, db_path: Path, run_id: str, task_key: str,
     phase: str, dataset: str, seed: int, fold: int, condition: str,
     pipeline: str, model: str, fingerprint: str, exc: BaseException,
+    result_index_path: Path | None = None,
 ) -> dict[str, Any]:
     summary = " ".join(str(exc).split())[:1000]
     record_task(
@@ -413,7 +481,7 @@ def _record_failure(
         "phase": phase, "status": "failed", "exception_type": type(exc).__name__,
         "error_summary": summary,
     }
-    _safe_result_write(run_dir / "results.jsonl", row)
+    _safe_result_write(run_dir / "results.jsonl", row, index_path=result_index_path)
     return row
 
 
@@ -532,6 +600,8 @@ def run_experiment(
     durable_scheduler: bool = False,
     scheduler_lease_seconds: float = 3600.0,
     scheduler_max_attempts: int = 3,
+    cache_audit: bool = False,
+    use_gpu: bool = False,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
@@ -619,6 +689,8 @@ def run_experiment(
         "durable_scheduler": durable_scheduler,
         "scheduler_lease_seconds": scheduler_lease_seconds,
         "scheduler_max_attempts": scheduler_max_attempts,
+        "cache_audit": bool(cache_audit),
+        "use_gpu": bool(use_gpu),
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
     config_fingerprint = stable_digest(config_data)
@@ -645,6 +717,8 @@ def run_experiment(
 
     run_dir.mkdir(parents=True, exist_ok=True)
     db_path = run_dir / "checkpoints.sqlite"
+    result_index_path = run_dir / "results_index.sqlite"
+    _initialize_result_index(result_index_path, run_dir / "results.jsonl")
     init_db(db_path)
     cache_manager = (
         CacheManager(
@@ -665,6 +739,29 @@ def run_experiment(
     scheduler_worker_id = f"runner-pid-{os.getpid()}"
     if scheduler is not None:
         scheduler.reconcile()
+        # A new process on this single-host run may replace a coordinator
+        # whose lease is still live.  Reclaim only foreign worker leases after
+        # reconciling any result artifact that was already durably published.
+        scheduler.reclaim_foreign_leases(scheduler_worker_id)
+    prior_cache_audit = (existing_manifest or {}).get("cache_audit", {})
+    if cache_audit and prior_cache_audit.get("enabled"):
+        cache_audit_state: dict[str, Any] = {
+            "enabled": True,
+            "artifacts": dict(prior_cache_audit.get("artifacts", {})),
+            "policy": prior_cache_audit.get(
+                "policy",
+                "one build, all compatible consumers, delete after durable terminal consumers and no active leases",
+            ),
+        }
+    else:
+        cache_audit_state = (
+            {
+                "enabled": True,
+                "artifacts": {},
+                "policy": "one build, all compatible consumers, delete after durable terminal consumers and no active leases",
+            }
+            if cache_audit else {"enabled": False}
+        )
     base_manifest = {
         "run_id": run_id, "protocol_version": PROTOCOL_VERSION,
         "created_utc": (existing_manifest or {}).get(
@@ -680,6 +777,7 @@ def run_experiment(
         "split_policy": split_policy,
         "cache_policy": cache_policy,
         "durable_scheduler": durable_scheduler,
+        "cache_audit": cache_audit_state,
         "partition_uses_held_out_features": False,
         "datasets": list((existing_manifest or {}).get("datasets", [])),
     }
@@ -811,6 +909,7 @@ def run_experiment(
                         "condition": condition, "dataset_checksum": task_checksum,
                     })[:20]
                     for pipeline_name in pipelines:
+                        feature_consumer_task_keys: list[str] = []
                         for model_position, model_name in enumerate(models):
                             task = {
                                 "dataset": dataset_name, "seed": seed, "fold": fold,
@@ -855,6 +954,43 @@ def run_experiment(
                             feature_cache_fp = cache_fingerprint(feature_manifest)
                             task_manifest["task_fingerprint"] = task_fp
                             task_manifest["cache_fingerprint"] = feature_cache_fp
+                            feature_consumer_task_keys.append(task_key)
+                            cache_audit_key = _bounded_cache_key(feature_key, pipeline_name, feature_cache_fp)
+                            if cache_audit:
+                                cache_audit_artifacts = base_manifest["cache_audit"]["artifacts"]
+                                cache_audit_artifacts.setdefault(cache_audit_key, {
+                                    "cache_key": cache_audit_key,
+                                    "feature_task_key": feature_key,
+                                    "pipeline": pipeline_name,
+                                    "expected_consumers": len(models),
+                                    "consumer_task_keys": [],
+                                    "terminal_consumer_task_keys": [],
+                                    "build_count": 0,
+                                    "hit_count": 0,
+                                    "regeneration_count": 0,
+                                    "active_reader_history": [],
+                                    "deletion_time_utc": None,
+                                    "deletion_observed": False,
+                                })
+                                audit_record = cache_audit_artifacts[cache_audit_key]
+                                if task_key not in audit_record["consumer_task_keys"]:
+                                    audit_record["consumer_task_keys"].append(task_key)
+
+                                def cache_audit_event(event: str, details: dict[str, Any]) -> None:
+                                    if event == "build":
+                                        audit_record["build_count"] += 1
+                                        audit_record["regeneration_count"] = max(0, audit_record["build_count"] - 1)
+                                    elif event == "hit":
+                                        audit_record["hit_count"] += 1
+                                    elif event == "reader_acquired":
+                                        audit_record["active_reader_history"].append({
+                                            "task_key": task_key,
+                                            "active_readers": int(details.get("active_readers", 0)),
+                                            "observed_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                        })
+                            else:
+                                audit_record = None
+                                cache_audit_event = None
                             domain_auc_status = (
                                 domain_metadata.get(family, {}).get("auc_status")
                                 if family in domain_metadata else None
@@ -883,8 +1019,10 @@ def run_experiment(
                                     manifest_fingerprint=task_fp,
                                     error_summary=skip_reason,
                                 )
-                                _safe_result_write(run_dir / "results.jsonl", skipped)
+                                _safe_result_write(run_dir / "results.jsonl", skipped, index_path=result_index_path)
                                 _upsert_outcome(outcomes, skipped)
+                                if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                    audit_record["terminal_consumer_task_keys"].append(task_key)
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
                             scheduler_lease: Lease | None = None
@@ -901,14 +1039,53 @@ def run_experiment(
                                 if scheduler_state and scheduler_state.get("status") == "success":
                                     if has_success(db_path, run_id, task_key, "phase2", task_fp):
                                         _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
+                                        if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                            audit_record["terminal_consumer_task_keys"].append(task_key)
                                         _save_run_manifest(run_dir, base_manifest, outcomes)
                                         continue
-                                    raise RuntimeError(
-                                        f"Scheduler marks {task_key} successful but checkpoint is incomplete"
+                                    recovered = _recover_scheduler_payload(scheduler, task_key)
+                                    if recovered is None:
+                                        raise RuntimeError(
+                                            f"Scheduler marks {task_key} successful but checkpoint is incomplete and its result artifact is unavailable"
+                                        )
+                                    # Repair the checkpoint after a crash in
+                                    # the publication boundary.  The
+                                    # scheduler result is already immutable
+                                    # and checksum-validated, so no model is
+                                    # refit or result row appended twice.
+                                    record_task(
+                                        db_path, run_id=run_id, task_key=task_key,
+                                        phase="phase1", status="success", dataset=dataset_name,
+                                        seed=seed, fold=fold, condition=condition,
+                                        pipeline=pipeline_name, model=model_name,
+                                        manifest_fingerprint=task_fp,
                                     )
+                                    record_task(
+                                        db_path, run_id=run_id, task_key=task_key,
+                                        phase="phase2", status="success", dataset=dataset_name,
+                                        seed=seed, fold=fold, condition=condition,
+                                        pipeline=pipeline_name, model=model_name,
+                                        manifest_fingerprint=task_fp,
+                                    )
+                                    _upsert_outcome(outcomes, dict(recovered, status="success", resumed=True))
+                                    if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                        audit_record["terminal_consumer_task_keys"].append(task_key)
+                                    _save_run_manifest(run_dir, base_manifest, outcomes)
+                                    continue
+                                if scheduler_state and scheduler_state.get("status") in {"failed", "timed_out"}:
+                                    terminal_state = scheduler_state["status"]
+                                    prior = next((row for row in outcomes if row.get("task_key") == task_key), None)
+                                    terminal_row = dict(prior or task_manifest, status=terminal_state, resumed=True)
+                                    _upsert_outcome(outcomes, terminal_row)
+                                    if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                        audit_record["terminal_consumer_task_keys"].append(task_key)
+                                    _save_run_manifest(run_dir, base_manifest, outcomes)
+                                    continue
                             if (has_success(db_path, run_id, task_key, "phase2", task_fp)
                                     and has_success(db_path, run_id, task_key, "phase1", task_fp)):
                                 _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
+                                if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                    audit_record["terminal_consumer_task_keys"].append(task_key)
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
                             if scheduler is not None:
@@ -946,6 +1123,7 @@ def run_experiment(
                                             pipeline_name=pipeline_name,
                                             config=PIPELINE_CONFIGS[pipeline_name],
                                         ),
+                                        audit_callback=cache_audit_event,
                                     )
                                 (x_train_fe, x_test_fe, y_train_enc, encoder,
                                  fe_meta, x_test_clean) = payload
@@ -956,6 +1134,8 @@ def run_experiment(
                                     pipeline=pipeline_name, model=model_name,
                                     manifest_fingerprint=task_fp,
                                 )
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
                                     scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
@@ -964,7 +1144,7 @@ def run_experiment(
                                     task_key=task_key, phase="phase1", dataset=dataset_name,
                                     seed=seed, fold=fold, condition=condition,
                                     pipeline=pipeline_name, model=model_name,
-                                    fingerprint=task_fp, exc=exc,
+                                    fingerprint=task_fp, exc=exc, result_index_path=result_index_path,
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
@@ -978,15 +1158,22 @@ def run_experiment(
                                                     posinf=1e10, neginf=-1e10)
                                 xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0,
                                                     posinf=1e10, neginf=-1e10)
-                                model = build_model(model_name, random_state=seed, use_gpu=False)
+                                model = build_model(
+                                    model_name, random_state=seed,
+                                    use_gpu=bool(use_gpu and model_name in {"xgboost", "catboost"}),
+                                )
                                 started = time.perf_counter()
                                 model.fit(xtr, y_train_enc)
                                 train_time = time.perf_counter() - started
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 started = time.perf_counter()
                                 y_pred = model.predict(xte)
                                 y_proba = model.predict_proba(xte) if hasattr(model, "predict_proba") else np.zeros(
                                     (len(xte), len(encoder.classes_)))
                                 infer_time = time.perf_counter() - started
+                                if scheduler is not None and scheduler_lease is not None:
+                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 try:
                                     y_test_enc = encoder.transform(y_test.astype(str))
                                 except ValueError as exc:
@@ -1004,6 +1191,7 @@ def run_experiment(
                                     **task, "run_id": run_id, "task_key": task_key,
                                     "status": "success", "n_train": len(xtr), "n_test": len(xte),
                                     "split_policy": split_policy,
+                                    "model_backend": "gpu" if use_gpu and model_name in {"xgboost", "catboost"} else "cpu",
                                     "experiment_scope": experiment_scope,
                                     "split_status": task_split_status,
                                     "n_original": int(x_test_clean.shape[1]),
@@ -1035,9 +1223,11 @@ def run_experiment(
                                     "train_auc": train_metrics.get("roc_auc"),
                                     **test_metrics,
                                 }
-                                _safe_result_write(run_dir / "results.jsonl", result)
+                                _safe_result_write(run_dir / "results.jsonl", result, index_path=result_index_path)
                                 if scheduler is not None and scheduler_lease is not None:
                                     scheduler.publish_result(scheduler_lease, _scheduler_payload(result))
+                                    if failure_hook:
+                                        failure_hook("after_scheduler_publish", task)
                                 record_task(
                                     db_path, run_id=run_id, task_key=task_key,
                                     phase="phase2", status="success", dataset=dataset_name,
@@ -1046,6 +1236,8 @@ def run_experiment(
                                     manifest_fingerprint=task_fp,
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, status="success"))
+                                if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                    audit_record["terminal_consumer_task_keys"].append(task_key)
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
                                     scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
@@ -1054,9 +1246,11 @@ def run_experiment(
                                     task_key=task_key, phase="phase2", dataset=dataset_name,
                                     seed=seed, fold=fold, condition=condition,
                                     pipeline=pipeline_name, model=model_name,
-                                    fingerprint=task_fp, exc=exc,
+                                    fingerprint=task_fp, exc=exc, result_index_path=result_index_path,
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
+                                if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+                                    audit_record["terminal_consumer_task_keys"].append(task_key)
                             _save_run_manifest(run_dir, base_manifest, outcomes)
                             if cache_manager is not None and model_position == len(models) - 1:
                                 # All compatible classifiers for this
@@ -1064,10 +1258,44 @@ def run_experiment(
                                 # Lease-aware cleanup can now reclaim the
                                 # regenerated artifact without affecting
                                 # resumption or any active reader.
-                                cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+                                terminal_statuses = {"success", "failed", "skipped", "timed_out"}
+                                terminal = True
+                                for consumer_key in feature_consumer_task_keys:
+                                    if scheduler is not None:
+                                        state = scheduler.task_state(consumer_key)
+                                        consumer_status = state.get("status") if state else None
+                                    else:
+                                        row = next((item for item in outcomes if item.get("task_key") == consumer_key), None)
+                                        consumer_status = row.get("status") if row else None
+                                    if consumer_status not in terminal_statuses:
+                                        terminal = False
+                                        break
+                                if terminal:
+                                    cleanup_report = cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+                                    if cache_audit:
+                                        deleted = set(cleanup_report.get("deleted_digests", []))
+                                        for record in base_manifest["cache_audit"]["artifacts"].values():
+                                            if CacheManager._digest(record["cache_key"]) in deleted:
+                                                record["deletion_observed"] = True
+                                                record["deletion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if cache_manager is not None:
         cache_reconciled = cache_manager.reconcile()
-        cache_cleanup = cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+        scheduler_pending = False
+        if scheduler is not None:
+            with scheduler._connection() as connection:
+                scheduler_pending = bool(connection.execute(
+                    "SELECT 1 FROM scheduler_tasks WHERE status IN ('pending','running') LIMIT 1"
+                ).fetchone())
+        cache_cleanup = (
+            {"deferred": True, "reason": "durable scheduler has pending or running consumers"}
+            if scheduler_pending else cache_manager.cleanup(max_age_seconds=0, dry_run=False)
+        )
+        if cache_audit:
+            deleted = set(cache_cleanup.get("deleted_digests", []))
+            for record in base_manifest["cache_audit"]["artifacts"].values():
+                if CacheManager._digest(record["cache_key"]) in deleted:
+                    record["deletion_observed"] = True
+                    record["deletion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         base_manifest["cache_storage"] = {
             "policy": "bounded_regenerable",
             "root": str(cache_manager.root),
@@ -1097,6 +1325,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--durable-scheduler", action="store_true")
     parser.add_argument("--scheduler-lease-seconds", type=float, default=3600.0)
     parser.add_argument("--scheduler-max-attempts", type=int, default=3)
+    parser.add_argument(
+        "--cache-audit", action="store_true",
+        help="Persist per-feature cache build/hit/consumer/reader/deletion evidence (bounded runs only)",
+    )
+    parser.add_argument("--use-gpu", action="store_true", help="Use CUDA for XGBoost/CatBoost cells when the host/backend supports it")
     args = parser.parse_args(argv)
 
     names = load_dataset_names("config/dataset_list.yaml")
@@ -1118,6 +1351,8 @@ def main(argv: list[str] | None = None) -> None:
         durable_scheduler=args.durable_scheduler,
         scheduler_lease_seconds=args.scheduler_lease_seconds,
         scheduler_max_attempts=args.scheduler_max_attempts,
+        cache_audit=args.cache_audit,
+        use_gpu=args.use_gpu,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 
