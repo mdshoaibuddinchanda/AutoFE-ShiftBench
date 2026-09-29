@@ -195,15 +195,21 @@ def expand_features_with_dfs(
     if not cfg.enable_dfs:
         # Just selection control
         train_out, test_out, selected = _limit_features(train_base, test_base, y_train, cfg)
+        empty_candidate_counts = {
+            item: {"generated": 0, "rejected": 0, "eligible": 0, "selected": 0, "duplicates": 0}
+            for item in ARITHMETIC_PRIMITIVES
+        }
         metadata = {
             "n_generated": 0,
             "n_retained": len(selected),
             "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
             "feature_metadata": [{"name": c, "primitive": "raw", "parents": [], "depth": 0} for c in selected],
+            "operator_counts": {item: 0 for item in ARITHMETIC_PRIMITIVES},
+            "operator_candidate_counts": empty_candidate_counts,
             "operator_configuration": {
                 "enabled_operators": [],
                 "excluded_operators": list(ARITHMETIC_PRIMITIVES),
-                "candidate_counts": {item: {"generated": 0, "rejected": 0, "eligible": 0, "selected": 0, "duplicates": 0} for item in ARITHMETIC_PRIMITIVES},
+                "candidate_counts": empty_candidate_counts,
             },
         }
         return train_out, test_out, metadata

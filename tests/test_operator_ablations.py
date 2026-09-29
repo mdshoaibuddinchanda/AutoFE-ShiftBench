@@ -155,6 +155,7 @@ def test_all_operator_variants_write_distinct_result_rows(tmp_path):
     successful = [row for row in rows if row.get("status") == "success"]
     assert {row["pipeline"] for row in successful} == set(EXPECTED)
     assert all("operator_configuration" in row for row in successful)
+    assert all(set(row["operator_candidate_counts"]) == set(ARITHMETIC_PRIMITIVES) for row in successful)
     note = build_corrected_result_note(
         tmp_path / "runs" / "operator-smoke" / "results.jsonl",
         manifest_path=tmp_path / "runs" / "operator-smoke" / "manifest.json",
