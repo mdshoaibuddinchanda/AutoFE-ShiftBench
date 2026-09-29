@@ -1,6 +1,6 @@
 # Corrected results note
 
-Status: **PENDING CORRECTED RUN**. No full corrected campaign has been launched.
+Status: **PENDING CORRECTED RUN**. No full corrected campaign has been launched. A bounded `sonar` preflight passed under both split policies; its artifact is `provenance/reviewer1_preflight_manifest.json`.
 
 This file is reserved for the machine-checked result record. It must be generated from a frozen run manifest and explicit result ledger, never from the historical ledger.
 
@@ -12,7 +12,7 @@ This file is reserved for the machine-checked result record. It must be generate
 - Dataset source/version, CSV checksum, sidecar checksum: `PENDING CORRECTED RUN`
 - Split policies: `row_level` legacy-comparable and `group_aware` exact raw-feature groups
 - Canonical grouping rule: target-excluded, unperturbed raw predictors; type/missing/numeric/categorical canonicalization and collision checks recorded in the group audit
-- Conditions/pipelines/models/seeds/folds: `PENDING FROZEN MANIFEST`
+- Conditions/pipelines/models/seeds/folds: `PENDING FROZEN MANIFEST` (bounded preflight used one clean condition, seed 42, requested fold 1, three pipelines, and logistic regression)
 - Task denominator: `PENDING FROZEN MANIFEST`
 - Interval method and confidence level: `PENDING FROZEN ANALYSIS`
 - Multiplicity families and adjustment: dataset-level paired contrasts with prespecified Holm families
@@ -31,14 +31,14 @@ Per-dataset values must be preserved below the aggregate table so reversals and 
 
 ## Duplicate and fold diagnostics
 
-- Duplicate-group prevalence: recorded in `dataset_schema_audit.json`; corrected run artifact: `PENDING`.
-- Row-level cross-fold overlap: recorded in `dataset_schema_audit.md`; corrected run artifact: `PENDING`.
-- Conflicting-label group counts: recorded in `dataset_schema_audit.json`; corrected run artifact: `PENDING`.
-- Group-aware shared-group overlap: must be exactly zero per valid fold; corrected value: `PENDING CORRECTED RUN`.
+- Duplicate-group prevalence: recorded in `dataset_schema_audit.json`; all-dataset group artifact: `provenance/group_fold_audit.json`.
+- Row-level cross-fold overlap: recorded in `dataset_schema_audit.md` and `group_fold_audit.md` (e.g. PhishingWebsites 65.418363%, KDDCup99 67.007%).
+- Conflicting-label group counts: recorded in `dataset_schema_audit.json` and `group_fold_audit.json`.
+- Group-aware shared-group overlap: zero by assertion on all feasible preflight folds; two datasets are explicitly AUC-infeasible and are not substituted.
 
 ## Mechanism/operator and coverage sections
 
-Candidate/Jacobian summaries, operator-isolation results, feature counts/cost, task coverage, failures, retries, timeouts, complete-case analysis, and missingness sensitivity are all `PENDING CORRECTED RUN`.
+Candidate/Jacobian summaries and operator-isolation benchmark values remain `PENDING CORRECTED RUN`. The bounded preflight recorded 950 training-only candidate-history records and estimated approximately 79.7 GiB compressed for the original 612,500-task grid at that rate. Full task coverage, failures, retries, timeouts, complete-case analysis, and missingness sensitivity remain pending.
 
 ## Historical ledger (separate)
 

@@ -1,0 +1,82 @@
+{
+  "artifact_type": "reviewer1_bounded_preflight",
+  "environment": "D:\\Conda\\p12",
+  "dataset": "sonar",
+  "n_splits": 5,
+  "seed": 42,
+  "code_commit": "74f7712a038e8ae6fac7b62c102483e0db6408de",
+  "code_fingerprint": "08c6f6234231d9fbbb093f1c02191340035443c1c5c4c84e5c3f0985a840bd11",
+  "runs": [
+    {
+      "run_id": "sonar-row_level",
+      "split_policy": "row_level",
+      "elapsed_s": 1.776952899992466,
+      "status": "complete",
+      "counts": {
+        "failed": 0,
+        "success": 3
+      },
+      "counts_by_status": {
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "success": 3,
+        "timed_out": 0
+      },
+      "expected_tasks": 3,
+      "result_bytes": 4540,
+      "cache_bytes": 380691
+    },
+    {
+      "run_id": "sonar-group_aware",
+      "split_policy": "group_aware",
+      "elapsed_s": 1.581315400020685,
+      "status": "complete",
+      "counts": {
+        "failed": 0,
+        "success": 3
+      },
+      "counts_by_status": {
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "success": 3,
+        "timed_out": 0
+      },
+      "expected_tasks": 3,
+      "result_bytes": 4596,
+      "cache_bytes": 380633
+    }
+  ],
+  "candidate_history": {
+    "records_written": 950,
+    "uncompressed_bytes": 391790,
+    "compressed_bytes": 53200,
+    "metadata": {
+      "enabled": true,
+      "records_written": 950,
+      "operator_counts": {
+        "add_numeric": 190,
+        "divide_numeric": 380,
+        "multiply_numeric": 190,
+        "subtract_numeric": 190
+      },
+      "selection_score_status": {
+        "finite": 950,
+        "undefined": 0,
+        "not_scored": 0
+      },
+      "score_scope": "train"
+    },
+    "full_grid_estimate": {
+      "records": 581875000,
+      "bytes_per_record": 420,
+      "uncompressed_bytes": 244387500000,
+      "compressed_bytes": 85535625000,
+      "uncompressed_mib": 233066.08200073242,
+      "compressed_mib": 81573.12870025635,
+      "compression_ratio": 0.35
+    }
+  },
+  "full_campaign_started": false
+}

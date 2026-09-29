@@ -8,6 +8,7 @@ from typing import Any
 
 
 LEGACY_DB_PATH = Path("reports/cache.db")
+TASK_STATUSES = {"success", "failed", "skipped", "timed_out", "pending"}
 
 
 def init_db(db_path: str | Path = LEGACY_DB_PATH) -> None:
@@ -19,7 +20,7 @@ def init_db(db_path: str | Path = LEGACY_DB_PATH) -> None:
                 run_id TEXT NOT NULL,
                 task_key TEXT NOT NULL,
                 phase TEXT NOT NULL,
-                status TEXT NOT NULL CHECK(status IN ('success', 'failed')),
+                status TEXT NOT NULL CHECK(status IN ('success', 'failed', 'skipped', 'timed_out', 'pending')),
                 dataset TEXT NOT NULL,
                 seed INTEGER,
                 fold INTEGER,
@@ -32,6 +33,31 @@ def init_db(db_path: str | Path = LEGACY_DB_PATH) -> None:
                 PRIMARY KEY (run_id, task_key, phase)
             )
         """)
+        # Migrate databases created by the pre-review schema.  SQLite cannot
+        # alter a CHECK constraint in place, so rebuild while preserving all
+        # historical phase attempts.
+        definition = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='task_state'"
+        ).fetchone()[0]
+        if "'skipped'" not in definition:
+            conn.execute("ALTER TABLE task_state RENAME TO task_state_legacy")
+            conn.execute("""
+                CREATE TABLE task_state (
+                    run_id TEXT NOT NULL, task_key TEXT NOT NULL, phase TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('success', 'failed', 'skipped', 'timed_out', 'pending')),
+                    dataset TEXT NOT NULL, seed INTEGER, fold INTEGER, condition TEXT,
+                    pipeline TEXT, model TEXT, manifest_fingerprint TEXT,
+                    exception_type TEXT, error_summary TEXT,
+                    PRIMARY KEY (run_id, task_key, phase)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO task_state
+                SELECT run_id, task_key, phase, status, dataset, seed, fold, condition,
+                       pipeline, model, manifest_fingerprint, exception_type, error_summary
+                FROM task_state_legacy
+            """)
+            conn.execute("DROP TABLE task_state_legacy")
 
 
 def has_success(
@@ -73,8 +99,8 @@ def record_task(
     exception_type: str | None = None,
     error_summary: str | None = None,
 ) -> None:
-    if status not in {"success", "failed"}:
-        raise ValueError("Task state status must be 'success' or 'failed'")
+    if status not in TASK_STATUSES:
+        raise ValueError(f"Task state status must be one of {sorted(TASK_STATUSES)}")
     init_db(db_path)
     with sqlite3.connect(db_path, timeout=30) as conn:
         conn.execute("""

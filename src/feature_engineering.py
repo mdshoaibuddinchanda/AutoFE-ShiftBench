@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import itertools
 import pickle
 import random
@@ -110,6 +112,9 @@ def expand_features_with_dfs(
     x_test: pd.DataFrame,
     y_train: np.ndarray | None = None,
     config: DFSConfig | None = None,
+    *,
+    audit_context: dict[str, Any] | None = None,
+    candidate_history_writer: Any | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     cfg = config or DFSConfig()
     
@@ -182,11 +187,84 @@ def expand_features_with_dfs(
     
     retained_meta = [g for g in generated_features if g["name"] in selected_cols]
 
+    # Optional candidate ledger.  Every score is computed from the training
+    # matrix only; the test feature matrix is never consulted for selection.
+    # The writer is deliberately opt-in because a full benchmark can generate
+    # many gigabytes of JSONL history.
+    history_records = 0
+    history_operator_counts: dict[str, int] = {}
+    history_score_status: dict[str, int] = {"finite": 0, "undefined": 0, "not_scored": 0}
+    if candidate_history_writer is not None:
+        from src.mechanism_audit import CandidateHistoryRecord
+
+        context = dict(audit_context or {})
+        required = {"dataset", "split_policy", "seed", "fold", "condition"}
+        missing = sorted(required.difference(context))
+        if missing:
+            raise ValueError(f"candidate history context is missing: {missing}")
+        selected_set = set(selected_cols)
+        for iteration, feature in enumerate(generated_features):
+            primitive = str(feature.get("primitive", "")).lower()
+            primitive_map = {
+                "add": "add_numeric", "add_numeric": "add_numeric",
+                "subtract": "subtract_numeric", "subtract_numeric": "subtract_numeric",
+                "multiply": "multiply_numeric", "multiply_numeric": "multiply_numeric",
+                "divide": "divide_numeric", "divide_numeric": "divide_numeric",
+            }
+            operator = primitive_map.get(primitive)
+            if operator is None:
+                continue
+            parents = tuple(str(item) for item in feature.get("parents", ()))
+            candidate_id = hashlib.sha256(json.dumps({
+                "name": feature["name"], "parents": parents, "operator": operator,
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:24]
+            values = pd.to_numeric(train_feature_matrix[feature["name"]], errors="coerce").to_numpy(dtype=float)
+            with np.errstate(all="ignore"):
+                score = float(np.nanvar(values)) if np.isfinite(values).any() else None
+            score_status = "finite" if score is not None and np.isfinite(score) else "undefined"
+            admissible = bool(np.isfinite(values).all())
+            rejection_reason = None if admissible else "nonfinite_candidate_value"
+            if not admissible:
+                decision = "rejected"
+            elif feature["name"] in selected_set:
+                decision = "selected"
+            else:
+                decision = "not_selected"
+            if score is None:
+                decision = "rejected" if not admissible else "not_selected"
+                score_status = "undefined"
+            record = CandidateHistoryRecord(
+                dataset=str(context["dataset"]), split_policy=str(context["split_policy"]),
+                seed=int(context["seed"]), fold=int(context["fold"]),
+                condition=str(context["condition"]), iteration=int(iteration),
+                candidate_id=candidate_id, parent_features=parents, operator=operator,
+                admissible=admissible, rejection_reason=rejection_reason,
+                selection_score=score, selection_score_status=score_status,
+                selection_decision=decision,
+                candidate_seed=int(context.get("candidate_seed", cfg.random_seed)),
+            )
+            candidate_history_writer.append(record)
+            history_records += 1
+            history_operator_counts[operator] = history_operator_counts.get(operator, 0) + 1
+            history_score_status[score_status] += 1
+
     metadata = {
         "n_generated": len(feature_defs),
         "n_retained": len(selected_cols),
         "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
-        "feature_metadata": retained_meta
+        "feature_metadata": retained_meta,
+        "generated_feature_metadata_count": len(generated_features),
+        "operator_counts": {
+            primitive: sum(1 for item in generated_features if item.get("primitive") == primitive)
+            for primitive in sorted({str(item.get("primitive")) for item in generated_features})
+        },
+        "candidate_history": {
+            "enabled": candidate_history_writer is not None,
+            "records_written": history_records,
+            "operator_counts": history_operator_counts,
+            "selection_score_status": history_score_status,
+            "score_scope": "train",
+        },
     }
 
     return train_out, test_out, metadata

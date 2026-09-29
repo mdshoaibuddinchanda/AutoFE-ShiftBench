@@ -2,7 +2,7 @@
 
 ## Outcome and scope
 
-The corrected implementation is on branch `revision/fix-leakage-provenance`, based on original commit `f265ee118c6e0c07cf3f17e332e8aface6ab7f34`. The working tree is not committed; corrected run manifests therefore identify both this base commit and the source fingerprint. Historical result files were not rewritten.
+The corrected implementation is on branch `revision/fix-leakage-provenance`. Historical result files were not rewritten. The current source fingerprint for the audited implementation is `08c6f6234231d9fbbb093f1c02191340035443c1c5c4c84e5c3f0985a840bd11`.
 
 The six local historical ledgers/tables checked in `original_run.json` still match their recorded byte counts and SHA-256 hashes. The primary `results_stream.jsonl` has 560,002 rows. The manuscript's 538,972-row number is a historical reported subset count, not a corrected count. `reports/cache.db` was absent. I downloaded and inspected all 25 configured datasets into git-ignored `data/raw/`; 24 are from OpenML and Dry Bean is from UCI. All 25 CSV hashes and sidecar schemas match. The inspection exposed an existing source mapping error: OpenML data ID 42585 contains a different dataset (penguin measurements), not Dry Bean. The downloader now fetches [UCI Dry Bean ID 602](https://archive.ics.uci.edu/dataset/602/dry+bean+dataset); the saved data has 13,611 rows, 16 features, and seven classes.
 
@@ -72,7 +72,7 @@ Result: exit code 0. `git diff --check` reported no whitespace errors; Git emitt
 
 The synthetic end-to-end grid ran clean and Gaussian-noise conditions for Raw and AutoFE-Baseline with one CPU logistic-regression model. Each fresh run recorded four successes, zero failures. Training-matrix, test-matrix, and prediction hashes match across the two fresh runs; reusing one run ID resumed without duplicate result rows. The run-scoped progress reader reported 4/4 tasks, 4 Phase 1 successes, 4 Phase 2 successes, and 4 ledger rows.
 
-The saved example at `corrected_smoke_manifest.json` records a clean AutoFE-Baseline task for synthetic dataset `synthetic-v1`, target `numeric_target`, seed `1266883750`, train/test index hashes, dataset/checksum identity, code/config/runtime fingerprints, cache fingerprint `3be7b261eb4e188c6f93d0f56cd868b04f607d8762a8187c8f03307dc78f4d83`, and Phase 1/2 success. The full run had expected task count 4 and zero failures. Its recorded source fingerprint is `81b893258b50ad2985f3501583c1070f8c1cc26380a4e86a2caec6f6319264b4`. The current source fingerprint after the UCI downloader fix is `d46c872632bcfe45a8e15b415f0ac4cc2ebbf403f25610a6f277fc057d77cbab`; the example remains an inspectable pre-fix smoke snapshot, not validation of that final downloader change. The base commit field is the original HEAD because this revision has not been committed.
+The saved example at `corrected_smoke_manifest.json` records a clean AutoFE-Baseline task for synthetic dataset `synthetic-v1`, target `numeric_target`, seed `1266883750`, train/test index hashes, dataset/checksum identity, code/config/runtime fingerprints, cache fingerprint `3be7b261eb4e188c6f93d0f56cd868b04f607d8762a8187c8f03307dc78f4d83`, and Phase 1/2 success. The full run had expected task count 4 and zero failures. Its recorded source fingerprint is `81b893258b50ad2985f3501583c1070f8c1cc26380a4e86a2caec6f6319264b4`; the example remains an inspectable pre-fix smoke snapshot, not validation of the final downloader or Reviewer #1 integration.
 
 ## Primary and segregated conditions
 

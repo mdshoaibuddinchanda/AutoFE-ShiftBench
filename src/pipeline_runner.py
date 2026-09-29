@@ -28,6 +28,14 @@ from src.checkpoint import has_success, init_db, record_task
 from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
 from src.evaluation import compute_classification_metrics
 from src.feature_engineering import DFSConfig, expand_features_with_dfs
+from src.group_splits import (
+    GroupSplitInfeasibleError,
+    assert_group_fold_integrity,
+    assess_group_fold_feasibility,
+    canonical_feature_group_ids,
+    summarize_groups,
+    get_group_stratified_splits,
+)
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.provenance import (
@@ -72,6 +80,9 @@ PIPELINE_CONFIGS: dict[str, DFSConfig] = {
     "Raw": DFSConfig(enable_dfs=False, selection_method="none", max_features=None, max_base_features=None),
     "Raw_Variance": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100, max_base_features=None),
     "Raw_MI": DFSConfig(enable_dfs=False, selection_method="mi", max_features=100, max_base_features=None),
+    # Matched-cap raw baseline: same 20-column input cap and 100-feature
+    # selector budget as the default DFS condition, but without synthesis.
+    "Raw_CapMatched": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100, max_base_features=20),
     "AutoFE_Baseline": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1),
     "AutoFE_MI": DFSConfig(enable_dfs=True, selection_method="mi", max_features=100, depth=1),
     "AutoFE_Random": DFSConfig(enable_dfs=True, selection_method="random", max_features=100, depth=1),
@@ -80,6 +91,21 @@ PIPELINE_CONFIGS: dict[str, DFSConfig] = {
         trans_primitives=["add_numeric", "subtract_numeric"],
     ),
 }
+
+# Operator-isolation scopes use the same depth, base-feature cap, output cap,
+# and variance selector.  They are secondary diagnostics and do not alter the
+# frozen Raw-vs-Baseline primary core.
+for _operator in ("add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric"):
+    _short = _operator.removesuffix("_numeric").title()
+    PIPELINE_CONFIGS[f"AutoFE_Isolate_{_short}"] = DFSConfig(
+        enable_dfs=True, selection_method="variance", max_features=100,
+        max_base_features=20, depth=1, trans_primitives=[_operator],
+    )
+    PIPELINE_CONFIGS[f"AutoFE_LeaveOut_{_short}"] = DFSConfig(
+        enable_dfs=True, selection_method="variance", max_features=100,
+        max_base_features=20, depth=1,
+        trans_primitives=[item for item in ("add_numeric", "subtract_numeric", "multiply_numeric", "divide_numeric") if item != _operator],
+    )
 
 
 def _condition_name(family: str, severity: float) -> str:
@@ -310,14 +336,31 @@ def _dataset_identity(dataset_name: str, csv_path: Path, sidecar_path: Path) -> 
     return identity, sidecar
 
 
+def _compact_group_status(status: dict[str, Any]) -> dict[str, Any]:
+    """Keep fold diagnostics bounded while retaining a reproducible conflict digest."""
+    compact = dict(status)
+    conflict_ids = list(compact.pop("conflicting_label_group_ids", []))
+    compact["conflicting_label_group_id_count"] = len(conflict_ids)
+    compact["conflicting_label_group_id_sha256"] = stable_digest(conflict_ids)
+    compact["conflicting_label_group_id_examples"] = conflict_ids[:5]
+    return compact
+
+
 def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[str, Any]]) -> None:
     latest: dict[str, dict[str, Any]] = {}
     for outcome in outcomes:
         latest[outcome["task_key"]] = outcome
     outcomes[:] = list(latest.values())
+    # Keep the historical ``counts`` shape stable for existing consumers while
+    # publishing a complete status accounting block for corrected campaigns.
     counts: dict[str, int] = {"success": 0, "failed": 0}
+    counts_by_status: dict[str, int] = {
+        "success": 0, "failed": 0, "skipped": 0, "timed_out": 0, "pending": 0,
+    }
     for outcome in outcomes:
         counts[outcome["status"]] = counts.get(outcome["status"], 0) + 1
+        if outcome.get("status") in counts_by_status:
+            counts_by_status[outcome["status"]] += 1
     configuration = base.get("configuration", {})
     expected = (
         len(configuration.get("datasets", []))
@@ -327,11 +370,31 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
         * len(configuration.get("pipelines", []))
         * len(configuration.get("models", []))
     )
-    if len(outcomes) < expected:
+    counts_by_status["pending"] = max(expected - len(outcomes), 0)
+    forced_status = base.get("status") if base.get("status", "").startswith("blocked_") else None
+    if forced_status:
+        status = forced_status
+    elif len(outcomes) < expected:
         status = "running_with_failures" if counts["failed"] else "running"
     else:
         status = "completed_with_failures" if counts["failed"] else "complete"
-    manifest = dict(base, status=status, expected_tasks=expected, counts=counts, tasks=outcomes)
+    phase_counts: dict[str, int] = {}
+    for outcome in outcomes:
+        phase = outcome.get("phase")
+        if phase:
+            phase_counts[phase] = phase_counts.get(phase, 0) + 1
+    manifest = dict(
+        base, status=status, expected_tasks=expected, counts=counts,
+        counts_by_status=counts_by_status,
+        task_accounting={
+            "expected": expected,
+            "terminal": sum(counts_by_status[name] for name in ("success", "failed", "skipped", "timed_out")),
+            "counts_by_status": counts_by_status,
+            "counts_by_phase": phase_counts,
+            "pending_definition": "expected task keys absent from the current-attempt task list",
+        },
+        tasks=outcomes,
+    )
     atomic_write_json(run_dir / "manifest.json", manifest)
 
 
@@ -368,9 +431,12 @@ def run_experiment(
     pipelines: tuple[str, ...] = ("Raw", "AutoFE_Baseline"),
     models: tuple[str, ...] = ("logistic_regression",),
     n_splits: int = 5,
+    split_policy: str = "row_level",
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
+    if split_policy not in {"row_level", "group_aware"}:
+        raise ValueError("split_policy must be 'row_level' or 'group_aware'")
     seeds = seeds or [42, 123, 456, 789, 2025]
     folds = folds or list(range(1, n_splits + 1))
     selected_families = {family for family, _severity in conditions}
@@ -429,6 +495,7 @@ def run_experiment(
         "conditions": [list(x) for x in conditions],
         "pipelines": list(pipelines), "models": list(models), "seeds": seeds,
         "folds": folds, "n_splits": n_splits,
+        "split_policy": split_policy,
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
     config_fingerprint = stable_digest(config_data)
@@ -468,6 +535,7 @@ def run_experiment(
         "runtime_fingerprint": runtime_fingerprint,
         "primary_conditions": ["clean", "gaussian_noise_*", "missing_values_*", "label_noise_*"],
         "experiment_scope": experiment_scope,
+        "split_policy": split_policy,
         "partition_uses_held_out_features": False,
         "datasets": list((existing_manifest or {}).get("datasets", [])),
     }
@@ -498,19 +566,65 @@ def run_experiment(
             X, y, target_column=target_column,
             source_target_name=sidecar.get("source_target_name"),
         )
+        # Exact-feature groups are formed once from the unperturbed raw
+        # predictors.  Their IDs and summary are persisted for both tracks so
+        # the row-level overlap diagnostic is inspectable and the group-aware
+        # track can assert zero shared groups without a silent fallback.
+        group_ids = canonical_feature_group_ids(X)
+        group_summary = _compact_group_status(summarize_groups(group_ids, y))
+        group_status = _compact_group_status(assess_group_fold_feasibility(group_ids, y, n_splits, 42))
         dataset_manifest = {
             "dataset": dataset_name, "path": csv_path.as_posix(),
             "dataset_identity": dataset_identity, "source_csv_sha256": source_csv_checksum,
             "source_metadata_sha256": sidecar_checksums[dataset_name],
             "target_column": target_column, "schema_columns": list(frame.columns),
             "target_proxy_review": proxy_audit,
+            "split_policy": split_policy,
+            "canonicalization": {
+                "target_excluded_raw_predictors": True,
+                "schema_and_column_order_included": True,
+                "missing_values_unified": True,
+                "numeric_1_equals_numeric_1_0": True,
+                "text_1_distinct_from_numeric_1": True,
+                "group_id_sha256": stable_digest(group_ids.tolist()),
+            },
+            "group_summary": group_summary,
+            "group_fold_status_seed_42": group_status,
+            "group_fold_status_by_seed": {},
         }
         base_manifest["datasets"] = [
             row for row in base_manifest.get("datasets", []) if row.get("dataset") != dataset_name
         ] + [dataset_manifest]
         for seed in seeds:
-            ordinary_splits = get_stratified_splits(X, y, n_splits, seed, target_column=target_column)
-            assert_fold_integrity(ordinary_splits, len(frame))
+            if split_policy == "group_aware":
+                # Primary classification metrics require all classes in every
+                # train/test fold.  Infeasibility is explicit and never
+                # substituted with row-level folds.
+                try:
+                    ordinary_splits, split_status = get_group_stratified_splits(
+                        X, y, n_splits, seed, target_column=target_column,
+                        require_class_support=True, require_auc=True, return_status=True,
+                    )
+                except GroupSplitInfeasibleError as exc:
+                    dataset_manifest["group_fold_status_by_seed"][str(seed)] = _compact_group_status(exc.status)
+                    base_manifest["datasets"] = [
+                        row for row in base_manifest.get("datasets", []) if row.get("dataset") != dataset_name
+                    ] + [dataset_manifest]
+                    base_manifest["status"] = "blocked_group_split_infeasible"
+                    base_manifest["split_policy_blocker"] = {
+                        "dataset": dataset_name, "seed": seed,
+                        "reason": str(exc), "status": _compact_group_status(exc.status),
+                    }
+                    _save_run_manifest(run_dir, base_manifest, outcomes)
+                    raise
+                assert_group_fold_integrity(ordinary_splits, group_ids)
+                split_status = _compact_group_status(split_status)
+                split_status["split_policy"] = "group_aware"
+                dataset_manifest["group_fold_status_by_seed"][str(seed)] = split_status
+            else:
+                ordinary_splits = get_stratified_splits(X, y, n_splits, seed, target_column=target_column)
+                assert_fold_integrity(ordinary_splits, len(frame))
+                split_status = {"split_policy": "row_level", "split_feasible": True}
             domain_splits: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {}
             for family, severity in conditions:
                 if family == "covariate_partition":
@@ -544,6 +658,7 @@ def run_experiment(
                             task = {
                                 "dataset": dataset_name, "seed": seed, "fold": fold,
                                 "condition": condition, "pipeline": pipeline_name, "model": model_name,
+                                "split_policy": split_policy,
                             }
                             task_key = stable_digest(dict(task, run_id=run_id))
                             task_manifest = {
@@ -558,6 +673,7 @@ def run_experiment(
                                 "code_fingerprint": source_fingerprint,
                                 "runtime_fingerprint": runtime_fingerprint,
                                 "target_column": target_column,
+                                "split_status": split_status,
                                 "status": "running",
                             }
                             feature_manifest = {
@@ -573,6 +689,7 @@ def run_experiment(
                                 "dataset_identity": dataset_identity,
                                 "condition": condition,
                                 "pipeline": pipeline_name,
+                                "split_policy": split_policy,
                             }
                             task_fp = cache_fingerprint(task_manifest)
                             feature_cache_fp = cache_fingerprint(feature_manifest)
@@ -650,6 +767,7 @@ def run_experiment(
                                 result = {
                                     **task, "run_id": run_id, "task_key": task_key,
                                     "status": "success", "n_train": len(xtr), "n_test": len(xte),
+                                    "split_policy": split_policy,
                                     "n_original": int(x_test_clean.shape[1]),
                                     "train_time_s": train_time, "infer_time_s": infer_time,
                                     "autofe_gen_time_s": float(fe_meta.get("generation_time_s", 0.0)),
@@ -657,6 +775,10 @@ def run_experiment(
                                     "n_generated": int(fe_meta.get("n_generated", 0)),
                                     "n_retained": int(fe_meta.get("n_retained", x_train_fe.shape[1])),
                                     "ram_used_mb": float(fe_meta.get("ram_used_mb", 0.0)),
+                                    "operator_counts": fe_meta.get("operator_counts", {}),
+                                    "candidate_history": fe_meta.get("candidate_history", {
+                                        "enabled": False, "records_written": 0, "score_scope": "train",
+                                    }),
                                     # The held-out features are unchanged in the primary
                                     # protocol; do not report a test distribution-shift score.
                                     "wasserstein": None,
@@ -703,6 +825,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--max-conditions", type=int)
     parser.add_argument("--pipelines", nargs="+", default=["Raw", "AutoFE_Baseline"])
     parser.add_argument("--models", nargs="+", default=["logistic_regression"])
+    parser.add_argument("--split-policy", choices=["row_level", "group_aware"], default="row_level")
     args = parser.parse_args(argv)
 
     names = load_dataset_names("config/dataset_list.yaml")
@@ -718,6 +841,7 @@ def main(argv: list[str] | None = None) -> None:
         seeds=[42, 123, 456, 789, 2025][:args.max_seeds] if args.max_seeds else None,
         folds=list(range(1, args.max_folds + 1)) if args.max_folds else None,
         conditions=conditions, pipelines=tuple(args.pipelines), models=tuple(args.models),
+        split_policy=args.split_policy,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 

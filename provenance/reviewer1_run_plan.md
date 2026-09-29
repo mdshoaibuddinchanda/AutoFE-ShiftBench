@@ -1,6 +1,6 @@
 # Reviewer #1 correction run plan
 
-Status: **preflight / implementation in progress** (2026-09-29, Asia/Calcutta).
+Status: **bounded preflight complete; full campaign intentionally held** (2026-09-29, Asia/Calcutta).
 
 This plan freezes the work required before any approximately 14-day corrected campaign. The campaign is not launched by this plan. Existing Conda `p12` at `D:\Conda\p12` is the only execution environment.
 
@@ -19,9 +19,9 @@ This plan freezes the work required before any approximately 14-day corrected ca
 
 | Assignment | Owner | Files allowed | Evidence required | Status |
 |---|---|---|---|---|
-| Source identity, canonical raw-feature groups, group-aware folds, fold feasibility | lead + data/folds agent | `src/group_splits.py`, `tests/test_group_splits.py`, dataset audit additions | source IDs, canonicalization definition, group sizes/conflicting labels, zero-overlap assertions, class support and AUC feasibility | in progress |
-| FSVA mechanism and operator ablations | mechanism agent | new mechanism modules/tests only unless lead integrates a focused patch | Jacobian definition/norm, analytic-vs-numeric checks, candidate history schema/storage estimate, operator budget and undefined cases | in progress |
-| Dataset-level analysis and result accounting | analysis agent | new analysis/provenance files only unless lead integrates a focused patch | primary contrasts, denominators, paired dataset inference, multiplicity, coverage, row/group comparison schema | in progress |
+| Source identity, canonical raw-feature groups, group-aware folds, fold feasibility | lead + data/folds agent | `src/group_splits.py`, `tests/test_group_splits.py`, dataset audit additions | source IDs, canonicalization definition, group sizes/conflicting labels, zero-overlap assertions, class support and AUC feasibility | implemented; 25/25 structural, 23/25 AUC-supported |
+| FSVA mechanism and operator ablations | mechanism agent | new mechanism modules/tests only unless lead integrates a focused patch | Jacobian definition/norm, analytic-vs-numeric checks, candidate history schema/storage estimate, operator budget and undefined cases | implemented; bounded history preflight complete |
+| Dataset-level analysis and result accounting | analysis agent | new analysis/provenance files only unless lead integrates a focused patch | primary contrasts, denominators, paired dataset inference, multiplicity, coverage, row/group comparison schema | implemented; corrected ledger pending |
 | Independent information-flow audit | independent audit agent | report only; no source edits | paths for target/held-out data/statistics, stale cache/run identity, unsupported claims, blockers | in progress |
 
 ## Frozen two-track core (before corrected results)
@@ -54,4 +54,6 @@ The original corrected grid is `25 datasets × 5 seeds × 5 folds × 14 conditio
 
 Baseline evidence: `D:\\Conda\\p12\\python.exe -m pytest -q -rs tests` -> `19 passed, 2 warnings in 27.12s`; `D:\\Conda\\p12\\python.exe -m compileall -q src tests main.py` -> pass. Warnings are Loky physical-core detection and Woodwork `pkg_resources` deprecation. The full suite was run after the Dry Bean downloader change and before the new Reviewer #1 modules are integrated.
 
-Current blocker: repeated exact raw feature vectors cross row-level folds; group-aware fold feasibility and the final common-core runtime are not yet verified. No long benchmark is running.
+Current decision: the bounded preflight passed for `sonar` under both policies. The full group-aware campaign is held because `wine-quality-red` and `kddcup99` cannot support all-fold ROC-AUC under exact-feature grouping; the runner records this as `blocked_group_split_infeasible` and never falls back to row-level folds. Candidate-history logging at the observed preflight rate is estimated at approximately 79.7 GiB compressed for the original 612,500-task grid. No long benchmark is running.
+
+Preflight artifact: [`reviewer1_preflight_manifest.json`](reviewer1_preflight_manifest.json). It records 1.80 s for the row-level three-task smoke and 1.52 s for the group-aware three-task smoke, with zero failures and explicit cache/result byte counts. These timings are a gate measurement, not a projection for the 14-day campaign.

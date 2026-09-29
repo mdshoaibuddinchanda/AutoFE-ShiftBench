@@ -14,6 +14,12 @@ PCA covariate partitions and K-means population partitions are target-free but u
 
 The primary analysis compares Raw with four named AutoFE variants. It pairs results within dataset/task and uses datasets as the independent unit for Wilcoxon contrasts with Holm correction. Folds, seeds, models, and conditions are not treated as independent datasets.
 
+The corrected runner exposes two separate split tracks. `--split-policy row_level`
+is the legacy-comparable stratified fold; `--split-policy group_aware` groups
+identical target-excluded raw predictor rows and asserts zero shared groups in
+each fold. Group-aware class/AUC infeasibility is recorded explicitly and is
+never replaced with a row-level fold.
+
 ## Existing environment and run commands
 
 Activate the existing Conda environment; these instructions do not create an environment:
@@ -21,6 +27,9 @@ Activate the existing Conda environment; these instructions do not create an env
 ~~~
 conda activate p12
 python -m src.pipeline_runner --run-id corrected-smoke --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 2 --pipelines Raw AutoFE_Baseline --models logistic_regression
+
+# Bounded Reviewer #1 gate (existing p12 environment; no full campaign)
+python -m provenance.reviewer1_preflight
 ~~~
 
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
@@ -30,7 +39,7 @@ For a full corrected grid, download the configured datasets and provide every pi
 ~~~
 conda activate p12
 python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-python -m src.pipeline_runner --run-id corrected-full-001 --pipelines Raw Raw_Variance Raw_MI AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
+python -m src.pipeline_runner --run-id corrected-full-001 --split-policy row_level --pipelines Raw Raw_CapMatched AutoFE_Baseline AutoFE_MI AutoFE_Random AutoFE_NoMultiply --models logistic_regression random_forest extra_trees linear_svm knn gaussian_nb mlp lightgbm xgboost catboost
 ~~~
 
 Failed dataset downloads stop the run with an error. Missing configured CSVs also stop the run before any tasks start; a partial run is not reported as complete.

@@ -6,14 +6,14 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 
 - Exact concern: Jacobian norms and candidate-level selection histories were not directly measured.
 - Original problem / affected claim: FSVA was presented as a mechanism without direct derivative, candidate-history, or dataset-level association evidence.
-- Relevant files: `src/feature_engineering.py`, `src/pipeline_runner.py`, `src/mechanism_audit.py` (planned), `tests/test_mechanism_audit.py` (planned).
+- Relevant files: `src/feature_engineering.py`, `src/pipeline_runner.py`, `src/mechanism_audit.py`, `tests/test_mechanism_audit.py`.
 - Decision and rationale: define a feature-map Jacobian only for supported arithmetic primitives; record undefined/non-finite cases; treat associations as evidence consistent with a mechanism, not proof of causality.
-- Implementation: pending mechanism agent integration.
-- Tests and commands: pending targeted derivative/history tests and bounded preflight.
-- Commit hash: pending.
-- Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
+- Implementation: arithmetic Jacobian/finite-difference checks, scaled local norms, candidate-history schema, storage estimator, and optional Featuretools candidate logging are implemented. The runner does not enable full-grid history by default because the bounded estimate is large.
+- Tests and commands: `D:\Conda\p12\python.exe -m pytest -q tests/test_mechanism_audit.py` -> 14 passed; bounded real-data preflight wrote 950 training-only candidate records with all four operators and finite scores.
+- Commit hash: integration milestone pending.
+- Benchmark artifact IDs / observed values: preflight `provenance/reviewer1_preflight_manifest.json`; full corrected values remain `PENDING CORRECTED RUN`.
 - Limitations: Featuretools internals may not expose every generated expression or derivative boundary.
-- Status: `open`.
+- Status: `implemented-not-run`.
 
 ## R2. Statistical analysis
 
@@ -21,8 +21,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Original problem / affected claim: uncertainty and significance could be overstated.
 - Relevant files: `src/stats_analysis.py`, `src/generate_tables.py`, `provenance/corrected_results_note.md`.
 - Decision and rationale: dataset is the primary independent unit; prespecified paired contrasts, intervals, exact denominators, and Holm correction are required. Winner selection on shared folds remains exploratory unless nested selection is added.
-- Implementation: existing dataset-level Wilcoxon path is baseline evidence; expanded result-note and interval checks are pending.
-- Tests and commands: baseline suite passed 19 tests; post-integration checks pending.
+- Implementation: `src/reviewer1_analysis.py` now emits expected-cell coverage, finite-metric denominators, paired dataset bootstrap intervals (10,000 replicates, seed 20260929), Holm family metadata, and row/group side-by-side schema. No corrected campaign ledger has been analyzed.
+- Tests and commands: focused post-integration suite passed 42 tests; full suite gate remains to be rerun after final documentation commit.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
 - Benchmark artifact IDs / observed values: historical values remain separate; corrected values are `PENDING CORRECTED RUN`.
 - Limitations: No corrected benchmark estimates exist yet.
@@ -32,12 +32,12 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 
 - Exact concern: target/held-out information paths and exact duplicate feature vectors crossing folds were not fully addressed.
 - Original problem / affected claim: row-level folds can put identical raw feature vectors in train and test, allowing memorization; target-free partition boundaries must remain explicit.
-- Relevant files: `src/splitters.py`, `src/group_splits.py` (planned), `provenance/dataset_schema_audit.{json,md}`, `tests/test_group_splits.py` (planned).
+- Relevant files: `src/splitters.py`, `src/group_splits.py`, `provenance/dataset_schema_audit.{json,md}`, `provenance/group_fold_audit.{json,md}`, `tests/test_group_splits.py`.
 - Decision and rationale: retain row-level folds as legacy-comparable sensitivity; add group-aware folds using deterministic canonical target-excluded raw predictors and assert zero shared groups. Never silently fall back or discard infeasible datasets.
-- Implementation: group-aware module and feasibility audit pending agent integration.
-- Tests and commands: current target-free negative controls pass; group tests pending.
-- Commit hash: pending integration.
-- Benchmark artifact IDs / observed values: schema audit verified 25/25 CSV/sidecars; row-level overlap examples include PhishingWebsites 65.42% and KDDCup99 67.01%; group-track values are `PENDING CORRECTED RUN`.
+- Implementation: deterministic typed canonicalization, SHA-256 group IDs with collision checks, `StratifiedGroupKFold`, zero-shared-group assertions, runner split-policy identity, and explicit infeasibility manifests are implemented.
+- Tests and commands: `python -m provenance.audit_group_folds` -> 25/25 structural group splits, 23/25 all-fold class/AUC support; `wine-quality-red` and `kddcup99` are explicitly infeasible for all-fold AUC; targeted group tests pass 7 tests. Row-level overlap examples include PhishingWebsites 65.42% and KDDCup99 67.01%.
+- Commit hash: integration milestone pending.
+- Benchmark artifact IDs / observed values: `provenance/group_fold_audit.json` and `.md`; corrected performance remains `PENDING CORRECTED RUN`.
 - Limitations: Grouping removes duplicate-vector overlap, not semantic target proxies or deployment shift.
 - Status: `implemented-not-run`.
 
@@ -46,7 +46,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: conditions were not always distinguished as training corruption, transductive partitioning, or deployment shift.
 - Decision and rationale: preserve condition names, add explicit scope metadata, and reserve deployment-shift language for a protocol that changes held-out deployment distribution.
 - Relevant files: `src/pipeline_runner.py`, `src/shift_generator.py`, `README.md`, `provenance/reviewer1_run_plan.md`.
-- Implementation: primary/transductive/availability/relabeling scopes already fail closed when mixed; manuscript phrase checklist remains pending.
+- Implementation: primary/transductive/availability/relabeling scopes already fail closed when mixed; runner now persists `experiment_scope` and `split_policy` in manifests and task rows. Manuscript phrase checklist remains pending.
 - Tests and commands: `tests/test_leakage_controls.py` condition semantics test passed in baseline suite.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
 - Benchmark artifact IDs / observed values: none; corrected values `PENDING CORRECTED RUN`.
@@ -58,32 +58,32 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: Raw and AutoFE dimensionality/selection caps were not matched.
 - Decision and rationale: retain the original Raw baseline, add a cap-matched Raw comparator and full-dimensional Raw comparator, and report pre/post-synthesis caps, selected counts, and cost.
 - Relevant files: `src/pipeline_runner.py`, `src/feature_engineering.py`, result schema (planned).
-- Implementation: pending protocol integration.
-- Tests and commands: pending configuration and smoke checks.
+- Implementation: `Raw_CapMatched` and full-dimensional `Raw` are explicit; isolate-one and leave-one-out operator configs share depth/base/output/variance budgets. Preflight ran Raw, cap-matched Raw, and AutoFE baseline under both policies.
+- Tests and commands: bounded preflight completed in 1.52–1.80 seconds per three-task policy run on `sonar`; result/cache sizes are recorded in `provenance/reviewer1_preflight_manifest.json`.
 - Commit hash: pending.
 - Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
 - Limitations: Matched-cap results cannot be inferred from historical results.
-- Status: `open`.
+- Status: `implemented-not-run`.
 
 ## R6. Individual operator effects
 
 - Exact concern: `AutoFE_NoMultiply` excludes multiplication and division, and does not isolate individual operator effects.
 - Decision and rationale: preserve its historical meaning; add isolate-one-operator and justified leave-one-out configurations with shared budgets and finite-value rules.
 - Relevant files: `src/feature_engineering.py`, `src/pipeline_runner.py`, `src/shift_generator.py` (planned integration).
-- Implementation: pending operator-agent evidence and lead integration.
-- Tests and commands: pending.
+- Implementation: `AutoFE_Isolate_{Add,Subtract,Multiply,Divide}` and `AutoFE_LeaveOut_{Add,Subtract,Multiply,Divide}` configs are wired with matched budgets; historical `AutoFE_NoMultiply` remains explicitly addition/subtraction-only.
+- Tests and commands: mechanism tests pass; operator-generation benchmark values remain pending.
 - Commit hash: pending.
 - Benchmark artifact IDs / observed values: `PENDING CORRECTED RUN`.
 - Limitations: Division-by-zero behavior and Featuretools expression naming require explicit validation.
-- Status: `open`.
+- Status: `implemented-not-run`.
 
 ## R7. Incomplete runs and stopping
 
 - Exact concern: missing tasks and stopped blocks could be mistaken for zeroes or complete evidence.
 - Decision and rationale: every task must have success, failed, skipped-with-reason, timed-out, or pending status with resumable identity and coverage by all design dimensions.
 - Relevant files: `src/checkpoint.py`, `src/pipeline_runner.py`, `src/check_progress.py`, `provenance/corrected_results_note.md`.
-- Implementation: phase-level success/failure accounting exists; skipped/timeout taxonomy and complete coverage summaries are pending.
-- Tests and commands: baseline failure/resume tests passed; post-integration checks pending.
+- Implementation: checkpoint schema accepts success/failed/skipped/timed_out/pending; manifests publish expected, terminal, pending, phase, and status counts while retaining legacy `counts` compatibility.
+- Tests and commands: failure/resume tests and result-note accounting tests pass; a long-run ledger is not available.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
 - Benchmark artifact IDs / observed values: no corrected run; historical ledger remains separately labeled.
 - Limitations: unknown outcomes cannot support a causal or confirmatory claim.
@@ -94,8 +94,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: stable seeds, source identity, cache/run identity, and final artifacts must be independently reproducible.
 - Decision and rationale: use canonical SHA-256 identities, source/sidecar checksums, runtime/package fingerprints, immutable task manifests, and explicit resume commands.
 - Relevant files: `src/provenance.py`, `src/data_loader.py`, `src/pipeline_runner.py`, `requirements.txt`, `provenance/dataset_schema_audit.*`.
-- Implementation: baseline reproducibility controls and UCI Dry Bean correction are committed in `a6a8e3b`; final corrected-run freeze is pending.
-- Tests and commands: 19 tests passed, compileall passed, 25/25 schema/hash checks passed; full post-agent gate pending.
+- Implementation: baseline reproducibility controls and UCI Dry Bean correction are committed in `a6a8e3b`; split policy, group digests, task fingerprints, and preflight artifacts are now included.
+- Tests and commands: focused post-integration suite passed 42 tests; compileall, full suite, schema/hash audit, and group audit are final gates.
 - Commit hash: `a6a8e3b` baseline provenance milestone.
 - Benchmark artifact IDs / observed values: source fingerprint `d46c872632bcfe45a8e15b415f0ac4cc2ebbf403f25610a6f277fc057d77cbab` before new modules; corrected run `PENDING CORRECTED RUN`.
 - Limitations: historical Dry Bean input is unavailable and historical scores cannot be reconstructed.
@@ -106,8 +106,8 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - Exact concern: major fixes must be made and protocol frozen before the expensive run.
 - Decision and rationale: do not launch until both split policies, common core, ablations, resource estimates, and result schemas are frozen and preflighted.
 - Relevant files: `provenance/reviewer1_run_plan.md`, `provenance/corrected_results_note.md`, frozen manifest (planned).
-- Implementation: plan exists; group-aware, mechanism, operator, baseline, and runtime gates remain in progress.
-- Tests and commands: baseline suite/compile/schema audit passed; remaining gates pending.
+- Implementation: plan, change catalog, response draft, corrected-result schema, group audit, and bounded real-data preflight are present. The long campaign is deliberately not launched: two configured datasets cannot support all-fold group-aware AUC, and candidate-history storage is estimated at about 79.7 GiB compressed for the original 612,500-task grid at the observed preflight rate.
+- Tests and commands: bounded row/group preflight completed; final full-suite and clean-commit review remain.
 - Commit hash: `a6a8e3b` plan and baseline milestone.
 - Benchmark artifact IDs / observed values: none; no long run is running.
 - Limitations: corrected numerical results are unavailable.
@@ -119,3 +119,5 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 - 2026-09-29: Baseline suite rerun in existing `p12`: 19 passed, 2 warnings in 27.12s; compileall passed.
 - 2026-09-29: 25 datasets verified; Dry Bean source corrected to UCI ID 602. Commit `a6a8e3b` records baseline provenance and plan.
 - 2026-09-29: Reviewer #1 run plan frozen provisionally; group-aware feasibility, mechanism measurement, operator isolation, and final resource gate remain open.
+- 2026-09-29: Group audit completed in `p12`: all 25 group partitions construct, 23 support all-fold class/AUC metrics; `wine-quality-red` and `kddcup99` are recorded as infeasible rather than substituted.
+- 2026-09-29: Bounded `sonar` preflight completed under both policies with Raw, cap-matched Raw, and AutoFE baseline; no full campaign was started. Candidate-history preflight wrote 950 training-only records and estimated approximately 79.7 GiB compressed for the full grid.
