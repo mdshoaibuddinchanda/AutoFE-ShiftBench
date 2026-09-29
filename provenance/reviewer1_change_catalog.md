@@ -92,7 +92,7 @@ Status legend: `open` = not yet implemented; `implemented-not-run` = code exists
 The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis); these utility configurations are outside the frozen 14-pipeline Reviewer #1 manifest and are not added to the task grid.
 
 - Tests and commands: `tests/test_operator_ablations.py` covers the truth table, operand ordering, zero/near-zero/nonfinite division, duplicate/rejected candidates, identity separation, repeated metadata stability, all ten bounded operator configurations, and result-note operator auditing. Focused operator tests pass; corrected performance effects remain pending.
-- Commit hash: `db29aec4ec07a7b913670a199a6c582f6ee2fdce`.
+- Commit hash: `c6e1b3201a2e6808816dc40db9b50802f98b916f` (operator implementation and validity boundary; earlier truth-table milestone `db29aec`).
 - Configuration artifact: `provenance/reviewer1_operator_ablation_manifest_v1.json`.
 - Benchmark artifact IDs / observed values: bounded synthetic smoke only; ROC-AUC effects are **PENDING CORRECTED RUN**.
 - Limitations: Featuretools can produce different candidate counts for noncommutative versus commutative operators; counts are reported, not padded. No scientific performance conclusion is made.
@@ -145,7 +145,7 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - 2026-09-29: Final post-integration gate in `p12`: 42 tests passed, compileall passed, schema audit 25/25, and compact group audit 25/25 structural with 23/25 AUC-supported.
 - 2026-09-29: Large-dataset `airlines` scale gate measured 57.45 s for three row-level tasks, 101.89 s for three group-aware tasks, and about 0.87 GB of feature caches per three-task run. Frozen scope manifest records 1,750,000 intended two-policy tasks and a storage/runtime `DO_NOT_LAUNCH` decision under current retention.
 - 2026-09-30: Bounded profiling measured 80 Sonar pipeline/model tasks at 1/2/4 workers with 0/0/0 failures and zero one-versus-four prediction-hash mismatches. Lease-aware bounded cache and durable scheduler integration committed in `906e4cd` and `ef98cc8`; full p12 suite passed 68 tests, including retained-versus-bounded parity and interrupted new-process runner resume. The optimized versioned scope retains the original AUC denominator, data hashes, analysis definitions, and 1,750,000 intended task cells. Friend-PC host probe remains required before launch.
-- 2026-09-30: Operator audit completed in `db29aec`: all ten actual arithmetic ablation variants were smoke-tested. Multiplication-only, division-only, without-multiplication, and without-division paths were separately verified; historical `AutoFE_NoMultiply` remains the joint multiplication-and-division removal. Candidate validity accounting and result-note operator metadata were added; no pipeline-count change.
+- 2026-09-30: Operator audit completed in `c6e1b32` after truth-table milestone `db29aec`: all ten arithmetic ablation variants plus the four other frozen-scope names were smoke-tested. Multiplication-only, division-only, without-multiplication, and without-division paths were separately verified; historical `AutoFE_NoMultiply` remains the joint multiplication-and-division removal. Candidate validity accounting and result-note operator metadata were added; no pipeline-count change.
 
 ## R10. Performance, storage, and crash recovery before launch
 
