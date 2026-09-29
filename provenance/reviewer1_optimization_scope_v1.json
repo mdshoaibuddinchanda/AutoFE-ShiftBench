@@ -5,6 +5,7 @@
   "optimization_code_commit": "ef98cc8",
   "optimization_code_commit_full": "ef98cc8ac67f795bf1b477026edd6f5995c16c4b",
   "documentation_freeze_commit": "abfc3fc3bb5ec6074235b9c521a342d084c9fdac",
+  "final_gate_commit": "9a15211caed5793db304c159233bfebcb89f3a20",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "4ac3d332c0aff8c659fd09b90d2fdfb437b455e9dd7fa16105607294d53d0c32",
