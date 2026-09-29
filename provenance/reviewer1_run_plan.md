@@ -40,6 +40,8 @@ The large-dataset scale preflight on 100,000-row `airlines` took 57.45 seconds f
 
 The `D:` volume had 437.14 GiB free. The 79.66 GiB compressed candidate-history estimate alone leaves 357.48 GiB, and projected results/manifests/checkpoints add about 20.87 GiB. However, the measured `airlines` feature-cache rate projects to about 47,378 GiB for all 14 pipelines and both policies, or about 6,768 GiB for the core alone, under the current retention policy. Storage therefore fails with the current cache design. The long run remains blocked until caches are streamed/deleted or a larger storage target is provisioned. Exact values are frozen in [`reviewer1_scope_manifest.json`](reviewer1_scope_manifest.json) and [`reviewer1_scale_preflight_manifest.json`](reviewer1_scale_preflight_manifest.json).
 
+The frozen source identity is commit `8d0c90093232d4b4afd86a133b94f37052c1928b` with source fingerprint `7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7`; dataset-list, schema-audit, and group-audit hashes are recorded in the scope manifest. This is a protocol freeze only, not authorization to launch.
+
 ## Required durable outputs
 
 - `reviewer1_change_catalog.md`: one entry per Reviewer #1 concern, with implementation/evidence/status and dated decision log.
