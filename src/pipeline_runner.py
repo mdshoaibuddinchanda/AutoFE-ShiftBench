@@ -15,7 +15,7 @@ import platform
 import sys
 import time
 import traceback
-from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor, TimeoutError as FutureTimeoutError
 import multiprocessing as mp
 from importlib.metadata import PackageNotFoundError, version as package_version
 from dataclasses import asdict
@@ -29,7 +29,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from src.checkpoint import has_success, init_db, record_task
 from src.cache_manager import CacheManager, CacheNotReadyError
-from src.task_scheduler import Lease, TaskScheduler, TaskSpec
+from src.task_scheduler import Lease, LeaseLost, TaskScheduler, TaskSpec
 from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
 from src.evaluation import compute_classification_metrics
 from src.feature_engineering import DFSConfig, expand_features_with_dfs
@@ -941,7 +941,14 @@ def run_experiment(
             _upsert_outcome(outcomes, dict(task_manifest, status="success"))
         except Exception as exc:
             if scheduler is not None and scheduler_lease is not None:
-                scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                try:
+                    scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                except LeaseLost:
+                    # The result may already have been durably published (for
+                    # example, a coordinator manifest write failed after the
+                    # scheduler transition).  Preserve the local failure
+                    # evidence and let reconciliation repair the checkpoint.
+                    pass
             failure = _record_failure(
                 run_dir=run_dir, db_path=db_path, run_id=run_id, task_key=task_key,
                 phase="phase2", dataset=dataset_name, seed=seed, fold=fold,
@@ -954,11 +961,36 @@ def run_experiment(
         _save_run_manifest(run_dir, base_manifest, outcomes)
 
     def _drain_one() -> None:
-        future, meta = pending_futures.pop(0)
-        try:
-            fit = future.result()
-        except Exception as exc:
-            fit = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        def heartbeat_pending() -> None:
+            if scheduler is None:
+                return
+            for _, pending_meta in pending_futures:
+                lease = pending_meta.get("scheduler_lease")
+                if lease is None:
+                    continue
+                try:
+                    pending_meta["scheduler_lease"] = scheduler.heartbeat(lease)
+                except LeaseLost:
+                    # Publication will classify the task as a durable lease
+                    # failure; do not let one stale receipt stop unrelated
+                    # futures from being drained.
+                    continue
+
+        future, meta = pending_futures[0]
+        while True:
+            heartbeat_pending()
+            try:
+                # Keep coordinator-owned scheduler leases alive while a
+                # child process is fitting.  This also bounds how long the
+                # parent can remain unresponsive to recovery signals.
+                fit = future.result(timeout=min(30.0, max(1.0, scheduler_lease_seconds / 3.0)))
+                break
+            except FutureTimeoutError:
+                continue
+            except Exception as exc:
+                fit = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+                break
+        pending_futures.pop(0)
         _record_phase2(meta, fit)
 
     has_transductive_partition = experiment_scope == "transductive_domain_partition"
@@ -1315,7 +1347,10 @@ def run_experiment(
                                     scheduler_lease = scheduler.heartbeat(scheduler_lease)
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
-                                    scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                                    try:
+                                        scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                                    except LeaseLost:
+                                        pass
                                 failure = _record_failure(
                                     run_dir=run_dir, db_path=db_path, run_id=run_id,
                                     task_key=task_key, phase="phase1", dataset=dataset_name,
@@ -1368,7 +1403,10 @@ def run_experiment(
                                     _record_phase2(phase2_meta, _fit_and_score_worker(fit_payload))
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
-                                    scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                                    try:
+                                        scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+                                    except LeaseLost:
+                                        pass
                                 failure = _record_failure(
                                     run_dir=run_dir, db_path=db_path, run_id=run_id, task_key=task_key,
                                     phase="phase2", dataset=dataset_name, seed=seed, fold=fold,
