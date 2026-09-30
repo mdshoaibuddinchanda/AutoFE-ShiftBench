@@ -32,7 +32,7 @@ The migration `provenance/reconcile_pilot_progress.py` compared every overlappin
 - JSONL is a reporting mirror; scheduler/checkpoint state and checksummed result artifacts are the recovery authority.
 - Feature artifacts are checksum and identity validated, leased across compatible model consumers, and never used as proof that a classifier finished.
 
-The current pilot invocation uses the pre-existing 3,600-second lease setting from the frozen run identity; this operational mismatch with the requested ten-minute lease remains a documented limitation and must be corrected in a fresh implementation identity before any long benchmark launch.
+The recovered row-level run retained its pre-existing 3,600-second lease identity. The group-aware continuation was explicitly migrated to a 600-second lease without changing logical task keys; this operational migration is recorded below.
 
 ## Fault and restart evidence
 
@@ -57,5 +57,5 @@ This artifact is execution and recovery evidence, not a corrected performance re
 | `row_level` | 5,600 | 5,422 | 178 successful cells; 12 failed attempts were retried | 5,600 | 12 failed attempt rows, 0 terminal failures | 0 |
 | `group_aware` | 5,600 | 0 | in progress (scheduler snapshot: 680 successes) | 680 at snapshot | 0 terminal failures at snapshot | 4,920 at snapshot |
 
-The row-level JSONL contains 5,600 unique successful logical task keys and 12 historical failed-attempt rows; the scheduler and checkpoint ledgers contain exactly 5,600 successful task records. No previously committed model result was refit. The 12 retries correspond to worker/coordinator failure attempts with no committed model result; they are retained as attempt evidence. Group-aware execution remains active the first 905 group-aware cells were produced under the prior 3,600-second setting; the coordinator was then stopped, task identities were migrated without changing logical task keys, and continuation resumed with a 600-second lease. No performance effect is inferred from these execution values.
+The row-level JSONL contains 5,600 unique successful logical task keys and 12 historical failed-attempt rows; the scheduler and checkpoint ledgers contain exactly 5,600 successful task records. No previously committed model result was refit. The 12 retries correspond to worker/coordinator failure attempts with no committed model result; they are retained as attempt evidence. Group-aware execution remains active; the first 905 group-aware cells were produced under the prior 3,600-second setting; the coordinator was then stopped, task identities were migrated without changing logical task keys, and continuation resumed with a 600-second lease. No performance effect is inferred from these execution values.
 
