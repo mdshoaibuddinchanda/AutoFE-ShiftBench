@@ -101,7 +101,7 @@ D:\Conda\p12\python.exe -m compileall -q src tests main.py provenance
 git diff --check
 ```
 
-The long command in `README.md` remains held until the friend-PC gates pass. A full launch must use the frozen manifest and both split policies as separate run identities; no row-level fallback is permitted for the two group-AUC skips. The integrated worker count must be selected from measured friend-PC RAM/CPU/GPU evidence; four workers is the bounded pilot setting, not a universal launch recommendation.
+The `README.md` records the full-campaign hold and links to this gate; it does not provide an executable long-run command. A full launch must use the refreshed frozen manifest and both split policies as separate run identities; no row-level fallback is permitted for the two group-AUC skips. The integrated worker count must be selected from measured friend-PC RAM/CPU/GPU evidence; four workers is the bounded pilot setting, not a universal launch recommendation.
 
 ## Remaining launch blockers
 
