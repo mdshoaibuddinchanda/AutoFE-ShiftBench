@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+import src.cache_manager as cache_module
 from src.cache_manager import CacheBusyError, CacheManager, CacheNotReadyError
 
 
@@ -21,6 +22,43 @@ def test_put_publishes_only_atomic_ready_artifact_and_reads_through_lease(tmp_pa
         assert report["ready_count"] == 1
         assert report["active_lease_count"] == 1
     assert manager.reconcile()["active_lease_count"] == 0
+
+
+def test_transient_windows_manifest_replace_error_is_retried(tmp_path, monkeypatch):
+    manager = CacheManager(tmp_path / "cache")
+    manager.put_text("stable", "value")
+    real_replace = cache_module.os.replace
+    attempts = {"blocked": 0}
+
+    def briefly_locked(source, destination):
+        if str(destination).endswith(".manifest.json") and attempts["blocked"] < 2:
+            attempts["blocked"] += 1
+            raise PermissionError(5, "Access is denied", str(destination))
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(cache_module.os, "replace", briefly_locked)
+    with manager.lease("stable") as lease:
+        assert lease.read_bytes() == b"value"
+    assert attempts["blocked"] == 2
+    assert manager.reconcile()["ready_count"] == 1
+    assert not list(manager.root.glob("*.tmp"))
+
+
+def test_persistent_manifest_replace_error_keeps_previous_ready_artifact(tmp_path, monkeypatch):
+    manager = CacheManager(tmp_path / "cache")
+    manager.put_text("stable", "value")
+    real_replace = cache_module.os.replace
+
+    def locked(source, destination):
+        if str(destination).endswith(".manifest.json"):
+            raise PermissionError(5, "Access is denied", str(destination))
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(cache_module.os, "replace", locked)
+    with pytest.raises(PermissionError):
+        manager.acquire("stable")
+    assert manager.reconcile()["ready_count"] == 1
+    assert not list(manager.root.glob("*.tmp"))
 
 
 def test_partial_artifact_is_never_read_as_ready(tmp_path):

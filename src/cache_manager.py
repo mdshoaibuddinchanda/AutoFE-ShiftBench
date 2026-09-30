@@ -44,14 +44,29 @@ def _now_seconds() -> float:
     return time.time()
 
 
+def _replace_with_retry(source: Path, destination: Path) -> None:
+    """Tolerate a brief Windows destination lock without weakening atomicity."""
+    for attempt in range(8):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.05 * (attempt + 1))
+
+
 def _atomic_bytes(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp")
-    with temp.open("wb") as stream:
-        stream.write(payload)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.replace(temp, path)
+    try:
+        with temp.open("wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        _replace_with_retry(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -301,13 +316,13 @@ class CacheManager:
                 stream.write((json.dumps(base, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"))
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temp_payload, payload_path)
-            os.replace(temp_manifest, manifest_path)
+            _replace_with_retry(temp_payload, payload_path)
+            _replace_with_retry(temp_manifest, manifest_path)
             ready = {"state": "ready", "key": key, "digest": digest, "manifest_sha256": _sha256_bytes(manifest_path.read_bytes())}
             temp_ready.write_text(json.dumps(ready, sort_keys=True) + "\n", encoding="utf-8")
             with temp_ready.open("r+b") as stream:
                 os.fsync(stream.fileno())
-            os.replace(temp_ready, ready_path)
+            _replace_with_retry(temp_ready, ready_path)
         finally:
             temp_payload.unlink(missing_ok=True)
             temp_manifest.unlink(missing_ok=True)
