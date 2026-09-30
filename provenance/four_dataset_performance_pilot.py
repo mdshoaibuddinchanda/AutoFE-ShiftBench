@@ -119,13 +119,16 @@ def main() -> None:
         pipelines=PIPELINES, models=MODELS, n_splits=5,
         cache_policy="bounded", cache_max_bytes=8 * 1024**3,
         durable_scheduler=True, cache_audit=True,
-        scheduler_lease_seconds=600.0, scheduler_max_attempts=3,
+        scheduler_max_attempts=3,
         workers=4, use_gpu=False,
     )
     for split_policy in ("row_level", "group_aware"):
         run_id = f"pilot-{split_policy}-001"
         run_started = time.time()
-        run_experiment(**common, run_id=run_id, split_policy=split_policy)
+        # Preserve the original row-level run identity while requiring the
+        # ten-minute lease for the new group-aware continuation.
+        lease_seconds = 3600.0 if split_policy == "row_level" else 600.0
+        run_experiment(**common, run_id=run_id, split_policy=split_policy, scheduler_lease_seconds=lease_seconds)
         run_dir = OUT / run_id
         entry = _status(run_dir)
         entry.update({"split_policy": split_policy, "elapsed_s": time.time() - run_started})
