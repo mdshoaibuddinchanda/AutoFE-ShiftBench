@@ -55,7 +55,7 @@ This artifact is execution and recovery evidence, not a corrected performance re
 | Split policy | Intended | Valid recovered before continuation | Newly executed after recovery | Terminal successes | Retry/failure attempts retained | Remaining |
 |---|---:|---:|---:|---:|---:|---:|
 | `row_level` | 5,600 | 5,422 | 178 successful cells; 12 failed attempts were retried | 5,600 | 12 failed attempt rows, 0 terminal failures | 0 |
-| `group_aware` | 5,600 | 0 | in progress (scheduler snapshot: 680 successes) | 680 at snapshot | 0 terminal failures at snapshot | 4,920 at snapshot |
+| `group_aware` | 5,600 | 905 retained before lease migration | in progress (scheduler snapshot: 1,302 successes) | 1,302 at snapshot | 0 terminal failures at snapshot | 4,298 at snapshot |
 
 The row-level JSONL contains 5,600 unique successful logical task keys and 12 historical failed-attempt rows; the scheduler and checkpoint ledgers contain exactly 5,600 successful task records. No previously committed model result was refit. The 12 retries correspond to worker/coordinator failure attempts with no committed model result; they are retained as attempt evidence. Group-aware execution remains active; the first 905 group-aware cells were produced under the prior 3,600-second setting; the coordinator was then stopped, task identities were migrated without changing logical task keys, and continuation resumed with a 600-second lease. No performance effect is inferred from these execution values.
 
