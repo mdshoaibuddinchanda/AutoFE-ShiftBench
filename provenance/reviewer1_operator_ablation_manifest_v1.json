@@ -3,7 +3,7 @@
   "status": "verified_code_and_bounded_smoke; corrected_effects_pending",
   "environment": "D:\\Conda\\p12",
   "code_commit": "3072b14c1aca8ff440322bf75473b7df623a68c8",
-  "verified_on_commit": "1196ac6e2c2240604c0f2332ad8723125d10ec53",
+  "verified_on_commit": "530a2ef3c71903a2c30ed2056c9c79c267ed50d8",
   "parent_scope_manifest": {
     "path": "provenance/reviewer1_scope_manifest.json",
     "sha256": "b08caf2c41b996a7571edfbdf98729910f1aabd7ffba0928c4a136db223dd3d9"

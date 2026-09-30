@@ -136,6 +136,10 @@ def main() -> None:
         "host": {"hostname": os.environ.get("COMPUTERNAME"), "pid": os.getpid(), "python": os.sys.executable},
         "selection": selection,
         "runs": runs,
+        "superseded_attempt": {
+            "path": "corrected_runs/four_dataset_pilot/pilot-row_level-001-preheartbeat-aborted",
+            "reason": "initial attempt was stopped after a manifest publication race cascaded into LeaseLost rows; no scores from that attempt are used",
+        },
         "elapsed_s_total": time.time() - started,
         "scientific_status": "pilot execution and timing evidence only; corrected performance effects remain PENDING CORRECTED RUN",
     }
