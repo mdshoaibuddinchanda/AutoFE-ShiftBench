@@ -15,7 +15,10 @@ import platform
 import sys
 import time
 import traceback
+from contextlib import contextmanager
 from concurrent.futures import Future, ProcessPoolExecutor, TimeoutError as FutureTimeoutError
+from functools import wraps
+from inspect import signature
 import multiprocessing as mp
 from importlib.metadata import PackageNotFoundError, version as package_version
 from dataclasses import asdict
@@ -414,7 +417,7 @@ def _load_or_create_bounded_feature_cache(
     with manager.lease(key, owner=f"pid:{os.getpid()}") as lease:
         if audit_callback is not None:
             audit_callback("reader_acquired", {
-                "cache_key": key, "active_readers": manager.reconcile().get("active_lease_count", 0),
+                "cache_key": key, "active_readers": manager.active_lease_count(key),
             })
         payload = pickle.loads(lease.read_bytes())
     if not isinstance(payload, tuple):
@@ -649,6 +652,48 @@ def _runtime_versions() -> dict[str, str]:
     return versions
 
 
+@contextmanager
+def _coordinator_lock(run_dir: Path):
+    """Fence a run to one live coordinator; the OS releases a crashed owner."""
+    run_dir.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = run_dir.parent / f".{run_dir.name}.coordinator.lock"
+    with lock_path.open("a+b") as stream:
+        try:
+            stream.seek(0, os.SEEK_END)
+            if stream.tell() == 0:
+                stream.write(b"\0")
+                stream.flush()
+            stream.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise RuntimeError(f"Could not acquire coordinator lock for run directory {run_dir}") from exc
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def _fence_coordinator(fn):
+    @wraps(fn)
+    def guarded(*args, **kwargs):
+        bound = signature(fn).bind(*args, **kwargs)
+        bound.apply_defaults()
+        run_dir = Path(bound.arguments["output_root"]) / bound.arguments["run_id"]
+        with _coordinator_lock(run_dir):
+            return fn(*args, **kwargs)
+    return guarded
+
+
+@_fence_coordinator
 def run_experiment(
     data_paths: dict[str, str | Path],
     *,

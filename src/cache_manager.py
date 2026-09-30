@@ -397,6 +397,16 @@ class CacheManager:
         finally:
             handle.release()
 
+    def active_lease_count(self, key: str) -> int:
+        """Count readers of one artifact without scanning the entire cache.
+
+        Invalid lease files are counted conservatively because cleanup treats
+        them as blockers until they can be reconciled safely.
+        """
+        digest, _, _, _ = self._paths(key)
+        active, invalid = self._active_lease_files(digest, _now_seconds())
+        return len(active) + len(invalid)
+
     def _artifact_digests(self) -> set[str]:
         digests = {path.name[:-len(".payload")] for path in self.root.glob("*.payload")}
         digests.update(path.name[:-len(".manifest.json")] for path in self.root.glob("*.manifest.json"))

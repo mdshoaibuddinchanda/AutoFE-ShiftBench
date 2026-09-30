@@ -364,7 +364,10 @@ class TaskScheduler:
         timestamp = time.time() if now is None else float(now)
         # A crashed worker may have renamed its result before dying.  Recover
         # that artifact before permitting a replacement attempt to overwrite it.
-        self.reconcile(now=timestamp)
+        # Startup performs a full audit.  Before an individual claim, only
+        # that task's artifact can affect whether the claim is safe.  A full
+        # directory scan here grows quadratically with completed task count.
+        self.reconcile(now=timestamp, task_key=task_key)
         with self._connection() as conn:
             self._begin(conn)
             try:
@@ -710,8 +713,16 @@ class TaskScheduler:
             raise ValueError("artifact payload digest mismatch")
         return envelope
 
-    def reconcile(self, *, now: float | None = None, temp_max_age_seconds: float = 3600.0) -> ReconciliationReport:
-        """Recover durable artifacts, expire stale leases, and report anomalies."""
+    def reconcile(
+        self, *, now: float | None = None, temp_max_age_seconds: float = 3600.0,
+        task_key: str | None = None,
+    ) -> ReconciliationReport:
+        """Recover durable artifacts and expire stale leases.
+
+        A named task checks only its attempt artifacts before that task is
+        claimed.  The default full audit also scans orphan files and debris;
+        it is used at coordinator startup and for unqualified queue claims.
+        """
 
         timestamp = time.time() if now is None else float(now)
         if temp_max_age_seconds < 0:
@@ -723,15 +734,18 @@ class TaskScheduler:
         scanned = 0
         temp_removed = 0
         with self._connection() as conn:
-            rows = conn.execute(
-                """
+            query = """
                 SELECT a.task_key, a.attempt_no, a.lease_token, a.status,
                        t.run_id, t.status AS task_status
                 FROM scheduler_attempts AS a JOIN scheduler_tasks AS t ON t.task_key=a.task_key
                 WHERE a.status IN ('running','timed_out','failed')
-                ORDER BY a.task_key, a.attempt_no
-                """
-            ).fetchall()
+            """
+            parameters: tuple[Any, ...] = ()
+            if task_key is not None:
+                query += " AND a.task_key=?"
+                parameters = (task_key,)
+            query += " ORDER BY a.task_key, a.attempt_no"
+            rows = conn.execute(query, parameters).fetchall()
         known_paths: set[Path] = set()
         for row in rows:
             scanned += 1
@@ -778,25 +792,26 @@ class TaskScheduler:
                 except Exception:
                     self._rollback(conn)
                     raise
-        for path in self.artifact_dir.glob(".*.tmp"):
-            try:
-                age = max(0.0, timestamp - path.stat().st_mtime)
-                if age >= temp_max_age_seconds:
-                    path.unlink(missing_ok=True)
-                    temp_removed += 1
-            except OSError:
-                continue
-        for path in self.artifact_dir.glob("*.json"):
-            if path in known_paths:
-                continue
-            try:
-                envelope = self._read_artifact(path)
-                with self._connection() as conn:
-                    exists = conn.execute("SELECT 1 FROM scheduler_tasks WHERE task_key=? AND run_id=?", (envelope["task_key"], envelope["run_id"])).fetchone()
-                if not exists:
-                    orphan.append(path.name)
-            except Exception:
-                invalid.append(f"{path.name}: unrecognized orphan artifact")
+        if task_key is None:
+            for path in self.artifact_dir.glob(".*.tmp"):
+                try:
+                    age = max(0.0, timestamp - path.stat().st_mtime)
+                    if age >= temp_max_age_seconds:
+                        path.unlink(missing_ok=True)
+                        temp_removed += 1
+                except OSError:
+                    continue
+            for path in self.artifact_dir.glob("*.json"):
+                if path in known_paths:
+                    continue
+                try:
+                    envelope = self._read_artifact(path)
+                    with self._connection() as conn:
+                        exists = conn.execute("SELECT 1 FROM scheduler_tasks WHERE task_key=? AND run_id=?", (envelope["task_key"], envelope["run_id"])).fetchone()
+                    if not exists:
+                        orphan.append(path.name)
+                except Exception:
+                    invalid.append(f"{path.name}: unrecognized orphan artifact")
         return ReconciliationReport(len(rows), adopted, len(expired), tuple(invalid), tuple(orphan), temp_removed)
 
     def task_state(self, task_key: str) -> dict[str, Any] | None:

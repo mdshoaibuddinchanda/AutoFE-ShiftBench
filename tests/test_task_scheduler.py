@@ -101,6 +101,35 @@ def test_normal_result_publication_is_atomic_and_idempotent(tmp_path):
         scheduler.publish_result(lease, {"metric": 0.76}, now=3.0)
 
 
+def test_specific_claim_does_not_reconcile_unrelated_completed_artifacts(tmp_path, monkeypatch):
+    scheduler = _scheduler(tmp_path)
+    scheduler.register_tasks([_spec("first"), _spec("second")], now=0.0)
+    first = scheduler.claim_task("worker", task_key="first", now=1.0)
+    assert first is not None
+    scheduler.publish_result(first, {"metric": 1.0}, now=2.0)
+    def forbid_global_artifact_read(path):
+        raise AssertionError(f"unrelated result artifact was rescanned: {path}")
+    monkeypatch.setattr(scheduler, "_read_artifact", forbid_global_artifact_read)
+    second = scheduler.claim_task("worker", task_key="second", now=3.0)
+    assert second is not None and second.task_key == "second"
+    assert scheduler.result_state("first") is not None
+
+
+def test_specific_claim_adopts_its_own_published_crash_artifact(tmp_path):
+    scheduler = _scheduler(tmp_path, lease_seconds=30.0)
+    scheduler.register_tasks([_spec()], now=0.0)
+    lease = scheduler.claim_task("worker", task_key="task-1", now=1.0)
+    assert lease is not None
+    with pytest.raises(RuntimeError):
+        scheduler.publish_result(lease, {"metric": 1.0}, now=2.0, fault_stage="after_artifact")
+    assert scheduler.result_state("task-1") is None
+    assert scheduler.claim_task("replacement", task_key="task-1", now=3.0) is None
+    assert scheduler.task_state("task-1")["status"] == "success"
+    assert scheduler.result_state("task-1")["recovered"] == 1
+    with scheduler._connection() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scheduler_attempts WHERE task_key='task-1'").fetchone()[0] == 1
+
+
 def test_process_crash_after_artifact_rename_is_reconciled(tmp_path):
     db = tmp_path / "scheduler.sqlite"
     artifacts = tmp_path / "artifacts"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import textwrap
@@ -10,8 +11,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from src.pipeline_runner import run_experiment
+from src.pipeline_runner import _load_or_create_bounded_feature_cache, run_experiment
+from src.cache_manager import CacheManager
 from src.task_scheduler import TaskScheduler
 
 
@@ -86,6 +89,25 @@ def test_cache_audit_proves_one_build_and_ten_consumer_fanout(tmp_path):
     assert not list((tmp_path / "runs" / "fanout-run" / "cache_bounded").glob("*.payload"))
 
 
+def test_cache_reader_audit_does_not_scan_unrelated_artifacts(tmp_path, monkeypatch):
+    manager = CacheManager(tmp_path / "cache")
+    manager.put_bytes("unrelated", b"other payload")
+    events = []
+    def no_global_scan(*args, **kwargs):
+        raise AssertionError("reader audit scanned the entire cache")
+    monkeypatch.setattr(manager, "reconcile", no_global_scan)
+    args = dict(
+        feature_task_key="feature", pipeline_name="Raw",
+        expected_manifest={"version": 1}, make_payload=lambda: ("payload",),
+        audit_callback=lambda event, details: events.append((event, details)),
+    )
+    first, hit = _load_or_create_bounded_feature_cache(manager, **args)
+    second, hit_again = _load_or_create_bounded_feature_cache(manager, **args)
+    assert first == second == ("payload",)
+    assert (hit, hit_again) == (False, True)
+    assert [details["active_readers"] for event, details in events if event == "reader_acquired"] == [1, 1]
+
+
 def test_bounded_results_match_retained_cache_results(tmp_path):
     data_path = tmp_path / "parity.csv"
     _write_dataset(data_path)
@@ -148,7 +170,64 @@ def test_durable_runner_resumes_after_process_interrupt(tmp_path):
     assert manifest["counts_by_status"]["success"] == 1
 
 
-def test_cache_fanout_audit_survives_midgroup_process_resume(tmp_path):
+def test_live_coordinator_cannot_be_reclaimed_by_second_process(tmp_path):
+    data_path = tmp_path / "fenced.csv"
+    _write_dataset(data_path)
+    ready = tmp_path / "ready"
+    release = tmp_path / "release"
+    script = textwrap.dedent(f"""
+        import os, time
+        from pathlib import Path
+        from src.pipeline_runner import run_experiment
+        ready = Path({str(ready)!r})
+        release = Path({str(release)!r})
+        def hook(phase, task):
+            if phase == "phase2":
+                ready.write_text("ready")
+                deadline = time.monotonic() + 30
+                while not release.exists():
+                    if time.monotonic() > deadline:
+                        raise TimeoutError("test release missing")
+                    time.sleep(0.05)
+        run_experiment(
+            {{"fenced": Path({str(data_path)!r})}}, run_id="fenced-run",
+            output_root=Path({str(tmp_path / 'runs')!r}),
+            seeds=[42], folds=[1], conditions=(("clean", 0.0),),
+            pipelines=("Raw",), models=("logistic_regression",), n_splits=3,
+            cache_policy="bounded", cache_max_bytes=10 * 1024 * 1024,
+            durable_scheduler=True, scheduler_lease_seconds=600.0,
+            failure_hook=hook if os.environ.get("BLOCK") == "1" else None,
+        )
+    """)
+    env = dict(os.environ, BLOCK="1")
+    first = subprocess.Popen(
+        [sys.executable, "-c", script], cwd=Path(__file__).parents[1],
+        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while not ready.exists() and first.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert ready.exists(), first.communicate(timeout=2)
+        second = subprocess.run(
+            [sys.executable, "-c", script], cwd=Path(__file__).parents[1],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert second.returncode != 0
+        assert "Could not acquire coordinator lock" in second.stderr
+        with sqlite3.connect(tmp_path / "runs" / "fenced-run" / "scheduler.sqlite") as conn:
+            assert conn.execute("SELECT status FROM scheduler_tasks").fetchone()[0] == "running"
+            assert conn.execute("SELECT COUNT(*) FROM scheduler_attempts").fetchone()[0] == 1
+    finally:
+        release.write_text("release")
+        stdout, stderr = first.communicate(timeout=30)
+    assert first.returncode == 0, (stdout, stderr)
+    with sqlite3.connect(tmp_path / "runs" / "fenced-run" / "scheduler.sqlite") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scheduler_results").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("split_policy", ["row_level", "group_aware"])
+def test_cache_fanout_audit_survives_midgroup_process_resume(tmp_path, split_policy):
     data_path = tmp_path / "resume_fanout.csv"
     _write_dataset(data_path)
     count_path = tmp_path / "phase2-count.txt"
@@ -174,11 +253,18 @@ def test_cache_fanout_audit_survives_midgroup_process_resume(tmp_path):
             pipelines=("AutoFE_Baseline",), models={models!r}, n_splits=3,
             cache_policy="bounded", cache_max_bytes=10 * 1024 * 1024,
             durable_scheduler=True, scheduler_lease_seconds=30.0,
-            cache_audit=True, failure_hook=hook,
+            cache_audit=True, failure_hook=hook, split_policy={split_policy!r},
         )
     """)
     first = subprocess.run([sys.executable, "-c", script], cwd=Path(__file__).parents[1], check=False)
     assert first.returncode == 77
+    run_dir = tmp_path / "runs" / "resume-fanout"
+    with sqlite3.connect(run_dir / "scheduler.sqlite") as conn:
+        committed_before = dict(conn.execute(
+            "SELECT task_key, final_result_digest FROM scheduler_tasks WHERE status='success'"
+        ))
+    assert len(committed_before) == 5
+    assert len(list((run_dir / "cache_bounded").glob("*.payload"))) == 1
     time.sleep(0.5)
     resumed = subprocess.run(
         [sys.executable, "-c", script.replace("failure_hook=hook", "failure_hook=None")],
@@ -193,6 +279,20 @@ def test_cache_fanout_audit_survives_midgroup_process_resume(tmp_path):
     assert record["regeneration_count"] == 0
     assert len(record["terminal_consumer_task_keys"]) == 10
     assert record["deletion_observed"] is True
+    with sqlite3.connect(run_dir / "scheduler.sqlite") as conn:
+        committed_after = dict(conn.execute(
+            "SELECT task_key, final_result_digest FROM scheduler_tasks WHERE status='success'"
+        ))
+        attempts = dict(conn.execute(
+            "SELECT task_key, COUNT(*) FROM scheduler_attempts GROUP BY task_key"
+        ))
+        authoritative = conn.execute("SELECT COUNT(*) FROM scheduler_results").fetchone()[0]
+    assert len(committed_after) == authoritative == 10
+    assert all(committed_after[key] == digest and attempts[key] == 1
+               for key, digest in committed_before.items())
+    success_rows = [json.loads(line) for line in (run_dir / "results.jsonl").read_text().splitlines()
+                    if json.loads(line).get("status") == "success"]
+    assert len(success_rows) == len({row["task_key"] for row in success_rows}) == 10
 
 
 def test_scheduler_publication_before_checkpoint_is_repaired_on_resume(tmp_path):

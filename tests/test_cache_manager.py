@@ -87,6 +87,24 @@ def test_two_consumer_leases_form_refcount_and_block_cleanup(tmp_path):
     assert not (tmp_path / "cache" / f"{digest}.payload").exists()
 
 
+def test_key_specific_reader_count_matches_active_leases(tmp_path):
+    manager = CacheManager(tmp_path / "cache", lease_ttl_seconds=60)
+    manager.put_bytes("group/a", b"one")
+    manager.put_bytes("group/b", b"two")
+    assert manager.active_lease_count("group/a") == 0
+    first = manager.acquire("group/a", owner="first")
+    second = manager.acquire("group/a", owner="second")
+    other = manager.acquire("group/b", owner="other")
+    try:
+        assert manager.active_lease_count("group/a") == 2
+        assert manager.active_lease_count("group/b") == 1
+    finally:
+        first.release()
+        second.release()
+        other.release()
+    assert manager.active_lease_count("group/a") == 0
+
+
 def test_replacing_a_leased_artifact_is_rejected(tmp_path):
     manager = CacheManager(tmp_path / "cache")
     manager.put_text("replace", "old")
@@ -114,6 +132,7 @@ def test_malformed_lease_is_conservative_and_prevents_deletion(tmp_path):
     digest = manager._digest("protected")
     bad_lease = manager.leases_dir / f"{digest}.bad.lease.json"
     bad_lease.write_text("not json", encoding="utf-8")
+    assert manager.active_lease_count("protected") == 1
     result = manager.cleanup(max_age_seconds=0, now=time.time() + 1, dry_run=False)
     assert digest in result["skipped_leased"]
     assert (tmp_path / "cache" / f"{digest}.payload").exists()
