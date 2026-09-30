@@ -64,17 +64,17 @@ Reviewer point: the long-run plan needs measured bottlenecks, bounded storage, c
 
 Response: We profiled small and large local workloads in the existing `p12` environment. Sonar's complete 8-pipeline × 10-model mix took 91.1865, 46.4736, and 30.6148 seconds at 1, 2, and 4 workers, with all 240 bounded tasks successful and zero one-versus-four prediction-hash mismatches. Stage measurements include `airlines` Raw (8.6129 seconds, approximately 1.31 GiB RSS after fitting) and `AutoFE_Baseline` (29.7011 seconds, 970 candidates and 100 retained features). BLAS/OpenMP pools were fixed to one thread per worker; the local RTX 3050 was inventoried but not used. These values are local planning evidence, not friend-PC measurements or corrected results.
 
-The retained-cache design is replaced by a lease-aware bounded regenerable manager with ready markers, checksums, locks, high-water monitoring, and cleanup after the last compatible model. The optional durable runner mode uses a WAL/FULL SQLite scheduler with immutable task identity, 3600-second leases, heartbeats, three-attempt retry classification, fsynced atomic result envelopes, and reconciliation. Focused cache and scheduler tests pass, including child-process faults before and after result rename; the complete p12 suite now passes 83 tests, including retained-versus-bounded parity, condition-scope checks, GPU routing, and interrupted new-process runner resume. The optimized versioned scope preserves the original data hashes, split policies, AUC denominator, analysis definitions, and exact primary task counts. Corrected performance, Jacobian associations, operator effects, condition effects, and statistical conclusions remain **PENDING CORRECTED RUN** until the intended host probe, storage-margin check, and full ledger are complete.
+The retained-cache design is replaced by a lease-aware bounded regenerable manager with ready markers, checksums, locks, high-water monitoring, and cleanup after the last compatible model. The durable runner uses a WAL/FULL SQLite scheduler with immutable task identity, heartbeats, three-attempt retry classification, fsynced atomic result envelopes, and reconciliation. The recovered row-level pilot now has 5,600 unique successful cells with 12 failed attempt rows retained and no terminal failures; group-aware execution is still in progress under a 600-second lease. Focused cache and scheduler tests pass, including child-process faults before and after result rename; the complete p12 suite now passes 84 tests. The optimized versioned scope preserves the original data hashes, split policies, AUC denominator, analysis definitions, and exact primary task counts. Corrected performance, Jacobian associations, operator effects, condition effects, and statistical conclusions remain **PENDING CORRECTED RUN** until the full ledger is complete.
 
 The launch audit now records an opt-in ten-consumer cache proof: one build, nine hits, active-reader history, terminal consumer IDs, and deletion after the final durable consumer. The same bounded smoke kills the process mid-group and resumes in a new process without refitting completed classifiers or double-counting a task. Scheduler publication/checkpoint recovery repairs a missing checkpoint from a verified result artifact, and startup reclaims leases owned by a replaced single-host process. XGBoost and CatBoost GPU routing is explicit, while CPU-only models retain CPU backends. The friend PC was not available for measurement, so host identity, P/E scheduling, GPU parity, sustained valid-task rate, storage margin, and the ten-day gate are **UNKNOWN**. The full frozen benchmark is **DO NOT LAUNCH** until those measurements pass; no corrected performance claim is made.
 
 The integrated runner now executes model fits through a bounded Windows process
 pool selected by `--workers`; the coordinator alone publishes scheduler,
-checkpoint, cache, and result artifacts. A four-dataset pilot is being run
-through this entry point with one seed/fold and both split policies (11,200
-intended cells). It is an execution and timing check only. Corrected
-performance effects remain **PENDING CORRECTED RUN**, and the friend-PC launch
-verdict remains **UNKNOWN**.
+checkpoint, cache, and result artifacts. The recovered row-level four-dataset
+pilot is complete at 5,600 valid cells; the corresponding group-aware run is
+still executing toward its 5,600-cell denominator. This is execution and
+timing evidence only. Corrected performance effects remain **PENDING CORRECTED
+RUN**, and the friend-PC launch verdict remains **UNKNOWN**.
 
 ## Historical evidence boundary
 

@@ -119,7 +119,7 @@ def main() -> None:
         pipelines=PIPELINES, models=MODELS, n_splits=5,
         cache_policy="bounded", cache_max_bytes=8 * 1024**3,
         durable_scheduler=True, cache_audit=True,
-        scheduler_lease_seconds=3600.0, scheduler_max_attempts=3,
+        scheduler_lease_seconds=600.0, scheduler_max_attempts=3,
         workers=4, use_gpu=False,
     )
     for split_policy in ("row_level", "group_aware"):

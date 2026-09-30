@@ -2,7 +2,7 @@
   "audit_date_local": "2026-09-29 Asia/Calcutta",
   "repository": "AutoFE-ShiftBench",
   "environment": "D:\\Conda\\p12",
-  "method": "Read every configured CSV; verify its JSON sidecar checksum and schema; report types, missingness, target distribution, duplicates, constants, identifier-name and high-cardinality text candidates, exact target copies, target-like names, and perfect single-feature mappings. Findings are review candidates, not automatic exclusions. It also replayed the row-level stratified five-fold splitter at seed 42 and counted test rows with a feature-vector hash present in training; this is a split-overlap measure, not an estimate of score inflation.",
+  "method": "Read every configured CSV; verify its JSON sidecar checksum and schema; report types, missingness, target distribution, duplicates, constants, identifier-name and high-cardinality text candidates, exact target copies, target-like names, and perfect single-feature mappings. Findings are review candidates, not automatic exclusions.",
   "dataset_count_configured": 25,
   "dataset_count_ok": 25,
   "dataset_count_missing_or_error": 0,
@@ -12093,6 +12093,5 @@
         "intrinsic_dimension": 17.0
       }
     }
-  ],
-  "source_code_fingerprint": "7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7"
+  ]
 }

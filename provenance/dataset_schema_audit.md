@@ -9,7 +9,7 @@ This is a structural screen. Exact target matches, target-like names, perfect on
 The audit also replayed the current row-level stratified five-fold splitter with seed 42 and checked whether each test row had an identical feature vector in training. This measures split overlap in the saved data; it does not estimate score inflation. These repeated rows remain in the data because their frequencies are part of the source distribution.
 
 | Dataset | Rows | Features | Target (classes) | Missing feature cells | Repeated X rows | Conflicting X groups | Test rows with train X match, 5-fold seed 42 | Exact copies | Target-like names | Perfect mappings | Identifier-name candidates | High-cardinality text fields |
-| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |
+|---|---:|---:|---|---:|---:|---:|---:|---|---|---|---|---|
 | `haberman` | 306 | 3 | `target` (2) | 0 | 45 | 6 | 11.1111% | — | — | — | — | — |
 | `sonar` | 208 | 60 | `target` (2) | 0 | 0 | 0 | 0.0% | — | — | — | — | — |
 | `ionosphere` | 351 | 34 | `target` (2) | 0 | 2 | 0 | 0.5698% | — | — | — | — | — |

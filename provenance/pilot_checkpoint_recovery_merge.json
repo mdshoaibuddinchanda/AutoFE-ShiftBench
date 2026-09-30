@@ -1,0 +1,15 @@
+{
+  "performed_utc": "2026-09-30T09:10:20Z",
+  "source_run_dir": "corrected_runs\\four_dataset_pilot\\pilot-row_level-001-preheartbeat-aborted",
+  "source_code_commit": "82efe0049be8beafca7f1a9d627cb9234d9e40e7",
+  "target_code_commit": "530a2efbd009b7a4bff201bfaf4eb66959dda1a2",
+  "source_completed_successes": 5422,
+  "overlap_cells_compared": 5422,
+  "overlap_cells_matching": 5422,
+  "imported_completed_cells": 0,
+  "source_failed_cells_not_imported": 597,
+  "source_cache_artifacts_not_imported_as_completion": true,
+  "actual_recovered_old_only_completed_cells": 4154,
+  "pre_reconciliation_target_completed_cells": 1268,
+  "note": "The first migration pass imported 4,154 old-only successes before a scheduler publication interruption; the final idempotent pass published all 5,422 compatible successes. imported_completed_cells is 0 on the final rerun because those rows were already present."
+}
