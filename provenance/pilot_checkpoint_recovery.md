@@ -1,6 +1,6 @@
 # Pilot checkpoint recovery
 
-Status: recovery and resume in progress; corrected performance effects remain **PENDING CORRECTED RUN**.
+Status: four-dataset pilot recovery and both policy runs complete; corrected performance effects remain **PENDING CORRECTED RUN**.
 
 ## Scope and identity
 
@@ -40,7 +40,7 @@ Existing focused tests cover cache interruption/reuse, scheduler publication cra
 
 ## Counts and timing
 
-The target ledger had 5,422 valid cells before repair. The old attempt's 597 failed rows remain quarantined. The continuation is executing the previously unregistered cells; exact row-level and group-aware terminal counts, elapsed times, cache builds/hits/deletions, repeated-fit count, and per-dataset before/after table will be filled from the final manifests after the pilot stops cleanly.
+The target ledger had 5,422 valid cells before repair. The old attempt's 597 failed rows remain quarantined. The row continuation completed the remaining 178 cells. The group-aware run retained 905 committed cells at its lease migration and completed the remaining 4,695. Both final ledgers have 5,600 authoritative successes and zero terminal failures; detailed elapsed, cache, and per-dataset accounting is in [`four_dataset_pilot_diagnosis.md`](four_dataset_pilot_diagnosis.md).
 
 ## Resume command
 
@@ -50,12 +50,16 @@ Use existing Conda environment `p12`. The guarded coordinator command used for t
 
 This artifact is execution and recovery evidence, not a corrected performance result. ROC-AUC effects, operator effects, Jacobian associations, and statistical conclusions remain **PENDING CORRECTED RUN**. The 25-dataset benchmark remains blocked by the existing storage/host gates and was not launched.
 
-## Current checkpoint snapshot (2026-09-30)
+## Historical checkpoint snapshot during execution (2026-09-30)
 
 | Split policy | Intended | Valid recovered before continuation | Newly executed after recovery | Terminal successes | Retry/failure attempts retained | Remaining |
 |---|---:|---:|---:|---:|---:|---:|
 | `row_level` | 5,600 | 5,422 | 178 successful cells; 12 failed attempts were retried | 5,600 | 12 failed attempt rows, 0 terminal failures | 0 |
 | `group_aware` | 5,600 | 905 retained before lease migration | in progress (scheduler snapshot: 1,302 successes) | 1,302 at snapshot | 0 terminal failures at snapshot | 4,298 at snapshot |
 
-The row-level JSONL contains 5,600 unique successful logical task keys and 12 historical failed-attempt rows; the scheduler and checkpoint ledgers contain exactly 5,600 successful task records. No previously committed model result was refit. The 12 retries correspond to worker/coordinator failure attempts with no committed model result; they are retained as attempt evidence. Group-aware execution remains active; the first 905 group-aware cells were produced under the prior 3,600-second setting; the coordinator was then stopped, task identities were migrated without changing logical task keys, and continuation resumed with a 600-second lease. No performance effect is inferred from these execution values.
+At this snapshot, the row-level JSONL contained 5,600 unique successful logical task keys and 12 historical failed-attempt rows; the scheduler and checkpoint ledgers contained exactly 5,600 successful task records. No previously committed model result was refit. The 12 retries corresponded to worker/coordinator failure attempts with no committed model result; they were retained as attempt evidence. Group-aware execution was still active; its first 905 cells were produced under the prior 3,600-second setting; the coordinator was then stopped, task identities were migrated without changing logical task keys, and continuation resumed with a 600-second lease. No performance effect is inferred from these execution values.
+
+## Final reconciled outcome
+
+The group-aware coordinator exited normally at 18:16 UTC on 2026-09-30. Final scheduler result artifacts, phase-2 checkpoint successes, unique successful JSONL rows, and manifest successes each number 5,600 under each policy, with zero disagreements and zero duplicate successful attempts. The group final cache cleanup removed 562 physical artifact digests, reclaimed 101,056,731 bytes, and left zero payload files. The row cache also has zero remaining payload files. Historical retry attempts remain visible: row-level 12 failed JSONL rows plus 16 intentional `WorkerReplaced` scheduler attempts, and group-aware seven intentional replacement attempts. Neither run had a `LeaseExpired` attempt or refit a previously committed cell. The prior snapshot table above is retained as a dated execution record, not a current count.
 
