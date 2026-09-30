@@ -15,6 +15,8 @@ import platform
 import sys
 import time
 import traceback
+from concurrent.futures import Future, ProcessPoolExecutor
+import multiprocessing as mp
 from importlib.metadata import PackageNotFoundError, version as package_version
 from dataclasses import asdict
 from pathlib import Path
@@ -62,6 +64,60 @@ from src.splitters import (
     get_population_splits,
     get_stratified_splits,
 )
+
+
+def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
+    """Fit one classifier task in a bounded child process.
+
+    The parent process owns task leases, cache publication, checkpoints, and
+    result rows.  Workers receive only the already prepared numeric matrices
+    for one task, so no mutable scheduler or cache state crosses the process
+    boundary.  Timestamps and the PID are returned as evidence of actual
+    overlap in the integrated runner.
+    """
+    started_at = time.time()
+    started = time.perf_counter()
+    model_name = str(payload["model"])
+    seed = int(payload["seed"])
+    use_gpu = bool(payload.get("use_gpu", False))
+    xtr = np.asarray(payload["xtr"], dtype=np.float32)
+    xte = np.asarray(payload["xte"], dtype=np.float32)
+    y_train_enc = np.asarray(payload["y_train_enc"])
+    y_test_enc = np.asarray(payload["y_test_enc"])
+    classes = np.asarray(payload["classes"])
+    model = build_model(
+        model_name,
+        random_state=seed,
+        use_gpu=bool(use_gpu and model_name in {"xgboost", "catboost"}),
+    )
+    fit_started = time.perf_counter()
+    model.fit(xtr, y_train_enc)
+    train_time = time.perf_counter() - fit_started
+    infer_started = time.perf_counter()
+    y_pred = model.predict(xte)
+    y_proba = model.predict_proba(xte) if hasattr(model, "predict_proba") else np.zeros(
+        (len(xte), len(classes))
+    )
+    infer_time = time.perf_counter() - infer_started
+    train_pred = model.predict(xtr)
+    train_proba = model.predict_proba(xtr) if hasattr(model, "predict_proba") else np.zeros(
+        (len(y_train_enc), len(classes))
+    )
+    test_metrics = compute_classification_metrics(y_test_enc, y_pred, y_proba, classes)
+    train_metrics = compute_classification_metrics(y_train_enc, train_pred, train_proba, classes)
+    return {
+        "status": "success",
+        "pid": os.getpid(),
+        "worker_started_unix": started_at,
+        "worker_finished_unix": time.time(),
+        "worker_elapsed_s": time.perf_counter() - started,
+        "model_backend": "gpu" if use_gpu and model_name in {"xgboost", "catboost"} else "cpu",
+        "train_time_s": train_time,
+        "infer_time_s": infer_time,
+        "y_pred": np.asarray(y_pred),
+        "test_metrics": test_metrics,
+        "train_auc": train_metrics.get("roc_auc"),
+    }
 
 
 PRIMARY_CONDITIONS: tuple[tuple[str, float], ...] = (
@@ -602,6 +658,7 @@ def run_experiment(
     scheduler_max_attempts: int = 3,
     cache_audit: bool = False,
     use_gpu: bool = False,
+    workers: int = 1,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
@@ -615,6 +672,8 @@ def run_experiment(
         raise ValueError("scheduler_lease_seconds must be positive")
     if scheduler_max_attempts < 1:
         raise ValueError("scheduler_max_attempts must be positive")
+    if workers < 1:
+        raise ValueError("workers must be positive")
     seeds = seeds or [42, 123, 456, 789, 2025]
     folds = folds or list(range(1, n_splits + 1))
     selected_families = {family for family, _severity in conditions}
@@ -691,6 +750,7 @@ def run_experiment(
         "scheduler_max_attempts": scheduler_max_attempts,
         "cache_audit": bool(cache_audit),
         "use_gpu": bool(use_gpu),
+        "workers": int(workers),
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
     config_fingerprint = stable_digest(config_data)
@@ -784,6 +844,111 @@ def run_experiment(
     outcomes: list[dict[str, Any]] = list((existing_manifest or {}).get("tasks", []))
     if existing_manifest is None:
         _save_run_manifest(run_dir, base_manifest, outcomes)
+
+    # A bounded process pool is used only for the expensive model-fit phase.
+    # Feature preparation, cache leases, scheduler claims, and durable writes
+    # remain coordinator-owned.  This makes the main runner itself concurrent
+    # while preserving one authoritative task ledger.
+    executor: ProcessPoolExecutor | None = None
+    pending_futures: list[tuple[Future, dict[str, Any]]] = []
+    if workers > 1:
+        executor = ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=mp.get_context("spawn"),
+        )
+
+    def _record_phase2(meta: dict[str, Any], fit: dict[str, Any]) -> None:
+        """Publish one worker result or durable failure in the coordinator."""
+        task_manifest = meta["task_manifest"]
+        task = meta["task"]
+        task_key = meta["task_key"]
+        task_fp = meta["task_fp"]
+        scheduler_lease = meta.get("scheduler_lease")
+        dataset_name = meta["dataset_name"]
+        seed = meta["seed"]
+        fold = meta["fold"]
+        condition = meta["condition"]
+        pipeline_name = meta["pipeline_name"]
+        model_name = meta["model_name"]
+        audit_record = meta.get("audit_record")
+        try:
+            if fit.get("status") != "success":
+                raise RuntimeError(str(fit.get("error", "worker returned no result")))
+            x_train_fe = meta["x_train_fe"]
+            x_test_fe = meta["x_test_fe"]
+            x_test_clean = meta["x_test_clean"]
+            y_pred = np.asarray(fit["y_pred"])
+            test_metrics = fit["test_metrics"]
+            result = {
+                **task, "run_id": run_id, "task_key": task_key,
+                "status": "success", "n_train": int(meta["n_train"]), "n_test": int(meta["n_test"]),
+                "split_policy": split_policy,
+                "model_backend": fit.get("model_backend", "cpu"),
+                "experiment_scope": experiment_scope,
+                "split_status": meta["task_split_status"],
+                "n_original": int(x_test_clean.shape[1]),
+                "train_time_s": float(fit.get("train_time_s", 0.0)),
+                "infer_time_s": float(fit.get("infer_time_s", 0.0)),
+                "worker_pid": int(fit.get("pid", -1)),
+                "worker_started_unix": float(fit.get("worker_started_unix", 0.0)),
+                "worker_finished_unix": float(fit.get("worker_finished_unix", 0.0)),
+                "worker_elapsed_s": float(fit.get("worker_elapsed_s", 0.0)),
+                "autofe_gen_time_s": float(meta["fe_meta"].get("generation_time_s", 0.0)),
+                "autofe_cache_hit": bool(meta["cache_was_present"]),
+                "n_generated": int(meta["fe_meta"].get("n_generated", 0)),
+                "n_retained": int(meta["fe_meta"].get("n_retained", x_train_fe.shape[1])),
+                "ram_used_mb": float(meta["fe_meta"].get("ram_used_mb", 0.0)),
+                "operator_counts": meta["fe_meta"].get("operator_counts", {}),
+                "operator_candidate_counts": meta["fe_meta"].get("operator_candidate_counts", {}),
+                "operator_configuration": meta["fe_meta"].get("operator_configuration", {
+                    "enabled_operators": list(PIPELINE_CONFIGS[pipeline_name].trans_primitives)
+                    if PIPELINE_CONFIGS[pipeline_name].enable_dfs else [],
+                    "excluded_operators": [],
+                }),
+                "candidate_history": meta["fe_meta"].get("candidate_history", {
+                    "enabled": False, "records_written": 0, "score_scope": "train",
+                }),
+                "wasserstein": None, "ks_stat": None,
+                "cache_fingerprint": meta["feature_cache_fp"],
+                "task_fingerprint": task_fp,
+                "train_matrix_sha256": frame_sha256(x_train_fe),
+                "test_matrix_sha256": frame_sha256(x_test_fe),
+                "prediction_sha256": stable_digest(np.asarray(y_pred).tolist()),
+                "train_auc": fit.get("train_auc"),
+                **test_metrics,
+            }
+            _safe_result_write(run_dir / "results.jsonl", result, index_path=result_index_path)
+            if scheduler is not None and scheduler_lease is not None:
+                scheduler.publish_result(scheduler_lease, _scheduler_payload(result))
+                if failure_hook:
+                    failure_hook("after_scheduler_publish", task)
+            record_task(
+                db_path, run_id=run_id, task_key=task_key, phase="phase2", status="success",
+                dataset=dataset_name, seed=seed, fold=fold, condition=condition,
+                pipeline=pipeline_name, model=model_name, manifest_fingerprint=task_fp,
+            )
+            _upsert_outcome(outcomes, dict(task_manifest, status="success"))
+        except Exception as exc:
+            if scheduler is not None and scheduler_lease is not None:
+                scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
+            failure = _record_failure(
+                run_dir=run_dir, db_path=db_path, run_id=run_id, task_key=task_key,
+                phase="phase2", dataset=dataset_name, seed=seed, fold=fold,
+                condition=condition, pipeline=pipeline_name, model=model_name,
+                fingerprint=task_fp, exc=exc, result_index_path=result_index_path,
+            )
+            _upsert_outcome(outcomes, dict(task_manifest, **failure))
+        if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
+            audit_record["terminal_consumer_task_keys"].append(task_key)
+        _save_run_manifest(run_dir, base_manifest, outcomes)
+
+    def _drain_one() -> None:
+        future, meta = pending_futures.pop(0)
+        try:
+            fit = future.result()
+        except Exception as exc:
+            fit = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        _record_phase2(meta, fit)
 
     has_transductive_partition = experiment_scope == "transductive_domain_partition"
     base_manifest["partition_uses_held_out_features"] = has_transductive_partition
@@ -1159,100 +1324,50 @@ def run_experiment(
                                                     posinf=1e10, neginf=-1e10)
                                 xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0,
                                                     posinf=1e10, neginf=-1e10)
-                                model = build_model(
-                                    model_name, random_state=seed,
-                                    use_gpu=bool(use_gpu and model_name in {"xgboost", "catboost"}),
-                                )
-                                started = time.perf_counter()
-                                model.fit(xtr, y_train_enc)
-                                train_time = time.perf_counter() - started
-                                if scheduler is not None and scheduler_lease is not None:
-                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
-                                started = time.perf_counter()
-                                y_pred = model.predict(xte)
-                                y_proba = model.predict_proba(xte) if hasattr(model, "predict_proba") else np.zeros(
-                                    (len(xte), len(encoder.classes_)))
-                                infer_time = time.perf_counter() - started
-                                if scheduler is not None and scheduler_lease is not None:
-                                    scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 try:
                                     y_test_enc = encoder.transform(y_test.astype(str))
                                 except ValueError as exc:
                                     raise ValueError("Held-out labels contain a class absent from training labels") from exc
-                                train_pred = model.predict(xtr)
-                                train_proba = model.predict_proba(xtr) if hasattr(model, "predict_proba") else np.zeros(
-                                    (len(y_train_enc), len(encoder.classes_)))
-                                test_metrics = compute_classification_metrics(
-                                    y_test_enc, y_pred, y_proba, encoder.classes_,
-                                )
-                                train_metrics = compute_classification_metrics(
-                                    y_train_enc, train_pred, train_proba, encoder.classes_,
-                                )
-                                result = {
-                                    **task, "run_id": run_id, "task_key": task_key,
-                                    "status": "success", "n_train": len(xtr), "n_test": len(xte),
-                                    "split_policy": split_policy,
-                                    "model_backend": "gpu" if use_gpu and model_name in {"xgboost", "catboost"} else "cpu",
-                                    "experiment_scope": experiment_scope,
-                                    "split_status": task_split_status,
-                                    "n_original": int(x_test_clean.shape[1]),
-                                    "train_time_s": train_time, "infer_time_s": infer_time,
-                                    "autofe_gen_time_s": float(fe_meta.get("generation_time_s", 0.0)),
-                                    "autofe_cache_hit": cache_was_present,
-                                    "n_generated": int(fe_meta.get("n_generated", 0)),
-                                    "n_retained": int(fe_meta.get("n_retained", x_train_fe.shape[1])),
-                                    "ram_used_mb": float(fe_meta.get("ram_used_mb", 0.0)),
-                                    "operator_counts": fe_meta.get("operator_counts", {}),
-                                    "operator_candidate_counts": fe_meta.get("operator_candidate_counts", {}),
-                                    "operator_configuration": fe_meta.get("operator_configuration", {
-                                        "enabled_operators": list(PIPELINE_CONFIGS[pipeline_name].trans_primitives)
-                                        if PIPELINE_CONFIGS[pipeline_name].enable_dfs else [],
-                                        "excluded_operators": [],
-                                    }),
-                                    "candidate_history": fe_meta.get("candidate_history", {
-                                        "enabled": False, "records_written": 0, "score_scope": "train",
-                                    }),
-                                    # The held-out features are unchanged in the primary
-                                    # protocol; do not report a test distribution-shift score.
-                                    "wasserstein": None,
-                                    "ks_stat": None,
-                                    "cache_fingerprint": feature_cache_fp,
-                                    "task_fingerprint": task_fp,
-                                    "train_matrix_sha256": frame_sha256(x_train_fe),
-                                    "test_matrix_sha256": frame_sha256(x_test_fe),
-                                    "prediction_sha256": stable_digest(np.asarray(y_pred).tolist()),
-                                    "train_auc": train_metrics.get("roc_auc"),
-                                    **test_metrics,
+                                phase2_meta = {
+                                    "task_manifest": task_manifest, "task": task, "task_key": task_key,
+                                    "task_fp": task_fp, "feature_cache_fp": feature_cache_fp,
+                                    "scheduler_lease": scheduler_lease, "audit_record": audit_record,
+                                    "dataset_name": dataset_name, "seed": seed, "fold": fold,
+                                    "condition": condition, "pipeline_name": pipeline_name,
+                                    "model_name": model_name, "task_split_status": task_split_status,
+                                    "x_train_fe": x_train_fe, "x_test_fe": x_test_fe,
+                                    "x_test_clean": x_test_clean, "fe_meta": fe_meta,
+                                    "cache_was_present": cache_was_present,
+                                    "n_train": len(xtr), "n_test": len(xte),
                                 }
-                                _safe_result_write(run_dir / "results.jsonl", result, index_path=result_index_path)
-                                if scheduler is not None and scheduler_lease is not None:
-                                    scheduler.publish_result(scheduler_lease, _scheduler_payload(result))
-                                    if failure_hook:
-                                        failure_hook("after_scheduler_publish", task)
-                                record_task(
-                                    db_path, run_id=run_id, task_key=task_key,
-                                    phase="phase2", status="success", dataset=dataset_name,
-                                    seed=seed, fold=fold, condition=condition,
-                                    pipeline=pipeline_name, model=model_name,
-                                    manifest_fingerprint=task_fp,
-                                )
-                                _upsert_outcome(outcomes, dict(task_manifest, status="success"))
-                                if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
-                                    audit_record["terminal_consumer_task_keys"].append(task_key)
+                                fit_payload = {
+                                    "model": model_name, "seed": seed, "use_gpu": use_gpu,
+                                    "xtr": xtr, "xte": xte, "y_train_enc": np.asarray(y_train_enc),
+                                    "y_test_enc": np.asarray(y_test_enc), "classes": np.asarray(encoder.classes_),
+                                }
+                                if executor is not None:
+                                    pending_futures.append((
+                                        executor.submit(_fit_and_score_worker, fit_payload),
+                                        phase2_meta,
+                                    ))
+                                    # Keep serialized matrices bounded in memory.
+                                    if len(pending_futures) >= max(1, workers * 2):
+                                        _drain_one()
+                                else:
+                                    _record_phase2(phase2_meta, _fit_and_score_worker(fit_payload))
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
                                     scheduler.record_failure(scheduler_lease, type(exc).__name__, str(exc))
                                 failure = _record_failure(
-                                    run_dir=run_dir, db_path=db_path, run_id=run_id,
-                                    task_key=task_key, phase="phase2", dataset=dataset_name,
-                                    seed=seed, fold=fold, condition=condition,
-                                    pipeline=pipeline_name, model=model_name,
+                                    run_dir=run_dir, db_path=db_path, run_id=run_id, task_key=task_key,
+                                    phase="phase2", dataset=dataset_name, seed=seed, fold=fold,
+                                    condition=condition, pipeline=pipeline_name, model=model_name,
                                     fingerprint=task_fp, exc=exc, result_index_path=result_index_path,
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
                                 if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                     audit_record["terminal_consumer_task_keys"].append(task_key)
-                            _save_run_manifest(run_dir, base_manifest, outcomes)
+                                _save_run_manifest(run_dir, base_manifest, outcomes)
                             if cache_manager is not None and model_position == len(models) - 1:
                                 # All compatible classifiers for this
                                 # feature-task have reached a terminal phase.
@@ -1284,6 +1399,14 @@ def run_experiment(
                                         key for key in feature_consumer_task_keys
                                         if key not in audit_record["terminal_consumer_task_keys"]
                                     ]
+    # Finish all queued worker fits before final cache reconciliation.  This is
+    # also the durable boundary for the bounded feature fan-out: no artifact
+    # may be deleted while an outstanding classifier future can still read it.
+    while pending_futures:
+        _drain_one()
+    if executor is not None:
+        executor.shutdown(wait=True, cancel_futures=False)
+
     if cache_manager is not None:
         cache_reconciled = cache_manager.reconcile()
         scheduler_pending = False
@@ -1331,6 +1454,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--durable-scheduler", action="store_true")
     parser.add_argument("--scheduler-lease-seconds", type=float, default=3600.0)
     parser.add_argument("--scheduler-max-attempts", type=int, default=3)
+    parser.add_argument("--workers", type=int, default=1, help="bounded outer worker processes for model fits")
     parser.add_argument(
         "--cache-audit", action="store_true",
         help="Persist per-feature cache build/hit/consumer/reader/deletion evidence (bounded runs only)",
@@ -1359,6 +1483,7 @@ def main(argv: list[str] | None = None) -> None:
         scheduler_max_attempts=args.scheduler_max_attempts,
         cache_audit=args.cache_audit,
         use_gpu=args.use_gpu,
+        workers=args.workers,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 

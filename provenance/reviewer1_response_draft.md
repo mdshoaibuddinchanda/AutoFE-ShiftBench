@@ -68,6 +68,14 @@ The retained-cache design is replaced by a lease-aware bounded regenerable manag
 
 The launch audit now records an opt-in ten-consumer cache proof: one build, nine hits, active-reader history, terminal consumer IDs, and deletion after the final durable consumer. The same bounded smoke kills the process mid-group and resumes in a new process without refitting completed classifiers or double-counting a task. Scheduler publication/checkpoint recovery repairs a missing checkpoint from a verified result artifact, and startup reclaims leases owned by a replaced single-host process. XGBoost and CatBoost GPU routing is explicit, while CPU-only models retain CPU backends. The friend PC was not available for measurement, so host identity, P/E scheduling, GPU parity, sustained valid-task rate, storage margin, and the ten-day gate are **UNKNOWN**. The full frozen benchmark is **DO NOT LAUNCH** until those measurements pass; no corrected performance claim is made.
 
+The integrated runner now executes model fits through a bounded Windows process
+pool selected by `--workers`; the coordinator alone publishes scheduler,
+checkpoint, cache, and result artifacts. A four-dataset pilot is being run
+through this entry point with one seed/fold and both split policies (11,200
+intended cells). It is an execution and timing check only. Corrected
+performance effects remain **PENDING CORRECTED RUN**, and the friend-PC launch
+verdict remains **UNKNOWN**.
+
 ## Historical evidence boundary
 
 The historical ledger and manuscript values are preserved as historical evidence. They are not merged into corrected estimates and cannot be used to infer the missing row-level/group-aware comparison.

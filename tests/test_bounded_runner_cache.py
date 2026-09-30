@@ -226,3 +226,25 @@ def test_scheduler_publication_before_checkpoint_is_repaired_on_resume(tmp_path)
     assert manifest["counts_by_status"]["success"] == 1
     rows = [json.loads(line) for line in (tmp_path / "runs" / "boundary-run" / "results.jsonl").read_text(encoding="utf-8").splitlines()]
     assert len({row["task_key"] for row in rows}) == 1
+
+
+def test_integrated_runner_workers_overlap_and_publish_unique_rows(tmp_path):
+    """The main runner, rather than the profiling harness, executes workers concurrently."""
+    data_path = tmp_path / "concurrent.csv"
+    _write_dataset(data_path)
+    models = ("logistic_regression", "random_forest", "extra_trees", "linear_svm")
+    manifest = run_experiment(
+        {"concurrent": data_path}, run_id="concurrent-run", output_root=tmp_path / "runs",
+        seeds=[42], folds=[1], conditions=(("clean", 0.0),), pipelines=("Raw",),
+        models=models, n_splits=3, cache_policy="bounded", cache_max_bytes=32 * 1024 * 1024,
+        durable_scheduler=True, cache_audit=True, workers=2,
+    )
+    assert manifest["status"] == "complete"
+    rows = [json.loads(line) for line in (tmp_path / "runs" / "concurrent-run" / "results.jsonl").read_text().splitlines()]
+    rows = [row for row in rows if row.get("status") == "success"]
+    assert len(rows) == len(models)
+    assert len({row["task_key"] for row in rows}) == len(models)
+    assert len({row["worker_pid"] for row in rows}) >= 2
+    intervals = [(row["worker_started_unix"], row["worker_finished_unix"]) for row in rows]
+    assert any(a0 < b1 and b0 < a1 for i, (a0, a1) in enumerate(intervals) for b0, b1 in intervals[i + 1:])
+    assert manifest["counts_by_status"]["success"] == len(models)

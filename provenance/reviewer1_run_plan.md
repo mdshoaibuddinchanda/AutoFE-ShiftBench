@@ -88,6 +88,15 @@ Preflight artifacts: [`reviewer1_preflight_manifest.json`](reviewer1_preflight_m
 
 The original retain-all cache gate remains rejected, and its 47,377.68 GiB projection is retained as the historical resource evidence. Versioned optimized scope and recovery controls are recorded in [`reviewer1_optimization_plan_v1.md`](reviewer1_optimization_plan_v1.md), [`reviewer1_optimization_scope_v1.json`](reviewer1_optimization_scope_v1.json), and [`performance_recovery_report.md`](performance_recovery_report.md). The runner now supports bounded regenerable feature caches with leases, ready markers, checksums, high-water accounting, and cleanup after the last compatible model. It also supports a durable task scheduler with leases, heartbeats, retry classification, atomic result envelopes, and reconciliation. These controls preserve the data hashes, AUC denominator, split policies, task counts, and analysis definitions; they do not produce corrected benchmark results.
 
+The integrated runner also accepts `--workers N` and executes model fits in a
+bounded Windows spawn pool while the coordinator owns scheduler leases, cache
+publication, checkpoints, and result rows. A focused smoke test records
+overlapping child-process intervals and unique task IDs. The bounded
+four-dataset pilot covers 11,200 intended cells across both policies with one
+seed and one fold; its timing and coverage are recorded in
+[`four_dataset_performance_pilot.md`](four_dataset_performance_pilot.md), and
+all corrected performance effects remain **PENDING CORRECTED RUN**.
+
 The bounded profile measured a complete 80-task Sonar mix at 1/2/4 workers in 91.1865/46.4736/30.6148 seconds, with zero one-versus-four prediction-hash mismatches. Applying the observed 2.979x speedup to the prior linear projections gives planning scenarios of 9.30 days (core row), 16.49 days (core group), 65.10 days (all-14 row), 115.46 days (all-14 group), and 180.56 days (both policies); cache-reuse benefit is not assumed. These are not a 14-day claim. The friend-PC host probe, representative large-task interruption/resume, and final storage-margin checks remain launch blockers.
 
 The operator truth table and candidate-validity policy are frozen in [`reviewer1_operator_ablation_manifest_v1.json`](reviewer1_operator_ablation_manifest_v1.json). It confirms that the existing 14-pipeline scope is unchanged: `AutoFE_Baseline` is the full arithmetic reference, `AutoFE_NoMultiply` remains the historical joint multiplication-and-division removal, and multiplication/division isolate and leave-one-out variants are separately executable. The bounded smoke and full p12 suite verify code behavior only; operator performance effects remain **PENDING CORRECTED RUN**.

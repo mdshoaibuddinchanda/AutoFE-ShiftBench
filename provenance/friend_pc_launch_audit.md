@@ -10,7 +10,12 @@ Full benchmark: **not launched**
 
 **UNKNOWN — do not launch the frozen benchmark yet.** The friend PC was not available in this session, so its CPU topology, RAM headroom, GPU backend support, drive throughput, thermal behavior, and sustained benchmark rate are unmeasured. The complete frozen scope requires 1,680,000 valid executable cells and at least 7,000 valid completed cells/hour for ten days, with additional margin. The local Sonar profile and the older local `D:` free-space measurement are not evidence for that host.
 
-The current runner is serial at the task-loop level. The profiling harness measures bounded worker pools, but those workers are not yet the full campaign executor. Therefore the prior worker speedup is a planning observation, not a launch-rate measurement.
+The integrated runner now supports a bounded `ProcessPoolExecutor` for model
+fits (`--workers N`). The coordinator remains the sole owner of scheduler
+leases, cache publication, checkpoints, and result JSONL writes. A focused
+synthetic run proves overlapping child-process timestamps and unique durable
+rows. The four-dataset pilot is the first campaign-scale measurement of this
+path; it is timing/coverage evidence only, not a corrected performance result.
 
 ## Frozen scope checks
 
@@ -96,7 +101,7 @@ D:\Conda\p12\python.exe -m compileall -q src tests main.py provenance
 git diff --check
 ```
 
-The long command in `README.md` remains held until the friend-PC gates pass. A full launch must use the frozen manifest and both split policies as separate run identities; no row-level fallback is permitted for the two group-AUC skips.
+The long command in `README.md` remains held until the friend-PC gates pass. A full launch must use the frozen manifest and both split policies as separate run identities; no row-level fallback is permitted for the two group-AUC skips. The integrated worker count must be selected from measured friend-PC RAM/CPU/GPU evidence; four workers is the bounded pilot setting, not a universal launch recommendation.
 
 ## Remaining launch blockers
 

@@ -176,4 +176,13 @@ The code registry also contains `Raw_Variance` and `Raw_MI` (both no synthesis);
 - Evidence: bounded ten-model fan-out reports one build/nine hits; mid-group forced termination and new-process resume report no refit and no duplicate logical task. These are code-verification smokes only. The friend-PC probe and 10-day throughput evidence are not available in this session.
 - Status: **UNKNOWN / DO NOT LAUNCH** pending friend-PC host measurement, representative both-policy throughput, storage margin, and restart preflight.
 
+## R13. Integrated runner concurrency and bounded pilot
+
+- Exact concern: the main runner was still serial; the separate profiler did not prove concurrent scheduler/cache execution.
+- Decision and rationale: add a bounded Windows spawn pool for model fits while keeping scheduler leases, cache publication, checkpoints, and result writes in one coordinator. Run a four-dataset, one-seed/one-fold pilot through this real entry point.
+- Relevant files: `src/pipeline_runner.py`, `tests/test_bounded_runner_cache.py`, `provenance/four_dataset_performance_pilot.py`, `provenance/four_dataset_performance_pilot.md`, `provenance/performance_optimization_change_log.md`.
+- Scientific scope: four prespecified group-AUC-eligible small datasets; 10 conditions, 14 frozen pipelines, 10 classifiers, one seed, one fold, both split policies; 11,200 intended cells. No model hyperparameters or metric definitions changed.
+- Evidence: focused integrated-run test proves overlapping worker PIDs and unique durable task rows. Pilot timing and completion counts are recorded separately; corrected effects remain **PENDING CORRECTED RUN**.
+- Status: **pilot evidence**; friend-PC launch verdict remains **UNKNOWN / DO NOT LAUNCH**.
+
 \r\n
