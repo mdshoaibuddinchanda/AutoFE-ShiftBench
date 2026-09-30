@@ -613,7 +613,18 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
         },
         tasks=outcomes,
     )
-    atomic_write_json(run_dir / "manifest.json", manifest)
+    # Windows antivirus/indexer/read-only observers can briefly hold the
+    # destination during ``os.replace``.  Retry the atomic publication instead
+    # of converting that transient filesystem condition into a task failure.
+    manifest_path = run_dir / "manifest.json"
+    for attempt in range(8):
+        try:
+            atomic_write_json(manifest_path, manifest)
+            break
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def _upsert_outcome(outcomes: list[dict[str, Any]], outcome: dict[str, Any]) -> None:

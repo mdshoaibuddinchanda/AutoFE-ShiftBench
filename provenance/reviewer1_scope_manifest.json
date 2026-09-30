@@ -7,7 +7,7 @@
   "code_fingerprint": "7f1a85210f1c3dd43c59381cad891e291242d874886f283b1e2b95d02abc84a7",
   "frozen_data_hash_artifacts": {
     "dataset_list_sha256": "d86874aabd0b885f5e1041b9a166e6b34135d77bbc1cb1ec6ce16a7819fbcaf4",
-    "dataset_schema_audit_sha256": "0a562d590b562ba5996e7011d3a2b23852532b3dbae0bd5c1b1286d102f4e5ad",
+    "dataset_schema_audit_sha256": "bfc06f94937527425878a32eafcf3d081e19afa94d1e345f9390a16262df8cc2",
     "group_fold_audit_sha256": "790905fd873b8e1925d109fe0187b248c51bfd4572c467cb1637f7a3a467067e",
     "per_dataset_csv_and_sidecar_hashes": "provenance/dataset_schema_audit.json and provenance/group_fold_audit.json"
   },
