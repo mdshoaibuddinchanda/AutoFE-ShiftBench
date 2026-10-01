@@ -1,34 +1,20 @@
 @echo off
-echo ============================================================
-echo   AutoFE-ShiftBench — One-Command Setup and Run
-echo ============================================================
-echo.
+setlocal
+cd /d "%~dp0"
 
-REM Step 1: Install dependencies
-echo [1/3] Installing Python dependencies...
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install dependencies.
-    pause
+set "P12_PYTHON=D:\Conda\p12\python.exe"
+if not exist "%P12_PYTHON%" (
+    echo ERROR: Existing p12 Python was not found at %P12_PYTHON%.
     exit /b 1
 )
-echo.
 
-REM Step 2: Download datasets
-echo [2/3] Downloading configured benchmark datasets...
-python -c "from src.data_loader import download_datasets_from_list; download_datasets_from_list()"
-if errorlevel 1 (
-    echo ERROR: Failed to download datasets.
-    pause
-    exit /b 1
-)
-echo.
+echo ============================================================
+echo   AutoFE-ShiftBench bounded smoke in existing p12
+echo   Full 25-dataset campaign: DO NOT LAUNCH until gates pass
+echo ============================================================
 
-REM Step 3: Run the benchmark
-echo [3/3] Starting benchmark with full parallelization...
-python -m src.pipeline_runner
-echo.
-echo ============================================================
-echo   Benchmark complete! Corrected run outputs are under corrected_runs by run ID.
-echo ============================================================
-pause
+"%P12_PYTHON%" main.py --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 2 --pipelines Raw AutoFE_Baseline --models logistic_regression --workers 1
+if errorlevel 1 exit /b 1
+
+echo Bounded smoke complete. Inspect corrected_runs by generated run ID.
+exit /b 0

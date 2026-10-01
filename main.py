@@ -1,8 +1,11 @@
-"""Repository entry point: download datasets and run the full benchmark.
+"""Download missing datasets, then forward explicit options to the runner.
 
 Usage:
-    python main.py                    # Full benchmark (all 25 datasets)
-    python main.py --max-datasets 2   # Smoke test on 2 datasets
+    python main.py --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 2
+
+Without bounds this processes all 25 configured datasets, but the runner's
+default two pipelines, one classifier, and row-level policy are not the frozen
+Reviewer #1 grid. The full two-policy campaign remains behind the launch gate.
 """
 
 from __future__ import annotations

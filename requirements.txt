@@ -18,3 +18,7 @@ pyarrow==16.0.0
 statsmodels==0.14.2
 tqdm==4.66.4
 ucimlrepo==0.0.7
+threadpoolctl==3.6.0
+
+# Repository test suite (the corrected benchmark itself does not import pytest)
+pytest==9.1.1

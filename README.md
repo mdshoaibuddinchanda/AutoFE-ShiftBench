@@ -119,7 +119,11 @@ python -m provenance.profile_runner --stage-datasets sonar airlines --mix-datase
 # Run the same bounded profile with --use-gpu only after the host probe confirms CUDA/backend support.
 ~~~
 
+`requirements.txt` pins the runner, plotting, profiling, and test packages used in this repository, including direct `threadpoolctl` and `pytest` imports. All 22 listed pins matched the existing `p12` environment at the 2026-10-01 audit. The environment-wide `pip check` still reports conflicts from installed `tableshift`, `opencv-python`, and `tabpfn`; this audit did not modify `p12`. Jupyter is not required for the corrected command-line workflow; the historical notebook needs a separate notebook frontend if it is used.
+
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
+
+On this Windows checkout, `setup_and_run.bat` uses `D:\Conda\p12\python.exe` to download any missing input for a **four-cell bounded smoke** and then runs the same two-pipeline, one-classifier subset. It does not install packages or start the full campaign. `python main.py` without bounds downloads the 25 configured datasets and plans **12,500 row-level tasks** using the runner's default two pipelines and one classifier; it is not the frozen 14-pipeline, ten-classifier, two-policy study.
 
 The configured dataset downloader can be run independently in `p12`:
 
@@ -130,6 +134,37 @@ python -c "from src.data_loader import download_datasets_from_list; download_dat
 
 Failed dataset downloads stop with an error. Missing configured CSVs also stop a run before tasks start; a partial run is not reported as complete. Dataset acquisition does not clear the full-campaign gate. When the [run plan](provenance/reviewer1_run_plan.md) passes, freeze the current code, data hashes, analysis definitions, and both-policy task manifests before selecting run IDs and launch commands. The bounded cache and durable scheduler settings remain required in the [launch audit](provenance/friend_pc_launch_audit.md).
 
+### What is stored where
+
+The runner produces evidence, not paper tables or figures automatically. Paths below are relative to this repository unless `--data-dir` or `--output-root` is changed.
+
+| Output | Location and purpose |
+|---|---|
+| Downloaded datasets | `data/raw/<dataset>.csv` and `<dataset>_meta.json`; 25 CSVs and 25 sidecars are present locally. |
+| One corrected run | `corrected_runs/<run-id>/manifest.json` records configuration, fingerprints, task status, and cache accounting; `results.jsonl` is the result and attempt mirror. |
+| Recovery evidence | The same run directory holds `checkpoints.sqlite`, `results_index.sqlite`, and, with durable scheduling, `scheduler.sqlite` plus `scheduler_results/` artifact JSONs. A coordinator lock is placed beside the run directory. |
+| Feature cache | `cache_bounded/` holds regenerable, size-governed artifacts when `--cache-policy bounded` is used; completed consumers permit payload cleanup. The default `retain` policy writes persistent `cache/*.pkl` and manifests, which is unsuitable for the full grid under the current storage gate. |
+| Candidate history | Optional detailed histories are produced only when explicitly enabled by the mechanism-audit API; the full runner does not enable them by default. The bounded preflight writes its sample under `corrected_runs/reviewer1_preflight/`. |
+| README pilot visualization | The versioned [`four_dataset_pilot_status.svg`](provenance/figures/four_dataset_pilot_status.svg) is regenerated from the pilot diagnosis by [`render_readme_pilot_visual.py`](provenance/render_readme_pilot_visual.py). It is an intentional project artifact, not a temporary file. |
+| Standalone workflow drawing | `python -m src.create_workflow_diagram` writes `results/AutoFE_ShiftBench_Workflow.png` and `.pdf` by default; it is a method diagram, not a corrected performance figure. |
+
+The historical ledgers and tables under `reports/tables/`, the historical notebook's `reports/figures/` destination, and the PDFs under `paper/figures/` are separate from corrected run outputs. The current corrected runs contain **no corrected publication tables or figures**. The notebook expects historical `final_results.csv` and `aggregated_results.csv`; it is not a corrected-run report generator.
+
+### Tables and figures after a completed corrected run
+
+Each split policy needs its own run ID and analysis. Replace `RUN_ID` below with one **completed and audited** run ID. These commands write drafts inside that run directory and do not edit historical reports or manuscript figures:
+
+~~~powershell
+$run = 'corrected_runs/RUN_ID'
+python -m src.check_progress --run-dir $run
+python -m src.generate_tables --results "$run/results.jsonl" --output "$run/analysis/q1_tables_corrected.md"
+python -m src.stats_analysis --results "$run/results.jsonl" --output "$run/analysis/statistical_results_dataset_level.csv"
+python -c "from src.reviewer1_analysis import build_corrected_result_note; build_corrected_result_note('corrected_runs/RUN_ID/results.jsonl', output_path='corrected_runs/RUN_ID/analysis/reviewer1_result_note.json')"
+python -m src.plotting_q1 --results "$run/results.jsonl" --out-dir "$run/figures"
+~~~
+
+`generate_tables` writes one Markdown file with ten table sections; `stats_analysis` writes one dataset-level contrast CSV; `reviewer1_analysis` writes a coverage and contrast JSON when given an output path. `plotting_q1` can write Figures 2–10 as PNG/PDF pairs to the explicit figure directory. These tools are separate commands. The table and figure generators remain **draft tooling**: Table 9 currently expects `test_auc` while corrected rows store `roc_auc`, and Figure 10 does not include the individual operator variants. Their scope, dataset-level uncertainty, and memory use on a full ledger need review before any paper use. Corrected ROC-AUC and figure captions remain **PENDING CORRECTED RUN**.
+
 ## Provenance and historical results
 
 - provenance/original_run.json records the historical local ledger hashes and counts.
@@ -138,16 +173,3 @@ Failed dataset downloads stop with an error. Missing configured CSVs also stop a
 - The old reports/tables/results_stream.jsonl, its backup, and the original paper figures are historical evidence. Corrected runs write to corrected_runs/ and do not overwrite them.
 - The manuscript methods, captions, and numerical claims remain unchanged until a full corrected run and its analyses are available. The original ledger is present locally; it must not be presented as a corrected result.
 - Legacy readers under `src/analysis/`, `src/plotting.py`, and `notebooks/visualization.ipynb` target historical paths or schemas. They are not corrected primary-analysis tools. `src/check_progress.py` reads a specific corrected run directory and never reads the historical cache.
-
-Check a bounded corrected run's progress with its run directory:
-
-~~~
-python -m src.check_progress --run-dir corrected_runs/corrected-smoke
-~~~
-
-Generate tables or statistics only from an explicit corrected-run ledger after the full campaign and analysis gate are complete. Pilot or smoke outputs are diagnostic, not paper results:
-
-~~~
-python -m src.generate_tables --results corrected_runs/COMPLETED_RUN_ID/results.jsonl
-python -c "from src.stats_analysis import run_wilcoxon_analysis; run_wilcoxon_analysis('corrected_runs/COMPLETED_RUN_ID/results.jsonl')"
-~~~
