@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="420" viewBox="0 0 1100 420" role="img" aria-labelledby="title desc">
+  <title id="title">Bounded four-dataset pilot execution status</title>
+  <desc id="desc">Row-level and group-aware policies each completed 5,600 of 5,600 tasks with zero terminal failures. On a separate matched 560-task profile, baseline runtime was 415.5 seconds and the committed implementation took 183.6 seconds. These are code-verification measurements, not corrected scientific results.</desc>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; fill: #152438; }
+    .title { font-size: 25px; font-weight: 700; }
+    .heading { font-size: 18px; font-weight: 700; }
+    .label { font-size: 14px; font-weight: 600; }
+    .value { font-size: 14px; font-weight: 700; }
+    .note { font-size: 12px; fill: #526278; }
+    .badge { font-size: 12px; font-weight: 700; fill: #14558a; }
+    .warning { fill: #77520a; }
+  </style>
+  <rect width="1100" height="420" fill="#f6f8fb"/>
+  <text class="title" x="40" y="44">Four-dataset execution pilot</text>
+  <rect x="827" y="18" width="233" height="32" rx="16" fill="#e4f1fb"/>
+  <text class="badge" x="944" y="39" text-anchor="middle">CODE VERIFICATION</text>
+
+  <rect x="40" y="72" width="490" height="262" rx="14" fill="#fff" stroke="#dce3ec"/>
+  <text class="heading" x="64" y="108">Authoritative task completion</text>
+  <text class="note" x="64" y="129">Four datasets · 10 conditions · 14 pipelines · 10 classifiers</text>
+  <text class="label" x="64" y="165">Row-level</text>
+  <text class="value" x="505" y="165" text-anchor="end">5,600 / 5,600</text>
+  <rect x="64" y="177" width="441" height="19" rx="9" fill="#e8edf3"/>
+  <rect x="64" y="177" width="441" height="19" rx="9" fill="#178a65"/>
+  <text class="label" x="64" y="232">Group-aware</text>
+  <text class="value" x="505" y="232" text-anchor="end">5,600 / 5,600</text>
+  <rect x="64" y="244" width="441" height="19" rx="9" fill="#e8edf3"/>
+  <rect x="64" y="244" width="441" height="19" rx="9" fill="#178a65"/>
+  <text class="note" x="64" y="304">Zero terminal failures in both policies</text>
+
+  <rect x="550" y="72" width="510" height="262" rx="14" fill="#fff" stroke="#dce3ec"/>
+  <text class="heading" x="574" y="108">Matched 560-task runtime</text>
+  <text class="note" x="574" y="129">Same four datasets, cells, CPU workers, and outputs</text>
+  <text class="label" x="574" y="165">Repaired baseline</text>
+  <text class="value" x="1036" y="165" text-anchor="end">415.5 s</text>
+  <rect x="574" y="177" width="380.0" height="21" rx="10" fill="#778ba6"/>
+  <text class="label" x="574" y="234">Committed implementation</text>
+  <text class="value" x="1036" y="234" text-anchor="end">183.6 s</text>
+  <rect x="574" y="246" width="167.9" height="21" rx="10" fill="#286fb0"/>
+  <text class="note" x="574" y="304">2.26× faster in this bounded profile; exact output parity</text>
+
+  <rect x="40" y="352" width="1020" height="43" rx="10" fill="#fff2d6" stroke="#e9c98a"/>
+  <text class="warning" x="58" y="379" font-size="14" font-weight="700">25-dataset campaign: DO NOT LAUNCH</text>
+  <text class="warning" x="401" y="379" font-size="13">Scientific effects remain PENDING CORRECTED RUN.</text>
+</svg>
