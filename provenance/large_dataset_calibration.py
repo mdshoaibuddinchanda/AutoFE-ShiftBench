@@ -9,12 +9,21 @@ split policies.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+# Set limits before importing numpy/sklearn through the runner. Four model-fit
+# workers must not each create an unrestricted numerical thread pool.
+THREAD_ENV = (
+    "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
+)
+for name in THREAD_ENV:
+    os.environ[name] = "1"
 
 from src.pipeline_runner import run_experiment
 from src.provenance import file_sha256
@@ -43,7 +52,7 @@ def main() -> None:
     rows = []
     started = time.time()
     for policy in ("row_level", "group_aware"):
-        run_id = f"calibration-{policy}-001"
+        run_id = f"calibration-{policy}-002"
         t0 = time.time()
         manifest = run_experiment(**common, run_id=run_id, split_policy=policy)
         rows.append({"run_id": run_id, "split_policy": policy, "elapsed_s": time.time() - t0, "status": manifest.get("status"), "counts": manifest.get("counts_by_status", {})})
@@ -52,7 +61,10 @@ def main() -> None:
         "datasets": list(DATASETS), "dataset_hashes": hashes,
         "selection": "airlines and covertype prespecified as large group-AUC-eligible datasets; no pilot scores used",
         "conditions": [list(x) for x in CONDITIONS], "pipelines": list(PIPELINES), "models": list(MODELS),
-        "seed": 42, "fold": 1, "workers": 4, "runs": rows,
+        "seed": 42, "fold": 1, "workers": 4,
+        "numerical_thread_environment": {name: os.environ[name] for name in THREAD_ENV},
+        "incomplete_predecessor": "calibration-row_level-001 (interrupted after discovering missing thread limits)",
+        "runs": rows,
         "elapsed_s_total": time.time() - started,
         "scientific_status": "slow-tail calibration only; corrected effects remain PENDING CORRECTED RUN",
     }

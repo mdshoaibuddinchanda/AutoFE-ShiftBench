@@ -6,6 +6,10 @@ From `D:\DR2\AutoFE_Submission` in PowerShell:
 
 ```powershell
 $py = 'D:\Conda\p12\python.exe'
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:NUMEXPR_NUM_THREADS = '1'
 & $py -m provenance.audit_group_seed_grid
 & $py -m provenance.freeze_reviewer1_launch_v2
 

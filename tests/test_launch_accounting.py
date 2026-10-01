@@ -5,6 +5,7 @@ import sqlite3
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.check_progress import check_progress
 from src.pipeline_runner import CompactOutcomeLedger, _save_run_manifest, run_experiment
@@ -141,3 +142,16 @@ def test_corrected_table_gap_and_operator_figure_use_result_schema(tmp_path, mon
     plotting_q1.plot_fig10_ablation(frame, tmp_path)
     assert captured["stem"] == "Figure_10_Ablation_Study"
     assert captured["labels"] == names
+
+
+def test_parallel_compact_run_requires_frozen_numerical_thread_limits(tmp_path, monkeypatch):
+    for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(ValueError, match="all set to 1"):
+        run_experiment(
+            {"placeholder": tmp_path / "not_read.csv"}, run_id="thread-guard",
+            output_root=tmp_path / "runs", seeds=[42], folds=[1],
+            conditions=(("clean", 0.0),), pipelines=("Raw",),
+            models=("logistic_regression",), manifest_policy="compact",
+            durable_scheduler=True, workers=2,
+        )

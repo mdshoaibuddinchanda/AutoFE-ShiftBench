@@ -14,6 +14,10 @@ from src.provenance import code_fingerprint, current_git_commit, file_sha256, st
 
 ROOT = Path(__file__).resolve().parents[1]
 SEEDS = (42, 123, 456, 789, 2025)
+THREAD_ENV = {
+    "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1", "NUMEXPR_NUM_THREADS": "1",
+}
 PIPELINES = (
     "Raw", "AutoFE_Baseline", "Raw_CapMatched", "AutoFE_MI", "AutoFE_Random",
     "AutoFE_NoMultiply", "AutoFE_Isolate_Add", "AutoFE_Isolate_Subtract",
@@ -80,6 +84,7 @@ def main() -> None:
             "conditions": condition_count, "intended_cells": intended,
             "prespecified_group_auc_skips": skipped,
             "auc_eligible_before_condition_specific_skips": intended - skipped,
+            "required_environment": THREAD_ENV,
             "command_argv": [*command_base, "--run-id", run_id, "--scope", scope,
                              "--split-policy", policy],
         })
@@ -103,6 +108,7 @@ def main() -> None:
         "all_seed_auc_rule": "A dataset is excluded from group-aware AUC for all configured cells when any configured seed lacks all-fold AUC support; its group folds and skip reasons remain in results.",
         "seeds": list(SEEDS), "folds": [1, 2, 3, 4, 5],
         "pipelines": list(PIPELINES), "models": list(MODELS),
+        "required_numerical_thread_environment": THREAD_ENV,
         "runs": runs,
         "totals": {
             "run_count": len(runs),

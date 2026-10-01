@@ -21,4 +21,6 @@ This directory is the versioned audit record for the Reviewer #1 revision. The f
 
 At that inventory, `corrected_runs/` held 22,290 files (2.13 GiB), mostly completed pilot and scale-preflight evidence. `data/raw/` held 25 CSVs and 25 sidecars (0.12 GiB). `reports/tables/` held four historical files (0.59 GiB). The `D:` volume had 434.94 GiB free. These counts describe this checkout only and may change during bounded verification.
 
+`corrected_runs/large_calibration/calibration-row_level-001/` is an **interrupted diagnostic**, retained after its thread-pool settings were found to be unfrozen. It is not a corrected result and is not a resume target for the revised code identity. The replacement calibration uses a new `-002` run ID with numerical-library threads set to one.
+
 The pre-existing execution-count edit in `../notebooks/visualization.ipynb` is outside the Reviewer #1 run freeze and must not be included in its code commit. The corrected runner and analysis do not use that notebook.

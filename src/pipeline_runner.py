@@ -130,6 +130,9 @@ PRIMARY_CONDITIONS: tuple[tuple[str, float], ...] = (
     ("missing_values", 0.05), ("missing_values", 0.10), ("missing_values", 0.20),
     ("label_noise", 0.05), ("label_noise", 0.10), ("label_noise", 0.20),
 )
+NUMERICAL_THREAD_ENV = (
+    "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
+)
 DOMAIN_PARTITION_CONDITIONS: tuple[tuple[str, float], ...] = (
     ("covariate_partition", 0.0), ("population_partition", 0.0),
 )
@@ -804,6 +807,14 @@ def run_experiment(
         raise ValueError("manifest_policy must be 'detailed' or 'compact'")
     if manifest_policy == "compact" and (not durable_scheduler or cache_audit):
         raise ValueError("compact manifests require a durable scheduler and cache_audit=False")
+    thread_environment = {name: os.environ.get(name) for name in NUMERICAL_THREAD_ENV}
+    if manifest_policy == "compact" and workers > 1 and any(
+        value != "1" for value in thread_environment.values()
+    ):
+        raise ValueError(
+            "Parallel compact runs require OMP_NUM_THREADS, MKL_NUM_THREADS, "
+            "OPENBLAS_NUM_THREADS, and NUMEXPR_NUM_THREADS all set to 1 before Python starts"
+        )
     seeds = seeds or [42, 123, 456, 789, 2025]
     folds = folds or list(range(1, n_splits + 1))
     expected_cells = (len(data_paths) * len(seeds) * len(folds) * len(conditions)
@@ -886,6 +897,7 @@ def run_experiment(
         "manifest_policy": manifest_policy,
         "use_gpu": bool(use_gpu),
         "workers": int(workers),
+        "numerical_thread_environment": thread_environment,
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
     config_fingerprint = stable_digest(config_data)
