@@ -113,7 +113,10 @@ def test_corrected_values_reach_tables_and_figures(tmp_path):
     assert absent["enabled"] == "False" and absent["generated"] == "0"
     assert len(_rows(output / "primary_dataset_auc_coverage.csv")) == 28
     assert len(_rows(output / "primary_condition_auc_summary.csv")) == 28
-    assert len(manifest["figures"]) == 14
+    assert len(manifest["figures"]) == 16
+    assert len(manifest['tables']) == 15
+    resources = _rows(output/'primary_resource_policy_and_use.csv')
+    assert resources[0]['ram_budget_gib'] == ''
     assert len(_rows(output / "primary_f1_contrasts.csv")) == 8
     assert len(_rows(output / "row_group_dataset_auc.csv")) == 14
     assert len(_rows(output / "primary_missingness_auc_bounds.csv")) == 28
@@ -125,6 +128,26 @@ def test_corrected_values_reach_tables_and_figures(tmp_path):
     assert "pilot code verification; not corrected performance" in record
     assert "Frozen F1 dataset contrasts" in record and "Missing-outcome sensitivity" in record
     assert all((output / name).stat().st_size > 1000 for name in manifest["figures"])
+
+
+def test_resource_budget_and_observed_numbers_reach_resource_table_and_figure(tmp_path):
+    from provenance.generate_corrected_assets import resource_summary, plot_resource_summary
+    source=dict(run_id='synthetic', configured_workers=6,
+                resource_plan=dict(policy='adaptive-v1', ram_budget_bytes=int(32*1024**3*.8),
+                    ram_reserve_bytes=int(32*1024**3*.2),cache_max_bytes=12*1024**3,
+                    settings=dict(reserve_cpus=2,vram_target_fraction=.8),
+                    hardware=dict(allowed_cpu_ids=list(range(8)),ram_total_bytes=32*1024**3,
+                                  gpu_devices=[dict(total_bytes=4*1024**3)])),
+                resource_usage=dict(observed_process_tree_rss_bytes=20*1024**3),
+                maximum_worker_sampled_rss_bytes=2*1024**3,
+                model_backend_counts=dict(cpu=80,gpu=20))
+    rows=resource_summary([source,source])
+    assert rows[0]['ram_budget_gib']==pytest.approx(25.6)
+    assert rows[0]['observed_process_tree_rss_gib']==20
+    assert rows[0]['configured_worker_ceiling']==6 and rows[0]['gpu_success_cells']==20
+    assert rows[0]['vram_admission_budget_gib']==pytest.approx(3.2)
+    files=plot_resource_summary(rows,tmp_path,diagnostic=True,missing_outcomes=False)
+    assert len(files)==2 and all((tmp_path/p).stat().st_size>1000 for p in files)
 
 
 def _dataset_summary_fixture():

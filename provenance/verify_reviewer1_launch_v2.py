@@ -17,12 +17,13 @@ from src.provenance import code_fingerprint, file_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v3.json"
+SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v4.json"
 HEAVY_COORDINATOR_MODULES = {
     "src.pipeline_runner", "provenance.large_dataset_calibration",
     "provenance.large_dataset_calibration_group_v3",
     "provenance.large_dataset_recovery_v1", "provenance.run_mechanism_history",
     "provenance.final_optimization_verification",
+    "provenance.adaptive_resource_verification",
 }
 
 
@@ -100,6 +101,9 @@ def _recovery_scientific_parity_valid(recovery: dict, scope_path: Path) -> bool:
 
 def verify(run_id: str, scope_path: Path | None = None) -> dict:
     scope = json.loads((scope_path or SCOPE).read_text(encoding="utf-8"))
+    if scope.get('adaptive_verification_path'):
+        from provenance.verify_adaptive_launch import verify as verify_adaptive
+        return verify_adaptive(run_id, scope_path or SCOPE)
     run = next((item for item in scope["runs"] if item["run_id"] == run_id), None)
     if run is None:
         raise ValueError(f"Run ID is not in the frozen seven-run scope: {run_id}")

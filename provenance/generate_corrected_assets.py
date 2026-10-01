@@ -23,7 +23,7 @@ import numpy as np
 from scipy.stats import wilcoxon
 
 from src.pipeline_runner import PIPELINE_CONFIGS
-from src.provenance import atomic_write_json, file_sha256
+from src.provenance import atomic_write_json, file_sha256, stable_digest
 from src.reviewer1_analysis import BOOTSTRAP_REPLICATES, BOOTSTRAP_SEED, paired_dataset_bootstrap
 from src.stats_analysis import PRIMARY_CONDITIONS, PRESPECIFIED_PIPELINES, _holm_adjust
 
@@ -37,6 +37,7 @@ SECONDARY_METRICS = (
     "pr_auc", "log_loss", "brier_score", "train_auc", "train_time_s",
     "infer_time_s", "autofe_gen_time_s", "ram_used_mb", "n_generated",
     "n_retained", "n_original", "preprocessing_time_s", "preparation_time_s",
+    'worker_peak_rss_bytes', 'gpu_ram_part',
 )
 
 
@@ -111,6 +112,10 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
     counts = defaultdict(lambda: {field: 0 for field in COUNT_FIELDS})
     feature_count = defaultdict(int)
     included_rows = 0
+    parameter_catalog = {}
+    backend_counts = defaultdict(int)
+    fallback_cells = 0
+    worker_peak = None
     dataset_names = {item["name"] for item in scope["datasets"]}
     pipeline_names = set(scope["pipelines"])
     enabled_by_pipeline = {name: set(_enabled(name)) for name in scope["pipelines"]}
@@ -149,6 +154,22 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                 if auc is None or not math.isfinite(float(auc)) or not 0 <= float(auc) <= 1:
                     raise ValueError(f"Successful cell lacks finite ROC-AUC: {key}")
                 bucket["auc_sum"] += float(auc)
+                backend_counts[str(row.get('model_backend', 'unrecorded'))] += 1
+                fallback_cells += row.get('model_backend_reason') == 'static matrix estimate exceeds GPU VRAM budget'
+                peak = row.get('worker_peak_rss_bytes')
+                if peak is not None:
+                    worker_peak = max(worker_peak or 0, int(peak))
+                fingerprint = row.get('model_parameters_fingerprint')
+                if fingerprint and fingerprint not in parameter_catalog:
+                    catalog_path = (run_dir / row['model_parameters_path']).resolve()
+                    if not catalog_path.is_relative_to((run_dir / 'model_parameters').resolve()):
+                        raise ValueError('Model parameter catalog path escapes its run directory')
+                    parameters = json.loads(catalog_path.read_text(encoding='utf-8'))
+                    if stable_digest(parameters) != fingerprint or parameters.get('model') != row['model']:
+                        raise ValueError('Model parameter catalog identity changed')
+                    parameter_catalog[fingerprint] = file_sha256(catalog_path)
+                if manifest.get('configuration', {}).get('resource_plan') and not fingerprint:
+                    raise ValueError('Adaptive result lacks its resolved model parameter catalog')
                 condition_bucket = conditions[(dataset, pipeline, str(row["condition"]))]
                 condition_bucket["success"] += 1
                 condition_bucket["auc_sum"] += float(auc)
@@ -248,7 +269,70 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
         "counts_by_status": {status: sum(bucket[status] for bucket in aggregate.values())
                              for status in ("success", "failed", "skipped", "timed_out")},
         "terminal_manifest_status": manifest["status"],
+        'resource_plan': manifest.get('configuration', {}).get('resource_plan'),
+        'resource_usage': manifest.get('resource_usage'),
+        'configured_workers': manifest.get('configuration', {}).get('workers'),
+        'model_backend_counts': dict(backend_counts),
+        'capacity_cpu_fallback_cells': fallback_cells,
+        'maximum_worker_sampled_rss_bytes': worker_peak,
+        'model_parameter_catalog_sha256': parameter_catalog,
     }
+
+
+def resource_summary(sources: list[dict]) -> list[dict]:
+    rows = []
+    for policy, source in zip(POLICIES, sources):
+        plan = source.get('resource_plan') or {}
+        usage = source.get('resource_usage') or {}
+        settings = plan.get('settings', {})
+        hardware = plan.get('hardware', {})
+        devices = hardware.get('gpu_devices', [])
+        rows.append(dict(
+            run_id=source['run_id'], split_policy=policy,
+            resource_policy=plan.get('policy', 'unrecorded'),
+            logical_cpu_slots=len(hardware['allowed_cpu_ids']) if 'allowed_cpu_ids' in hardware else None,
+            reserved_cpu_slots=settings.get('reserve_cpus'),
+            configured_worker_ceiling=source.get('configured_workers'),
+            ram_total_gib=hardware.get('ram_total_bytes', 0)/1024**3 if hardware else None,
+            ram_budget_gib=plan['ram_budget_bytes']/1024**3 if plan else None,
+            ram_reserve_gib=plan['ram_reserve_bytes']/1024**3 if plan else None,
+            observed_process_tree_rss_gib=usage['observed_process_tree_rss_bytes']/1024**3 if usage else None,
+            maximum_worker_sampled_rss_gib=source['maximum_worker_sampled_rss_bytes']/1024**3
+                if source.get('maximum_worker_sampled_rss_bytes') is not None else None,
+            vram_total_gib=sum(d['total_bytes'] for d in devices)/1024**3 if plan else None,
+            vram_target_fraction=settings.get('vram_target_fraction'),
+            vram_admission_budget_gib=sum(d['total_bytes'] for d in devices)*settings.get('vram_target_fraction', 0)/1024**3 if plan else None,
+            cache_cap_gib=plan['cache_max_bytes']/1024**3 if plan else None,
+            cpu_success_cells=source.get('model_backend_counts', {}).get('cpu', 0),
+            gpu_success_cells=source.get('model_backend_counts', {}).get('gpu', 0),
+            capacity_cpu_fallback_cells=source.get('capacity_cpu_fallback_cells', 0),
+            ram_admission_waits=usage.get('ram_waits'),
+            gpu_admission_waits=usage.get('gpu_waits'),
+            preparation_waits=usage.get('preparation_waits'),
+            distinct_parameter_records=len(source.get('model_parameter_catalog_sha256', {})),
+            measurement='RAM: sampled RSS; GPU budget: estimate, not observed allocation; native allocation is not forcibly capped',
+        ))
+    return rows
+
+
+def plot_resource_summary(rows: list[dict], output_dir: Path, **options) -> list[str]:
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    labels = [r['split_policy'].replace('_', ' ') for r in rows]
+    x = np.arange(len(rows))
+    for ax, fields, title, unit in (
+        (axes[0], ('ram_budget_gib', 'observed_process_tree_rss_gib'), 'RAM budget and sampled use', 'GiB'),
+        (axes[1], ('cpu_success_cells', 'gpu_success_cells'), 'Actual successful fit backends', 'Cells'),
+    ):
+        for index, field in enumerate(fields):
+            values = [r.get(field) for r in rows]
+            ax.bar(x+(index-.5)*.32, [v if v is not None else np.nan for v in values], .32,
+                   label=field.replace('_', ' '))
+        if all(r.get(fields[0]) is None for r in rows):
+            ax.text(.5, .5, 'Resource policy not recorded', ha='center', transform=ax.transAxes)
+        ax.set_xticks(x, labels); ax.set_ylabel(unit); ax.set_title(title)
+        ax.legend(fontsize=7); ax.grid(axis='y', alpha=.2)
+    fig.tight_layout()
+    return _save_figure(fig, output_dir/'primary_resource_budget_and_use', **options)
 
 
 def pipeline_summary(dataset_rows: list[dict], scope: dict) -> list[dict]:
@@ -838,7 +922,7 @@ def _write_result_record(output_dir: Path, scope: dict, manifest: dict,
 def generate(row_dir: Path, group_dir: Path, output_dir: Path,
              association_path: Path | None = None, scope_path: Path | None = None,
              sensitivity_root: Path | None = None) -> dict:
-    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v3.json"
+    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v4.json"
     scope_path = scope_path or frozen_scope
     scope = json.loads(scope_path.read_text(encoding="utf-8"))
     diagnostic = scope_path.resolve() != frozen_scope.resolve()
@@ -865,6 +949,7 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = {
         "primary_dataset_auc_coverage.csv": dataset_rows,
+        'primary_resource_policy_and_use.csv': resource_summary(sources),
         "primary_pipeline_auc_summary.csv": summary,
         "primary_operator_candidate_counts.csv": operator_rows,
         "primary_dataset_contrasts.csv": contrasts,
@@ -883,7 +968,8 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
     for name, rows in tables.items():
         _write_csv(output_dir / name, list(rows[0]), rows)
     plot_options = {"diagnostic": diagnostic, "missing_outcomes": missing_outcomes}
-    figures = (plot_primary(summary, output_dir, **plot_options)
+    figures = (plot_resource_summary(resource_summary(sources), output_dir, **plot_options)
+               + plot_primary(summary, output_dir, **plot_options)
                + plot_operator_counts(operator_rows, scope, output_dir, **plot_options)
                + plot_operator_funnel(operator_rows, output_dir, **plot_options)
                + plot_coverage(dataset_rows, scope, output_dir, **plot_options)
@@ -940,9 +1026,9 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v3-primary-row")
-    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v3-primary-group")
-    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json')
+    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v4-primary-row")
+    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v4-primary-group")
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json')
     parser.add_argument("--output-dir", type=Path, default=ROOT / "corrected_runs" / "paper_assets")
     parser.add_argument("--mechanism-association", type=Path)
     parser.add_argument("--sensitivity-root", type=Path,

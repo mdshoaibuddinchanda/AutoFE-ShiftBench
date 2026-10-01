@@ -23,6 +23,8 @@ def build_model(
     model_type: str,
     random_state: int = 42,
     use_gpu: bool = True,
+    gpu_device: int | None = None,
+    gpu_ram_part: float | None = None,
 ) -> BaseEstimator:
     """
     Build one of the 10 benchmark models with sensible defaults.
@@ -65,7 +67,7 @@ def build_model(
             verbosity=0,
         )
         if use_gpu:
-            params["device"] = "cuda"
+            params["device"] = "cuda" if gpu_device is None else f"cuda:{gpu_device}"
         else:
             params["device"] = "cpu"
         return XGBClassifier(**params)
@@ -90,7 +92,9 @@ def build_model(
         )
         if use_gpu:
             params["task_type"] = "GPU"
-            params["devices"] = "0"
+            params["devices"] = str(gpu_device if gpu_device is not None else 0)
+            if gpu_ram_part is not None:
+                params['gpu_ram_part'] = gpu_ram_part
         else:
             params["task_type"] = "CPU"
         return CatBoostClassifier(**params)

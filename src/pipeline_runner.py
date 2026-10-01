@@ -29,6 +29,7 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 import sklearn
+from threadpoolctl import threadpool_limits
 from sklearn.preprocessing import LabelEncoder
 
 from src.checkpoint import has_success, init_db, record_task
@@ -46,6 +47,10 @@ from src.group_splits import (
     get_group_stratified_splits,
 )
 from src.model import build_model
+from src.resource_policy import (
+    ResourceSettings, ResourceAdmission, detect_hardware, resolve_plan,
+    probe_gpu_models, initialize_worker, measured_worker,
+)
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.provenance import (
     PROTOCOL_VERSION,
@@ -70,6 +75,7 @@ from src.splitters import (
 )
 
 
+@measured_worker
 def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
     """Fit one classifier task in a bounded child process.
 
@@ -93,9 +99,14 @@ def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
         model_name,
         random_state=seed,
         use_gpu=bool(use_gpu and model_name in {"xgboost", "catboost"}),
+        gpu_device=payload.get("gpu_device"), gpu_ram_part=payload.get("gpu_ram_part"),
     )
     fit_started = time.perf_counter()
     model.fit(xtr, y_train_enc)
+    if use_gpu and model_name == 'xgboost':
+        actual_device = json.loads(model.get_booster().save_config())['learner']['generic_param']['device']
+        if not actual_device.startswith('cuda'):
+            raise RuntimeError('XGBoost GPU task used CPU; refusing silent backend substitution')
     train_time = time.perf_counter() - fit_started
     infer_started = time.perf_counter()
     y_pred = model.predict(xte)
@@ -109,6 +120,23 @@ def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
     )
     test_metrics = compute_classification_metrics(y_test_enc, y_pred, y_proba, classes)
     train_metrics = compute_classification_metrics(y_train_enc, train_pred, train_proba, classes)
+    def parameter_value(value):
+        if value is None or isinstance(value, (str, bool, int)):
+            return value
+        if isinstance(value, float):
+            return value if np.isfinite(value) else None
+        if isinstance(value, (tuple, list)):
+            return [parameter_value(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): parameter_value(item) for key, item in value.items()}
+        return repr(value)
+    resolved_parameters = (model.get_all_params() if model_name == 'catboost'
+                           else json.loads(model.get_booster().save_config()) if model_name == 'xgboost'
+                           else model.get_params(deep=False))
+    if model_name == 'catboost':
+        # Live allocation fraction is already recorded per result. Avoid a
+        # separate permanent classifier catalog entry for every VRAM sample.
+        resolved_parameters.pop('gpu_ram_part', None)
     return {
         "status": "success",
         "pid": os.getpid(),
@@ -116,6 +144,8 @@ def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
         "worker_finished_unix": time.time(),
         "worker_elapsed_s": time.perf_counter() - started,
         "model_backend": "gpu" if use_gpu and model_name in {"xgboost", "catboost"} else "cpu",
+        'gpu_device': payload.get('gpu_device'), 'gpu_ram_part': payload.get('gpu_ram_part'),
+        'model_parameters': parameter_value(resolved_parameters),
         "train_time_s": train_time,
         "infer_time_s": infer_time,
         "y_pred": np.asarray(y_pred),
@@ -794,11 +824,19 @@ def run_experiment(
     manifest_policy: str = "detailed",
     use_gpu: bool = False,
     workers: int = 1,
+    resource_policy: str = 'manual',
+    reserve_cpus: int = 2,
+    ram_target_fraction: float = 0.8,
+    vram_target_fraction: float = 0.8,
+    gpu_policy: str = 'auto',
+    adaptive_worker_cap: int | None = None,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
     if split_policy not in {"row_level", "group_aware"}:
         raise ValueError("split_policy must be 'row_level' or 'group_aware'")
+    if resource_policy not in {'manual', 'adaptive'}:
+        raise ValueError('resource_policy must be manual or adaptive')
     if cache_policy not in {"retain", "bounded"}:
         raise ValueError("cache_policy must be 'retain' or 'bounded'")
     if cache_policy == "bounded" and cache_max_bytes is not None and cache_max_bytes <= 0:
@@ -814,7 +852,7 @@ def run_experiment(
     if manifest_policy == "compact" and (not durable_scheduler or cache_audit):
         raise ValueError("compact manifests require a durable scheduler and cache_audit=False")
     thread_environment = {name: os.environ.get(name) for name in NUMERICAL_THREAD_ENV}
-    if manifest_policy == "compact" and workers > 1 and any(
+    if ((manifest_policy == "compact" and workers > 1) or resource_policy == "adaptive") and any(
         value != "1" for value in thread_environment.values()
     ):
         raise ValueError(
@@ -888,6 +926,29 @@ def run_experiment(
     source_fingerprint = code_fingerprint(Path.cwd())
     runtime_info = _runtime_versions()
     runtime_fingerprint = stable_digest(runtime_info)
+    resource_plan = None
+    admission = None
+    if resource_policy == 'adaptive':
+        settings = ResourceSettings(reserve_cpus, ram_target_fraction, vram_target_fraction, gpu_policy)
+        settings.validate()
+        hardware = detect_hardware(Path(output_root))
+        prior_plan = (existing_manifest or {}).get('configuration', {}).get('resource_plan')
+        if prior_plan is not None:
+            if (prior_plan['hardware'] != hardware or prior_plan['settings'] != asdict(settings)
+                    or prior_plan.get('worker_override') != adaptive_worker_cap
+                    or prior_plan.get('cache_override') != cache_max_bytes):
+                raise ValueError('Adaptive host/policy changed; choose a new run ID')
+            resource_plan = prior_plan
+        else:
+            probe = {} if gpu_policy == 'cpu' else probe_gpu_models(hardware['gpu_devices'])
+            resource_plan = resolve_plan(settings, hardware, models, gpu_probe=probe,
+                                         worker_override=adaptive_worker_cap, cache_override=cache_max_bytes)
+        workers = resource_plan['worker_ceiling']
+        if cache_policy == 'bounded':
+            cache_max_bytes = resource_plan['cache_max_bytes']
+        admission = ResourceAdmission(resource_plan)
+        if existing_manifest and existing_manifest.get('resource_usage'):
+            admission.telemetry.update(existing_manifest['resource_usage'])
     config_data = {
         "protocol": PROTOCOL_VERSION, "datasets": list(normalized_data_paths),
         "conditions": [list(x) for x in conditions],
@@ -901,11 +962,14 @@ def run_experiment(
         "scheduler_max_attempts": scheduler_max_attempts,
         "cache_audit": bool(cache_audit),
         "manifest_policy": manifest_policy,
-        "use_gpu": bool(use_gpu),
+        "use_gpu": bool(use_gpu or (resource_plan is not None and 'gpu' in resource_plan['backend_by_model'].values())),
         "workers": int(workers),
         "numerical_thread_environment": thread_environment,
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
+    if resource_plan is not None:
+        config_data['resource_policy'] = resource_policy
+        config_data['resource_plan'] = resource_plan
     config_fingerprint = stable_digest(config_data)
     if existing_manifest and (
         existing_manifest.get("configuration_fingerprint") != config_fingerprint
@@ -994,6 +1058,8 @@ def run_experiment(
         "partition_uses_held_out_features": False,
         "datasets": list((existing_manifest or {}).get("datasets", [])),
     }
+    if admission is not None:
+        base_manifest['resource_usage'] = admission.telemetry
     outcomes: list[dict[str, Any]] | CompactOutcomeLedger = (
         CompactOutcomeLedger(run_dir / "manifest_outcomes.sqlite")
         if manifest_policy == "compact"
@@ -1010,10 +1076,10 @@ def run_experiment(
     pending_futures: list[tuple[Future, dict[str, Any]]] = []
     deferred_cache_reclaims: dict[str, dict[str, Any]] = {}
     if workers > 1:
-        executor = ProcessPoolExecutor(
-            max_workers=workers,
-            mp_context=mp.get_context("spawn"),
-        )
+        pool_options = dict(max_workers=workers, mp_context=mp.get_context('spawn'),
+                            initializer=initialize_worker,
+                            initargs=(resource_plan['worker_cpu_ids'] if resource_plan is not None else None,))
+        executor = ProcessPoolExecutor(**pool_options)
 
     def _reclaim_terminal_feature_group(meta: dict[str, Any]) -> bool:
         """Remove only this group's payload after every planned consumer is terminal."""
@@ -1053,6 +1119,8 @@ def run_experiment(
     def _record_phase2(meta: dict[str, Any], fit: dict[str, Any]) -> None:
         """Publish one worker result or durable failure in the coordinator."""
         task_manifest = meta["task_manifest"]
+        if admission is not None:
+            admission.completed(meta['task']['model'], fit)
         task = meta["task"]
         task_key = meta["task_key"]
         task_fp = meta["task_fp"]
@@ -1069,11 +1137,22 @@ def run_experiment(
                 raise RuntimeError(str(fit.get("error", "worker returned no result")))
             y_pred = np.asarray(fit["y_pred"])
             test_metrics = fit["test_metrics"]
+            parameter_record = {'model': model_name, 'parameters': fit.get('model_parameters')}
+            parameter_fingerprint = stable_digest(parameter_record)
+            parameter_path = Path('model_parameters') / f'{parameter_fingerprint}.json'
+            catalog_path = run_dir / parameter_path
+            if not catalog_path.exists():
+                atomic_write_json(catalog_path, parameter_record)
             result = {
                 **task, "run_id": run_id, "task_key": task_key,
                 "status": "success", "n_train": int(meta["n_train"]), "n_test": int(meta["n_test"]),
                 "split_policy": split_policy,
                 "model_backend": fit.get("model_backend", "cpu"),
+                'worker_peak_rss_bytes': fit.get('worker_peak_rss_bytes'),
+                'gpu_device': fit.get('gpu_device'), 'gpu_ram_part': fit.get('gpu_ram_part'),
+                'model_backend_reason': meta.get('resource_reservation', {}).get('backend_reason', 'manual policy'),
+                'model_parameters_fingerprint': parameter_fingerprint,
+                'model_parameters_path': parameter_path.as_posix(),
                 "experiment_scope": experiment_scope,
                 "split_status": meta["task_split_status"],
                 "n_original": int(meta["n_original"]),
@@ -1323,6 +1402,7 @@ def run_experiment(
                         "condition": condition, "dataset_checksum": task_checksum,
                     })[:20]
                     for pipeline_name in pipelines:
+                        config = PIPELINE_CONFIGS[pipeline_name]
                         feature_consumer_task_keys = [stable_digest({
                             "dataset": dataset_name, "seed": seed, "fold": fold,
                             "condition": condition, "pipeline": pipeline_name, "model": model,
@@ -1335,6 +1415,36 @@ def run_experiment(
                         generated_group: list[tuple[Any, ...]] = []
 
                         def make_group_payload() -> tuple[Any, ...]:
+                            if not generated_group and admission is not None:
+                                encoded_width = sum(1 if pd.api.types.is_numeric_dtype(x_train[column])
+                                                    else x_train[column].nunique(dropna=False)+1
+                                                    for column in x_train.columns)
+                                rows_count = len(x_train)+len(x_test)
+                                if config.enable_dfs:
+                                    parents = min(config.max_base_features or encoded_width, encoded_width)
+                                    candidate_width = len(config.trans_primitives)*parents*parents
+                                    output_width = min(config.max_features or encoded_width+candidate_width,
+                                                       encoded_width+candidate_width)
+                                else:
+                                    candidate_width = 0
+                                    output_width = encoded_width
+                                prep_estimate = int((x_train.memory_usage(deep=True).sum()+x_test.memory_usage(deep=True).sum())*2
+                                                    + rows_count*8*(encoded_width*2+candidate_width*2+output_width*3))
+                                lease_meta = {'scheduler_lease': scheduler_lease}
+                                last_heartbeat = 0.0
+                                while not admission.preparation_allowed(prep_estimate,
+                                          [m.get('resource_reservation', {}) for _, m in pending_futures]):
+                                    if pending_futures:
+                                        _drain_one(lease_meta)
+                                    else:
+                                        now = time.monotonic()
+                                        if now-last_heartbeat >= min(30, scheduler_lease_seconds/3):
+                                            lease = lease_meta.get('scheduler_lease')
+                                            if scheduler is not None and lease is not None:
+                                                lease_meta['scheduler_lease'] = scheduler.heartbeat(lease)
+                                            _save_run_manifest(run_dir, base_manifest, outcomes)
+                                            last_heartbeat = now
+                                        time.sleep(0.2)
                             if not generated_group:
                                 generated_group.append(_prepare_matrices(
                                     x_train, y_train, x_test, family=family, severity=severity,
@@ -1658,13 +1768,36 @@ def run_experiment(
                                     "xtr": xtr, "xte": xte, "y_train_enc": y_train_enc,
                                     "y_test_enc": y_test_enc, "classes": classes,
                                 }
+                                if admission is not None:
+                                    matrix_bytes = sum(v.nbytes for v in fit_payload.values() if isinstance(v, np.ndarray))
+                                    last_heartbeat = 0.0
+                                    while True:
+                                        reserved = [m.get('resource_reservation', {}) for _, m in pending_futures]
+                                        reservation = admission.reservation(model_name, matrix_bytes, reserved)
+                                        if reservation is not None:
+                                            break
+                                        if pending_futures:
+                                            _drain_one(phase2_meta)
+                                        else:
+                                            now = time.monotonic()
+                                            if now-last_heartbeat >= min(30, scheduler_lease_seconds/3):
+                                                lease = phase2_meta.get('scheduler_lease')
+                                                if scheduler is not None and lease is not None:
+                                                    phase2_meta['scheduler_lease'] = scheduler.heartbeat(lease)
+                                                _save_run_manifest(run_dir, base_manifest, outcomes)
+                                                last_heartbeat = now
+                                            time.sleep(0.2)
+                                    phase2_meta['resource_reservation'] = reservation
+                                    fit_payload.update(use_gpu=reservation['backend']=='gpu',
+                                                       gpu_device=reservation['gpu_device'],
+                                                       gpu_ram_part=reservation['gpu_ram_part'])
                                 if executor is not None:
                                     pending_futures.append((
                                         executor.submit(_fit_and_score_worker, fit_payload),
                                         phase2_meta,
                                     ))
                                     # Keep serialized matrices bounded in memory.
-                                    if len(pending_futures) >= max(1, workers * 2):
+                                    if len(pending_futures) >= max(1, workers if admission is not None else workers*2):
                                         _drain_one()
                                 else:
                                     # Each serial estimator gets the same independent
@@ -1752,13 +1885,26 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--manifest-policy", choices=["detailed", "compact"], default="detailed")
     parser.add_argument("--scheduler-lease-seconds", type=float, default=3600.0)
     parser.add_argument("--scheduler-max-attempts", type=int, default=3)
-    parser.add_argument("--workers", type=int, default=1, help="bounded outer worker processes for model fits")
+    parser.add_argument("--workers", type=int, default=1, help="manual-policy worker processes; adaptive uses detected ceiling")
+    parser.add_argument('--resource-policy', choices=['adaptive', 'manual'], default='adaptive',
+                        help='Host-based CPU/RAM/GPU admission (CLI default); manual preserves explicit settings')
+    parser.add_argument('--reserve-cpus', type=int, default=2, help='Logical CPU slots kept available for other applications')
+    parser.add_argument('--ram-target-fraction', type=float, default=0.8)
+    parser.add_argument('--vram-target-fraction', type=float, default=0.8)
+    parser.add_argument('--gpu-policy', choices=['auto','cpu','require'], default='auto')
+    parser.add_argument('--adaptive-worker-cap', type=int, help='Optional lower override of detected worker ceiling')
     parser.add_argument(
         "--cache-audit", action="store_true",
         help="Persist per-feature cache build/hit/consumer/reader/deletion evidence (bounded runs only)",
     )
     parser.add_argument("--use-gpu", action="store_true", help="Use CUDA for XGBoost/CatBoost cells when the host/backend supports it")
     args = parser.parse_args(argv)
+    if args.resource_policy == 'adaptive':
+        for name in NUMERICAL_THREAD_ENV:
+            os.environ[name] = '1'
+        # Numerical libraries can have initialized before CLI parsing. The
+        # existing pinned threadpoolctl also limits those parent-side pools.
+        threadpool_limits(limits=1)
 
     names = load_dataset_names("config/dataset_list.yaml")
     if args.max_datasets:
@@ -1791,6 +1937,9 @@ def main(argv: list[str] | None = None) -> None:
         manifest_policy=args.manifest_policy,
         use_gpu=args.use_gpu,
         workers=args.workers,
+        resource_policy=args.resource_policy, reserve_cpus=args.reserve_cpus,
+        ram_target_fraction=args.ram_target_fraction, vram_target_fraction=args.vram_target_fraction,
+        gpu_policy=args.gpu_policy, adaptive_worker_cap=args.adaptive_worker_cap,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 

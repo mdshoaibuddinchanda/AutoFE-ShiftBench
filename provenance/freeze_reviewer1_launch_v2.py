@@ -49,7 +49,7 @@ RUN_CONDITIONS = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', choices=('2', '3'), default='3')
+    parser.add_argument('--version', choices=('2', '3', '4'), default='4')
     args = parser.parse_args()
     if Path(sys.executable).resolve() != Path(r"D:\Conda\p12\python.exe").resolve():
         raise RuntimeError("Freeze with the existing D:\\Conda\\p12\\python.exe")
@@ -86,6 +86,20 @@ def main() -> None:
         "--manifest-policy", "compact", "--scheduler-lease-seconds", "600",
         "--workers", "4", "--pipelines", *PIPELINES, "--models", *MODELS,
     ]
+    resource_plan = None
+    if args.version == '4':
+        from src.resource_policy import ResourceSettings, detect_hardware, probe_gpu_models, resolve_plan
+        hardware = detect_hardware(ROOT)
+        resource_plan = resolve_plan(ResourceSettings(), hardware, MODELS,
+                                     gpu_probe=probe_gpu_models(hardware['gpu_devices']))
+        command_base = [str(Path(sys.executable).resolve()), '-m', 'src.pipeline_runner',
+                        '--cache-policy', 'bounded', '--durable-scheduler', '--manifest-policy', 'compact',
+                        '--scheduler-lease-seconds', '600', '--resource-policy', 'adaptive',
+                        '--reserve-cpus', '2', '--ram-target-fraction', '0.8',
+                        '--vram-target-fraction', '0.8', '--gpu-policy', 'auto',
+                        '--pipelines', *PIPELINES, '--models', *MODELS]
+    else:
+        command_base.extend(['--resource-policy', 'manual'])
     runs = []
     for run_id, scope, policy, condition_count in RUNS:
         run_id = run_id.replace('r1-v2-', f'r1-v{args.version}-')
@@ -121,6 +135,8 @@ def main() -> None:
             "provenance/final_optimization_verification.py",
             "provenance/run_mechanism_history.py",
             "provenance/analyze_mechanism_history.py",
+            "provenance/adaptive_resource_verification.py",
+            "provenance/verify_adaptive_launch.py",
         )},
         "dataset_list_sha256": file_sha256(ROOT / "config" / "dataset_list.yaml"),
         "group_seed_audit_sha256": file_sha256(group_audit_path),
@@ -169,6 +185,23 @@ def main() -> None:
             "Prespecify and measure candidate-history mechanism subrun if Jacobian associations are required",
         ],
     }
+    if resource_plan is not None:
+        cache_gib = resource_plan['cache_max_bytes']/1024**3
+        payload.update(resource_plan=resource_plan,
+                       adaptive_verification_path='provenance/adaptive_resource_verification_v1.json',
+                       optimization_verification_path=None,
+                       recovery_evidence_path='provenance/adaptive_resource_verification_v1.json',
+                       mechanism_scope_path='provenance/mechanism_history_scope_v3.json')
+        payload['storage'].update(
+            bounded_live_cache_cap_gib_per_run=cache_gib,
+            cache_publication_temporary_allowance_gib=cache_gib,
+            scaled_results_checkpoints_projection_gib_all_seven_runs=31.13,
+            added_timing_metadata_reservation_gib=1,
+            added_adaptive_metadata_and_parameter_catalog_reservation_gib=3,
+            results_projection_basis='Historical 27.13 GiB plus 1 GiB measured-timing and 3 GiB resource/parameter-reference allowances; conservative planning estimate, not a guaranteed upper bound. Gate requires twice this volume plus live cache, staging cache and separate mechanism history.')
+        payload['runtime'].update(
+            basis='Older 229.69-day fixed-four-worker scenario retained as historical; adaptive backend/concurrency changes require bounded v4 timings. No validated full-campaign ETA; ten-day limit waived.',
+            adaptive_runtime_evidence='provenance/adaptive_resource_verification_v1.json')
     output = ROOT / "provenance" / f"reviewer1_launch_scope_v{args.version}.json"
     if output.exists():
         raise FileExistsError(f'Preserve prior freeze: {output}')

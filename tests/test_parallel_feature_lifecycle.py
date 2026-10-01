@@ -86,7 +86,7 @@ def test_completed_fast_classifier_is_published_before_unfinished_first_submissi
             if task["model"] == "logistic_regression":
                 release_first.set()
 
-    monkeypatch.setattr(runner, "ProcessPoolExecutor", lambda max_workers, mp_context:
+    monkeypatch.setattr(runner, "ProcessPoolExecutor", lambda max_workers, mp_context, **kwargs:
                         ThreadPoolExecutor(max_workers=max_workers))
     monkeypatch.setattr(runner, "_fit_and_score_worker", controlled_worker)
     manifest = runner.run_experiment(
