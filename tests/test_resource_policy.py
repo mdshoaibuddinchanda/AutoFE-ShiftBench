@@ -91,6 +91,16 @@ def test_static_gpu_capacity_uses_recorded_cpu_fallback_only_in_auto(monkeypatch
         controller.reservation('xgboost',resource.GIB,[])
 
 
+def test_gpu_capacity_backend_is_shared_across_different_pipeline_widths(monkeypatch):
+    plan=resource.resolve_plan(resource.ResourceSettings(),hardware(),('xgboost',),gpu_probe={'xgboost':dict(supported=True)})
+    controller=resource.ResourceAdmission(plan)
+    monkeypatch.setattr(controller,'sample',lambda **kwargs:dict(available_bytes=25*resource.GIB,resident_bytes=resource.GIB))
+    small=controller.reservation('xgboost',1024,[],comparison_matrix_bytes=resource.GIB)
+    large=controller.reservation('xgboost',resource.GIB//2,[],comparison_matrix_bytes=resource.GIB)
+    assert small['backend']==large['backend']=='cpu'
+    assert small['comparison_matrix_bytes']==large['comparison_matrix_bytes']
+
+
 def test_preparation_pressure_and_resident_reservations_are_not_double_counted(monkeypatch):
     controller=resource.ResourceAdmission(resource.resolve_plan(resource.ResourceSettings(gpu_policy='cpu'),hardware(),('knn',)))
     state=dict(available_bytes=12*resource.GIB,resident_bytes=8*resource.GIB,child_resident_bytes=6*resource.GIB)
@@ -138,6 +148,14 @@ def test_adaptive_cpu_has_exact_scientific_parity_and_resumes_same_plan(tmp_path
         assert stable_digest(parameters)==row['model_parameters_fingerprint']
         assert row['worker_peak_rss_bytes']>0 and parameters['model']==row['model']
     assert len(list((tmp_path/'adaptive'/'model_parameters').glob('*.json')))==2
+    result_rows=[json.loads(line) for line in (tmp_path/'adaptive'/'results.jsonl').read_text().splitlines()]
+    assert len({r['resource_comparison_matrix_bytes'] for r in result_rows})==1
+    profile=tmp_path/'profile.json'
+    profile.write_text(json.dumps({'resource_plan':adaptive['configuration']['resource_plan']}))
+    monkeypatch.setattr(runner,'probe_gpu_models',lambda devices: (_ for _ in ()).throw(AssertionError('Frozen plan must not be re-probed')))
+    frozen=runner.run_experiment(**common,run_id='frozen',resource_policy='adaptive',gpu_policy='cpu',resource_profile=profile)
+    assert fields('frozen')==fields('adaptive')
+    assert frozen['configuration']['resource_profile_sha256']
     resumed=runner.run_experiment(**common,run_id='adaptive',resource_policy='adaptive',gpu_policy='cpu')
     assert resumed['configuration_fingerprint']==adaptive['configuration_fingerprint']
     machine['ram_total_bytes']=64*resource.GIB

@@ -150,6 +150,17 @@ def test_resource_budget_and_observed_numbers_reach_resource_table_and_figure(tm
     assert len(files)==2 and all((tmp_path/p).stat().st_size>1000 for p in files)
 
 
+def test_primary_export_rejects_mixed_backends_within_operator_comparison(tmp_path):
+    scope_path,(row_dir,group_dir)=_fixture(tmp_path)
+    path=row_dir/'results.jsonl'
+    rows=[json.loads(line) for line in path.read_text().splitlines()]
+    for row in rows:row['model_backend']='cpu'
+    rows[-1]['model_backend']='gpu'
+    path.write_text(''.join(json.dumps(row)+'\n' for row in rows))
+    with pytest.raises(ValueError,match='different backends'):
+        collect_primary(row_dir,json.loads(scope_path.read_text()),'row_level')
+
+
 def _dataset_summary_fixture():
     scope = {"datasets": [{"name": "a"}, {"name": "b"},
                            {"name": "c", "group_auc_infeasible_seeds": [42]}],

@@ -118,11 +118,12 @@ def _successes(run_dir: Path) -> dict[str, tuple[str, str, str]]:
     return successes
 
 
-def _wait_for_successes(process: subprocess.Popen, run_dir: Path, *, timeout_s: float = 3600) -> dict:
+def _wait_for_successes(process: subprocess.Popen, run_dir: Path, *, timeout_s: float = 3600,
+                       expected: int = EXPECTED) -> dict:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         manifest = _manifest(run_dir)
-        if manifest and 1 <= manifest.get("counts_by_status", {}).get("success", 0) < EXPECTED:
+        if manifest and 1 <= manifest.get("counts_by_status", {}).get("success", 0) < expected:
             return manifest
         if process.poll() is not None:
             raise RuntimeError(f"Recovery worker exited before forced restart: {process.returncode}")
@@ -131,19 +132,19 @@ def _wait_for_successes(process: subprocess.Popen, run_dir: Path, *, timeout_s: 
 
 
 def _check_terminal(run_dir: Path, before: dict[str, tuple[str, str, str]],
-                    source_fingerprint: str) -> dict:
+                    source_fingerprint: str, expected: int = EXPECTED) -> dict:
     manifest = _manifest(run_dir)
     if not manifest or manifest.get("status") != "complete":
         raise ValueError(f"Resumed recovery run did not complete: {run_dir}")
     counts = manifest["counts_by_status"]
-    if (manifest.get("expected_tasks") != EXPECTED or counts.get("success") != EXPECTED
+    if (manifest.get("expected_tasks") != expected or counts.get("success") != expected
             or any(counts.get(status, 0) for status in ("failed", "skipped", "timed_out", "pending"))
             or manifest.get("code_fingerprint") != source_fingerprint
             or manifest.get("configuration", {}).get("scheduler_lease_seconds") != 600.0
             or manifest.get("configuration", {}).get("numerical_thread_environment") != THREAD_ENV):
         raise ValueError(f"Recovered run differs from frozen recovery contract: {run_dir}")
     after = _successes(run_dir)
-    if len(after) != EXPECTED or any(after.get(key) != identity for key, identity in before.items()):
+    if len(after) != expected or any(after.get(key) != identity for key, identity in before.items()):
         raise ValueError("A committed pre-crash result was lost or refit with different output")
     with sqlite3.connect(run_dir / "scheduler.sqlite") as connection:
         rows = connection.execute(
@@ -153,7 +154,7 @@ def _check_terminal(run_dir: Path, before: dict[str, tuple[str, str, str]],
         statuses = dict(connection.execute(
             "SELECT status, COUNT(*) FROM scheduler_tasks GROUP BY status"
         ).fetchall())
-    if statuses != {"success": EXPECTED} or any(attempts.get(key) != 1 for key in before):
+    if statuses != {"success": expected} or any(attempts.get(key) != 1 for key in before):
         raise ValueError("Scheduler refit a committed pre-crash cell or lost terminal coverage")
     return {
         "run_id": run_dir.name, "status": "passed",

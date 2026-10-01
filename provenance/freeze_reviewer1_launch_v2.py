@@ -97,6 +97,7 @@ def main() -> None:
                         '--scheduler-lease-seconds', '600', '--resource-policy', 'adaptive',
                         '--reserve-cpus', '2', '--ram-target-fraction', '0.8',
                         '--vram-target-fraction', '0.8', '--gpu-policy', 'auto',
+                        '--resource-profile', str(ROOT/'provenance'/'reviewer1_launch_scope_v4.json'),
                         '--pipelines', *PIPELINES, '--models', *MODELS]
     else:
         command_base.extend(['--resource-policy', 'manual'])

@@ -137,13 +137,15 @@ def resolve_plan(settings: ResourceSettings, hardware: dict, models: tuple[str, 
     # another artifact-sized temporary file, budgeted separately at launch.
     cache_bytes = cache_override if cache_override is not None else int(min(
         ram_total*0.4, hardware['disk_total_bytes']*0.025))
-    return dict(policy='adaptive-v1', settings=asdict(settings), hardware=hardware,
+    return dict(policy='adaptive-v2', settings=asdict(settings), hardware=hardware,
                 worker_ceiling=workers, worker_cpu_ids=cpus[:available_slots],
                 cpu_reserve_satisfied=len(cpus)>settings.reserve_cpus,
                 ram_budget_bytes=int(ram_total*settings.ram_target_fraction),
                 ram_reserve_bytes=int(ram_total*(1-settings.ram_target_fraction)),
                 cache_max_bytes=cache_bytes, backend_by_model=backend, gpu_probe=probe,
                 worker_override=worker_override, cache_override=cache_override,
+                gpu_capacity_matrix_factor=4,
+                gpu_backend_comparison_rule='Common training-schema matrix bound across every configured pipeline for the same dataset/split/seed/fold/condition/model; static oversize uses CPU for the whole comparison in auto mode',
                 memory_limit_type='soft estimated admission; native allocation is not forcibly capped')
 
 
@@ -237,7 +239,8 @@ class ResourceAdmission:
             self.telemetry['preparation_waits'] += 1
         return allowed
 
-    def reservation(self, model: str, matrix_bytes: int, pending: list[dict]) -> dict | None:
+    def reservation(self, model: str, matrix_bytes: int, pending: list[dict],
+                    *, comparison_matrix_bytes: int | None = None) -> dict | None:
         sample=self.sample(fresh=True)
         factor={'random_forest':8,'extra_trees':8,'linear_svm':8,'knn':4}.get(model,6)
         estimate=max(512*1024**2+matrix_bytes*factor,self.model_peak_bytes.get(model,0)+matrix_bytes)
@@ -255,8 +258,12 @@ class ResourceAdmission:
         reservation=dict(ram_bytes=estimate,model=model,gpu_device=None,gpu_ram_part=None,
                          backend=self.plan['backend_by_model'].get(model,'cpu'),
                          backend_reason='frozen host capability policy')
+        common_bytes = matrix_bytes if comparison_matrix_bytes is None else comparison_matrix_bytes
+        if common_bytes < matrix_bytes:
+            raise ValueError('Actual matrix exceeds common comparison bound')
+        reservation['comparison_matrix_bytes'] = common_bytes
         if self.plan['backend_by_model'].get(model)=='gpu':
-            required_vram = 256*1024**2+matrix_bytes*8
+            required_vram = 256*1024**2+common_bytes*self.plan['gpu_capacity_matrix_factor']
             verified = self.plan.get('gpu_probe', {}).get(model, {}).get('devices')
             devices = [d for d in self.plan['hardware']['gpu_devices']
                        if verified is None or verified.get(str(d['device_index']), {}).get('supported')]

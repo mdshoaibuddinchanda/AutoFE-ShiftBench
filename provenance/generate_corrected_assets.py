@@ -101,6 +101,10 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
         raise ValueError(f"Primary run is incomplete or has a different frozen identity: {run_dir}")
     if manifest.get("expected_tasks") != target["intended_cells"]:
         raise ValueError(f"Primary task denominator changed: {run_dir}")
+    if scope.get('resource_plan') and manifest.get('configuration', {}).get('resource_plan') != scope['resource_plan']:
+        raise ValueError('Primary run differs from the frozen adaptive resource plan')
+    if scope.get('_resource_profile_sha256') and manifest.get('configuration', {}).get('resource_profile_sha256') != scope['_resource_profile_sha256']:
+        raise ValueError('Primary run used a different frozen resource profile')
     lookup, connection = _terminal_lookup(run_dir, manifest)
     aggregate = defaultdict(lambda: {"success": 0, "skipped": 0, "failed": 0,
                                      "timed_out": 0, "auc_sum": 0.0, "reasons": set(),
@@ -114,6 +118,7 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
     included_rows = 0
     parameter_catalog = {}
     backend_counts = defaultdict(int)
+    comparison_backends = {}
     fallback_cells = 0
     worker_peak = None
     dataset_names = {item["name"] for item in scope["datasets"]}
@@ -155,6 +160,10 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                     raise ValueError(f"Successful cell lacks finite ROC-AUC: {key}")
                 bucket["auc_sum"] += float(auc)
                 backend_counts[str(row.get('model_backend', 'unrecorded'))] += 1
+                comparison = tuple(row.get(field) for field in ('dataset', 'seed', 'fold', 'condition', 'model'))
+                backend = row.get('model_backend', 'unrecorded')
+                if comparison_backends.setdefault(comparison, backend) != backend:
+                    raise ValueError('Classifiers use different backends within a pipeline comparison')
                 fallback_cells += row.get('model_backend_reason') == 'static matrix estimate exceeds GPU VRAM budget'
                 peak = row.get('worker_peak_rss_bytes')
                 if peak is not None:
@@ -305,6 +314,7 @@ def resource_summary(sources: list[dict]) -> list[dict]:
             cache_cap_gib=plan['cache_max_bytes']/1024**3 if plan else None,
             cpu_success_cells=source.get('model_backend_counts', {}).get('cpu', 0),
             gpu_success_cells=source.get('model_backend_counts', {}).get('gpu', 0),
+            unrecorded_backend_cells=source.get('model_backend_counts', {}).get('unrecorded', 0),
             capacity_cpu_fallback_cells=source.get('capacity_cpu_fallback_cells', 0),
             ram_admission_waits=usage.get('ram_waits'),
             gpu_admission_waits=usage.get('gpu_waits'),
@@ -321,11 +331,12 @@ def plot_resource_summary(rows: list[dict], output_dir: Path, **options) -> list
     x = np.arange(len(rows))
     for ax, fields, title, unit in (
         (axes[0], ('ram_budget_gib', 'observed_process_tree_rss_gib'), 'RAM budget and sampled use', 'GiB'),
-        (axes[1], ('cpu_success_cells', 'gpu_success_cells'), 'Actual successful fit backends', 'Cells'),
+        (axes[1], ('cpu_success_cells', 'gpu_success_cells', 'unrecorded_backend_cells'), 'Actual successful fit backends', 'Cells'),
     ):
         for index, field in enumerate(fields):
             values = [r.get(field) for r in rows]
-            ax.bar(x+(index-.5)*.32, [v if v is not None else np.nan for v in values], .32,
+            width = .8/len(fields)
+            ax.bar(x+(index-(len(fields)-1)/2)*width, [v if v is not None else np.nan for v in values], width,
                    label=field.replace('_', ' '))
         if all(r.get(fields[0]) is None for r in rows):
             ax.text(.5, .5, 'Resource policy not recorded', ha='center', transform=ax.transAxes)
@@ -928,6 +939,8 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
     diagnostic = scope_path.resolve() != frozen_scope.resolve()
     if diagnostic and scope.get("artifact_type") != "reporting_diagnostic_scope":
         raise ValueError("A custom scope must be explicitly labeled reporting_diagnostic_scope")
+    if not diagnostic and scope.get('resource_plan'):
+        scope['_resource_profile_sha256'] = file_sha256(scope_path)
     scope.setdefault("primary_conditions", sorted(PRIMARY_CONDITIONS))
     if len(scope["pipelines"]) != 14:
         raise ValueError("Corrected paper assets require the frozen 14-pipeline scope")

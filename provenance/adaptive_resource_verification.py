@@ -20,21 +20,24 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT/'corrected_runs'/'adaptive_verification'
 FEATURE_FIELDS = ('train_matrix_sha256','test_matrix_sha256','operator_candidate_counts',
                   'operator_configuration','n_original','n_retained','n_generated','n_train','n_test')
+GPU_MODELS = ('xgboost','catboost')
 
 
 def worker(kind, policy, run_id):
     from src.pipeline_runner import run_experiment
     datasets = ('sonar','heart-disease','haberman','ionosphere') if kind == 'small' else (kind,)
     pipelines = PIPELINES if kind == 'small' else ('Raw',) if kind == 'covertype' else ('Raw','AutoFE_Baseline')
+    selected_models=GPU_MODELS if kind=='airlines' else MODELS
     started=time.monotonic()
     manifest=run_experiment(
         {name:ROOT/'data'/'raw'/f'{name}.csv' for name in datasets},
         output_root=OUTPUT,run_id=run_id,seeds=[42],folds=[1],n_splits=5,
-        conditions=(('clean',0.0),),pipelines=pipelines,models=MODELS,
+        conditions=(('clean',0.0),),pipelines=pipelines,models=selected_models,
         split_policy=policy,cache_policy='bounded',durable_scheduler=True,
         scheduler_lease_seconds=600,cache_audit=True,
-        resource_policy='adaptive',gpu_policy='cpu' if kind=='small' else 'auto')
-    expected=len(datasets)*len(pipelines)*len(MODELS)
+        resource_policy='adaptive',gpu_policy='cpu' if kind=='small' else 'auto',
+        resource_profile=None if kind=='small' else ROOT/'provenance'/'reviewer1_launch_scope_v4.json')
+    expected=len(datasets)*len(pipelines)*len(selected_models)
     if manifest['status']!='complete' or manifest['counts_by_status']['success']!=expected:
         raise ValueError(f'Adaptive diagnostic not complete: {run_id}')
     atomic_write_json(OUTPUT/run_id/'measurement.json',dict(
@@ -82,10 +85,10 @@ def evidence(kind,policy,run_id,version):
     before={}
     if kind=='airlines':
         first=start(kind,policy,run_id,'forced_stop')
-        try:_wait_for_successes(first,run_dir)
+        try:_wait_for_successes(first,run_dir,expected=4)
         finally:_stop_process_tree(first)
         before=_successes(run_dir)
-        if not 0<len(before)<20:raise ValueError('Forced stop missed an in-progress run')
+        if not 0<len(before)<4:raise ValueError('Forced stop missed an in-progress run')
     process=start(kind,policy,run_id,'resume' if before else 'run')
     try:
         process.wait(timeout=7200)
@@ -97,7 +100,9 @@ def evidence(kind,policy,run_id,version):
     result=dict(kind=kind,policy=policy,run_id=run_id,baseline_dir=baseline.relative_to(ROOT).as_posix(),
                 elapsed_s_including_restart=time.monotonic()-started,
                 **compare(run_dir,baseline,kind!='small'))
-    if before:result['recovery']=_check_terminal(run_dir,before,code_fingerprint(ROOT))
+    if before:
+        result['pre_crash_committed_rows']=before
+        result['recovery']=_check_terminal(run_dir,before,code_fingerprint(ROOT),expected=4)
     return result
 
 
@@ -117,7 +122,7 @@ def verify_saved_report(report):
         manifest=json.loads((run_dir/'manifest.json').read_text())
         config=manifest['configuration']
         plan=config['resource_plan']
-        count={'small':560,'covertype':10,'airlines':20}[result['kind']]
+        count={'small':560,'covertype':10,'airlines':4}[result['kind']]
         datasets=['sonar','heart-disease','haberman','ionosphere'] if result['kind']=='small' else [result['kind']]
         pipelines=list(PIPELINES) if result['kind']=='small' else ['Raw'] if result['kind']=='covertype' else ['Raw','AutoFE_Baseline']
         if (manifest['status']!='complete' or manifest['expected_tasks']!=count
@@ -125,7 +130,8 @@ def verify_saved_report(report):
                 or manifest['code_fingerprint']!=report['code_fingerprint']
                 or config['split_policy']!=result['policy'] or config['resource_policy']!='adaptive'
                 or config['numerical_thread_environment']!=THREADS
-                or config['models']!=list(MODELS) or config['seeds']!=[42] or config['folds']!=[1]
+                or config['models']!=list(GPU_MODELS if result['kind']=='airlines' else MODELS)
+                or config['seeds']!=[42] or config['folds']!=[1]
                 or config['datasets']!=datasets or config['pipelines']!=pipelines
                 or config['conditions']!=[['clean',0.0]] or config['scheduler_lease_seconds']!=600
                 or config['cache_policy']!='bounded' or config['workers']!=plan['worker_ceiling']
@@ -134,6 +140,9 @@ def verify_saved_report(report):
                 or plan['hardware']!=report['resource_plan']['hardware']
                 or config['cache_max_bytes']!=plan['cache_max_bytes']):
             raise ValueError('Adaptive run design/source/host mismatch')
+        if result['kind']!='small' and (plan!=report['resource_plan']
+                or config.get('resource_profile_sha256')!=report['scope_sha256']):
+            raise ValueError('Adaptive run did not use the frozen capability profile')
         rechecked=compare(run_dir,ROOT/result['baseline_dir'],result['kind']!='small')
         if any(rechecked[k]!=result[k] for k in rechecked):raise ValueError('Saved comparison changed')
         for row in rows(run_dir/'results.jsonl').values():
@@ -141,10 +150,17 @@ def verify_saved_report(report):
             record=json.loads(path.read_text())
             if stable_digest(record)!=row['model_parameters_fingerprint'] or record['model']!=row['model']:
                 raise ValueError('Resolved model parameter record changed')
+        common_backends = {}
+        for row in rows(run_dir/'results.jsonl').values():
+            key=tuple(row[field] for field in ('dataset','seed','fold','condition','model'))
+            signature=(row['model_backend'],row.get('resource_comparison_matrix_bytes'))
+            if signature[1] is None or common_backends.setdefault(key,signature)!=signature:
+                raise ValueError('Backend/capacity bound differs within a pipeline comparison')
         if result['kind']=='airlines':
-            if not result['recovery']['pre_crash_successes_retained_without_refit']:
+            before={key:tuple(value) for key,value in result['pre_crash_committed_rows'].items()}
+            rechecked_recovery=_check_terminal(run_dir,before,report['code_fingerprint'],expected=4)
+            if not 0<len(before)<4 or rechecked_recovery!=result['recovery']:
                 raise ValueError('Adaptive committed-cell recovery failed')
-            # Recorded SQLite/artifact hashes bind the once-only attempt evidence.
         for entry in manifest['datasets']:
             if file_sha256(ROOT/'data'/'raw'/f"{entry['dataset']}.csv")!=entry['source_csv_sha256']:
                 raise ValueError('Diagnostic data changed')
@@ -156,7 +172,7 @@ def main():
     parser.add_argument('--worker',action='store_true')
     parser.add_argument('--kind',choices=['small','covertype','airlines'])
     parser.add_argument('--policy',choices=['row_level','group_aware'])
-    parser.add_argument('--run-id');parser.add_argument('--version',default='001')
+    parser.add_argument('--run-id');parser.add_argument('--version',default='002')
     parser.add_argument('--scope',type=Path,default=ROOT/'provenance'/'reviewer1_launch_scope_v4.json')
     parser.add_argument('--verify-report',type=Path)
     args=parser.parse_args()

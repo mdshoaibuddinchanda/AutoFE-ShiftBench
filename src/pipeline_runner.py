@@ -830,6 +830,7 @@ def run_experiment(
     vram_target_fraction: float = 0.8,
     gpu_policy: str = 'auto',
     adaptive_worker_cap: int | None = None,
+    resource_profile: str | Path | None = None,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
@@ -837,6 +838,8 @@ def run_experiment(
         raise ValueError("split_policy must be 'row_level' or 'group_aware'")
     if resource_policy not in {'manual', 'adaptive'}:
         raise ValueError('resource_policy must be manual or adaptive')
+    if resource_profile is not None and resource_policy != 'adaptive':
+        raise ValueError('A frozen resource profile requires adaptive execution')
     if cache_policy not in {"retain", "bounded"}:
         raise ValueError("cache_policy must be 'retain' or 'bounded'")
     if cache_policy == "bounded" and cache_max_bytes is not None and cache_max_bytes <= 0:
@@ -927,18 +930,34 @@ def run_experiment(
     runtime_info = _runtime_versions()
     runtime_fingerprint = stable_digest(runtime_info)
     resource_plan = None
+    resource_profile_hash = None
     admission = None
     if resource_policy == 'adaptive':
         settings = ResourceSettings(reserve_cpus, ram_target_fraction, vram_target_fraction, gpu_policy)
         settings.validate()
         hardware = detect_hardware(Path(output_root))
+        frozen_plan = None
+        if resource_profile is not None:
+            profile_path = Path(resource_profile)
+            profile = json.loads(profile_path.read_text(encoding='utf-8'))
+            resource_profile_hash = file_sha256(profile_path)
+            frozen_plan = profile['resource_plan']
+            if (frozen_plan['hardware'] != hardware or frozen_plan['settings'] != asdict(settings)
+                    or frozen_plan.get('worker_override') != adaptive_worker_cap
+                    or frozen_plan.get('cache_override') != cache_max_bytes
+                    or set(models).difference(frozen_plan['backend_by_model'])
+                    or profile.get('code_fingerprint', source_fingerprint) != source_fingerprint):
+                raise ValueError('Frozen resource profile differs from this source/host/policy')
         prior_plan = (existing_manifest or {}).get('configuration', {}).get('resource_plan')
         if prior_plan is not None:
             if (prior_plan['hardware'] != hardware or prior_plan['settings'] != asdict(settings)
                     or prior_plan.get('worker_override') != adaptive_worker_cap
-                    or prior_plan.get('cache_override') != cache_max_bytes):
+                    or prior_plan.get('cache_override') != cache_max_bytes
+                    or (frozen_plan is not None and prior_plan != frozen_plan)):
                 raise ValueError('Adaptive host/policy changed; choose a new run ID')
             resource_plan = prior_plan
+        elif frozen_plan is not None:
+            resource_plan = frozen_plan
         else:
             probe = {} if gpu_policy == 'cpu' else probe_gpu_models(hardware['gpu_devices'])
             resource_plan = resolve_plan(settings, hardware, models, gpu_probe=probe,
@@ -970,6 +989,8 @@ def run_experiment(
     if resource_plan is not None:
         config_data['resource_policy'] = resource_policy
         config_data['resource_plan'] = resource_plan
+        if resource_profile_hash is not None:
+            config_data['resource_profile_sha256'] = resource_profile_hash
     config_fingerprint = stable_digest(config_data)
     if existing_manifest and (
         existing_manifest.get("configuration_fingerprint") != config_fingerprint
@@ -1151,6 +1172,7 @@ def run_experiment(
                 'worker_peak_rss_bytes': fit.get('worker_peak_rss_bytes'),
                 'gpu_device': fit.get('gpu_device'), 'gpu_ram_part': fit.get('gpu_ram_part'),
                 'model_backend_reason': meta.get('resource_reservation', {}).get('backend_reason', 'manual policy'),
+                'resource_comparison_matrix_bytes': meta.get('resource_reservation', {}).get('comparison_matrix_bytes'),
                 'model_parameters_fingerprint': parameter_fingerprint,
                 'model_parameters_path': parameter_path.as_posix(),
                 "experiment_scope": experiment_scope,
@@ -1401,6 +1423,23 @@ def run_experiment(
                         "dataset": dataset_name, "seed": seed, "fold": fold,
                         "condition": condition, "dataset_checksum": task_checksum,
                     })[:20]
+                    # Backend capacity must be common to every pipeline in a
+                    # scientific comparison, even when their output widths differ.
+                    comparison_matrix_bytes = None
+                    if admission is not None:
+                        encoded_width = sum(1 if pd.api.types.is_numeric_dtype(x_train[column])
+                                            else x_train[column].nunique(dropna=False)+1
+                                            for column in x_train.columns)
+                        comparison_width = encoded_width
+                        for name in pipelines:
+                            candidate_config = PIPELINE_CONFIGS[name]
+                            if candidate_config.enable_dfs:
+                                parents = min(candidate_config.max_base_features or encoded_width, encoded_width)
+                                width = encoded_width+len(candidate_config.trans_primitives)*parents*parents
+                                if candidate_config.max_features and candidate_config.selection_method!='none':
+                                    width = min(width,candidate_config.max_features)
+                                comparison_width = max(comparison_width,width)
+                        comparison_matrix_bytes = int((len(x_train)+len(x_test))*(comparison_width*8+8)+1024)
                     for pipeline_name in pipelines:
                         config = PIPELINE_CONFIGS[pipeline_name]
                         feature_consumer_task_keys = [stable_digest({
@@ -1773,7 +1812,8 @@ def run_experiment(
                                     last_heartbeat = 0.0
                                     while True:
                                         reserved = [m.get('resource_reservation', {}) for _, m in pending_futures]
-                                        reservation = admission.reservation(model_name, matrix_bytes, reserved)
+                                        reservation = admission.reservation(model_name, matrix_bytes, reserved,
+                                                                            comparison_matrix_bytes=comparison_matrix_bytes)
                                         if reservation is not None:
                                             break
                                         if pending_futures:
@@ -1893,6 +1933,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument('--vram-target-fraction', type=float, default=0.8)
     parser.add_argument('--gpu-policy', choices=['auto','cpu','require'], default='auto')
     parser.add_argument('--adaptive-worker-cap', type=int, help='Optional lower override of detected worker ceiling')
+    parser.add_argument('--resource-profile', type=Path, help='Reuse the frozen scope resource plan; reject source/host/policy changes')
     parser.add_argument(
         "--cache-audit", action="store_true",
         help="Persist per-feature cache build/hit/consumer/reader/deletion evidence (bounded runs only)",
@@ -1940,6 +1981,7 @@ def main(argv: list[str] | None = None) -> None:
         resource_policy=args.resource_policy, reserve_cpus=args.reserve_cpus,
         ram_target_fraction=args.ram_target_fraction, vram_target_fraction=args.vram_target_fraction,
         gpu_policy=args.gpu_policy, adaptive_worker_cap=args.adaptive_worker_cap,
+        resource_profile=args.resource_profile,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 

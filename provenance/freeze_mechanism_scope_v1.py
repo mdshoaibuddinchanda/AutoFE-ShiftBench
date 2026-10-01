@@ -22,8 +22,9 @@ def _pilot_result(policy: str, dataset: str, source_fingerprint: str, adaptive: 
     path = (ROOT / 'corrected_runs' / 'final_optimization'
             / f'optimization-optimized-{policy}-001' / 'results.jsonl')
     if adaptive:
-        label = 'row' if policy == 'row_level' else 'group'
-        path = ROOT/'corrected_runs'/'adaptive_verification'/f'adaptive-small-{label}-001'/'results.jsonl'
+        report = json.loads((ROOT/'provenance'/'adaptive_resource_verification_v1.json').read_text())
+        run = next(r for r in report['runs'] if r['kind']=='small' and r['policy']==policy)
+        path = ROOT/'corrected_runs'/'adaptive_verification'/run['run_id']/'results.jsonl'
     manifest = json.loads((path.parent / "manifest.json").read_text(encoding="utf-8"))
     if (manifest.get("status") != "complete" or manifest.get("code_fingerprint") != source_fingerprint
             or manifest.get("split_policy") != policy):

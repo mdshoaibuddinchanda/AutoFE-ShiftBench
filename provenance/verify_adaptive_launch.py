@@ -65,6 +65,7 @@ def verify(run_id,scope_path):
         prior=json.loads(existing.read_text())
         checks['run_identity']=(prior.get('code_fingerprint')==scope['code_fingerprint']
                                 and prior['configuration'].get('resource_plan')==scope['resource_plan']
+                                and prior['configuration'].get('resource_profile_sha256')==file_sha256(scope_path)
                                 and prior['configuration'].get('split_policy')==run['split_policy']
                                 and prior.get('experiment_scope')==('primary_training_corruption' if run['scope']=='primary' else run['scope']))
     else:checks['run_identity']=not existing.parent.exists()
