@@ -1,0 +1,59 @@
+{
+  "artifact_type": "large_dataset_forced_restart_v1",
+  "status": "passed",
+  "scientific_use": "diagnostic recovery proof only",
+  "host": "SHOAIB_CHANDA",
+  "python_executable": "D:\\Conda\\p12\\python.exe",
+  "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+  "dataset": "airlines",
+  "csv_sha256": "6d2f4f0cb3fc0f56d7361efdbef9284975f081bca1fd0ec76fc32aa88b79ab77",
+  "sidecar_sha256": "627c9894eb3f3489a5ce6609d6b8fa3fb44d33fc853c141220f2a8d1eaf4b767",
+  "numerical_thread_environment": {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  },
+  "scheduler_lease_seconds": 600,
+  "workers": 4,
+  "task_design": "one seed, one fold, clean, Raw and AutoFE_Baseline, ten classifiers",
+  "runs": [
+    {
+      "run_id": "recovery-airlines-row-003",
+      "status": "passed",
+      "committed_successes_before_kill": 1,
+      "terminal_successes_after_resume": 20,
+      "pre_crash_successes_retained_without_refit": true,
+      "scheduler_statuses": {
+        "success": 20
+      },
+      "run_manifest": "corrected_runs/large_recovery/recovery-airlines-row-003/manifest.json",
+      "elapsed_s_including_forced_restart": 743.5
+    },
+    {
+      "run_id": "recovery-airlines-group-003",
+      "status": "passed",
+      "committed_successes_before_kill": 1,
+      "terminal_successes_after_resume": 20,
+      "pre_crash_successes_retained_without_refit": true,
+      "scheduler_statuses": {
+        "success": 20
+      },
+      "run_manifest": "corrected_runs/large_recovery/recovery-airlines-group-003/manifest.json",
+      "elapsed_s_including_forced_restart": 855.969
+    }
+  ],
+  "historical_calibration_scientific_parity": [
+    {
+      "policy": "row_level",
+      "compared_cells": 20,
+      "mismatches": []
+    },
+    {
+      "policy": "group_aware",
+      "compared_cells": 20,
+      "mismatches": []
+    }
+  ],
+  "scope_sha256": "2471016ab3f31213b87eeb6215b3808191212078246a808de80a7d55d47ca759"
+}

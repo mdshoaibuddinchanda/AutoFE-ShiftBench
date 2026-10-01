@@ -1,0 +1,331 @@
+{
+  "all_seven_ready": true,
+  "artifact_type": "reviewer1_launch_readiness_v3",
+  "checked_utc": "2026-10-01T15:28:22.505846+00:00",
+  "full_suite": "139passed,26warnings,94.31seconds inexisting p12",
+  "runs": [
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-primary-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-primary-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-domain-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-availability-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-availability-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-relabel-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "checks": {
+        "analysis_definitions": true,
+        "bounded_optimization_parity": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "historical_large_calibration": true,
+        "host_identity": true,
+        "host_probe_hash": true,
+        "large_airlines_scientific_parity": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 433.0,
+      "large_calibration": {
+        "group_aware": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        },
+        "row_level": {
+          "code_fingerprint_matches": false,
+          "expected": 120,
+          "status": "complete",
+          "success": 120,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 73.26,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v3-relabel-group"
+    }
+  ],
+  "scientific_use": "bounded code/host verification only; full campaign not started; corrected effects pending"
+}
