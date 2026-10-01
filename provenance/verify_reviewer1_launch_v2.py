@@ -17,11 +17,12 @@ from src.provenance import code_fingerprint, file_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v2.json"
+SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v3.json"
 HEAVY_COORDINATOR_MODULES = {
     "src.pipeline_runner", "provenance.large_dataset_calibration",
     "provenance.large_dataset_calibration_group_v3",
     "provenance.large_dataset_recovery_v1", "provenance.run_mechanism_history",
+    "provenance.final_optimization_verification",
 }
 
 
@@ -34,6 +35,10 @@ def _active_heavy_coordinators() -> list[dict]:
                 if value == "-m" and args[index + 1] in HEAVY_COORDINATOR_MODULES:
                     active.append({"pid": process.pid, "module": args[index + 1]})
                     break
+            else:
+                known_scripts = {name.split('.')[-1] + '.py' for name in HEAVY_COORDINATOR_MODULES}
+                if any(Path(value).name in known_scripts for value in args[1:]):
+                    active.append({'pid': process.pid, 'module': 'direct heavy script'})
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             continue
     return active
@@ -63,8 +68,38 @@ def _recovery_run_manifest_valid(item: dict, source_fingerprint: str) -> bool:
     )
 
 
-def verify(run_id: str) -> dict:
-    scope = json.loads(SCOPE.read_text(encoding="utf-8"))
+def _recovery_scientific_parity_valid(recovery: dict, scope_path: Path) -> bool:
+    """Bind the new Airline parity summary to the actual frozen result files."""
+    from provenance.final_optimization_verification import rows, FIELDS, MODELS
+    if recovery.get('scope_sha256') != file_sha256(scope_path):
+        return False
+    summaries = recovery.get('historical_calibration_scientific_parity', [])
+    if (len(summaries) != 2 or {r.get('policy') for r in summaries} != {'row_level', 'group_aware'}):
+        return False
+    try:
+        for policy, suffix, version in (('row_level', 'row', '002'), ('group_aware', 'group', '003')):
+            item = next(r for r in recovery['runs'] if r['run_id'].startswith(f'recovery-airlines-{suffix}-'))
+            directory = (ROOT / item['run_manifest']).parent
+            manifest = json.loads((directory / 'manifest.json').read_text())
+            config = manifest['configuration']
+            if (config.get('datasets') != ['airlines'] or config.get('pipelines') != ['Raw', 'AutoFE_Baseline']
+                    or config.get('models') != list(MODELS) or config.get('seeds') != [42]
+                    or config.get('folds') != [1] or config.get('n_splits') != 5
+                    or config.get('conditions') != [['clean', 0.0]] or config.get('use_gpu') is not False):
+                return False
+            current = rows(directory / 'results.jsonl')
+            prior = rows(ROOT / 'corrected_runs' / 'large_calibration' /
+                         f'calibration-{policy}-{version}' / 'results.jsonl')
+            if len(current) != 20 or any(key not in prior or any(
+                    current[key].get(field) != prior[key].get(field) for field in FIELDS) for key in current):
+                return False
+    except (OSError, ValueError, KeyError, StopIteration):
+        return False
+    return True
+
+
+def verify(run_id: str, scope_path: Path | None = None) -> dict:
+    scope = json.loads((scope_path or SCOPE).read_text(encoding="utf-8"))
     run = next((item for item in scope["runs"] if item["run_id"] == run_id), None)
     if run is None:
         raise ValueError(f"Run ID is not in the frozen seven-run scope: {run_id}")
@@ -100,6 +135,7 @@ def verify(run_id: str) -> dict:
     storage = scope["storage"]
     required_gib = (2 * storage["scaled_results_checkpoints_projection_gib_all_seven_runs"]
                     + storage["bounded_live_cache_cap_gib_per_run"]
+                    + storage.get("cache_publication_temporary_allowance_gib", 0)
                     + storage["separate_mechanism_history_reservation_gib"])
     free_gib = shutil.disk_usage(ROOT).free / 1024**3
     checks["disk_margin"] = free_gib >= required_gib
@@ -132,13 +168,50 @@ def verify(run_id: str) -> dict:
             "code_fingerprint_matches": item.get("code_fingerprint") == scope["code_fingerprint"],
             "threads_match": item.get("configuration", {}).get("numerical_thread_environment") == scope["required_numerical_thread_environment"],
         }
-    checks["large_calibration"] = all(
+    historical_calibration_passed = all(
         item.get("status") == "complete" and item.get("expected") == 120
         and item.get("success") == 120 and item.get("code_fingerprint_matches")
         and item.get("threads_match")
         for item in calibration.values()
     )
-    recovery_path = ROOT / "provenance" / "large_dataset_recovery_v1.json"
+    optimization_path = scope.get('optimization_verification_path')
+    if optimization_path:
+        path = ROOT / optimization_path
+        optimized = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+        saved_evidence_valid = False
+        if optimized.get('status') == 'passed' and optimized.get('per_run_evidence'):
+            try:
+                from provenance.final_optimization_verification import verify_saved_report
+                rechecked = verify_saved_report(optimized)
+                saved_evidence_valid = (rechecked['per_run_evidence'] == optimized['per_run_evidence']
+                                        and rechecked['scientific_fields'] == optimized.get('scientific_fields'))
+            except (OSError, ValueError, KeyError):
+                pass
+        checks['bounded_optimization_parity'] = (
+            saved_evidence_valid
+            and
+            optimized.get('status') == 'passed'
+            and optimized.get('code_fingerprint') == scope['code_fingerprint']
+            and optimized.get('workers') == 4
+            and optimized.get('numerical_thread_environment') == scope['required_numerical_thread_environment']
+            and len(optimized.get('small_dataset_parity', [])) == 2
+            and {r.get('policy') for r in optimized.get('small_dataset_parity', [])} == {'row_level', 'group_aware'}
+            and all(r.get('compared_cells') == 560 and r.get('mismatches') == [] for r in optimized.get('small_dataset_parity', []))
+            and len(optimized.get('large_dataset_parity', [])) == 2
+            and {r.get('policy') for r in optimized.get('large_dataset_parity', [])} == {'row_level', 'group_aware'}
+            and all(r.get('compared_cells') == 10 and r.get('mismatches') == [] for r in optimized.get('large_dataset_parity', []))
+            and all(file_sha256(ROOT / 'data' / 'raw' / f'{name}.csv') == digest
+                    for name, digest in optimized.get('data_hashes', {}).items())
+            and len(optimized.get('data_hashes', {})) == 5
+        )
+        # Old 120-cell timing reports are explicitly historical after a source
+        # change. New-source large data/parity and recovery are separate gates.
+        checks['historical_large_calibration'] = all(
+            item.get('status') == 'complete' and item.get('expected') == 120 and item.get('success') == 120
+            for item in calibration.values())
+    else:
+        checks['large_calibration'] = historical_calibration_passed
+    recovery_path = ROOT / scope.get('recovery_evidence_path', 'provenance/large_dataset_recovery_v1.json')
     recovery = json.loads(recovery_path.read_text(encoding="utf-8")) if recovery_path.exists() else {}
     airline = next(item for item in scope["datasets"] if item["name"] == "airlines")
     recovery_runs = recovery.get("runs", [])
@@ -164,7 +237,14 @@ def verify(run_id: str) -> dict:
                 and _recovery_run_manifest_valid(item, scope["code_fingerprint"])
                 for item in recovery_runs)
     )
-    mechanism_path = ROOT / "provenance" / "mechanism_history_scope_v1.json"
+    if optimization_path:
+        checks['large_airlines_scientific_parity'] = (
+            _recovery_scientific_parity_valid(recovery, scope_path or SCOPE)
+            and
+            len(recovery.get('historical_calibration_scientific_parity', [])) == 2
+            and all(r.get('compared_cells') == 20 and r.get('mismatches') == []
+                    for r in recovery.get('historical_calibration_scientific_parity', [])))
+    mechanism_path = ROOT / scope.get('mechanism_scope_path', 'provenance/mechanism_history_scope_v1.json')
     mechanism = json.loads(mechanism_path.read_text(encoding="utf-8")) if mechanism_path.exists() else {}
     checks["mechanism_history_scope"] = (
         mechanism.get("status") == "ready"
@@ -205,8 +285,9 @@ def verify(run_id: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument('--scope', type=Path, default=SCOPE)
     args = parser.parse_args()
-    result = verify(args.run_id)
+    result = verify(args.run_id, args.scope)
     print(json.dumps(result, indent=2))
     if not result["ready_for_frozen_command"]:
         raise SystemExit(2)

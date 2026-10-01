@@ -17,7 +17,7 @@ import sys
 import time
 import traceback
 from contextlib import contextmanager
-from concurrent.futures import Future, ProcessPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from functools import wraps
 from inspect import signature
 import multiprocessing as mp
@@ -32,7 +32,7 @@ import sklearn
 from sklearn.preprocessing import LabelEncoder
 
 from src.checkpoint import has_success, init_db, record_task
-from src.cache_manager import CacheManager, CacheNotReadyError
+from src.cache_manager import CacheBusyError, CacheCapacityError, CacheManager, CacheNotReadyError
 from src.task_scheduler import Lease, LeaseLost, TaskScheduler, TaskSpec
 from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
 from src.evaluation import compute_classification_metrics
@@ -278,6 +278,7 @@ def _prepare_matrices(
     config: DFSConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, LabelEncoder, dict[str, Any], pd.DataFrame]:
     """Fit every learned step on training rows and transform held-out X only."""
+    preparation_started = time.perf_counter()
     if not x_train.index.equals(y_train.index):
         raise ValueError("Training X/y row index and order differ before perturbation")
     x_train_corrupt, y_train_corrupt = apply_perturbation(
@@ -294,7 +295,7 @@ def _prepare_matrices(
     preprocessor = _build_preprocessor(x_train_corrupt, encoding="onehot", scale_numeric=True)
     train_arr = _to_dense_array(preprocessor.fit_transform(x_train_corrupt))
     test_arr = _to_dense_array(preprocessor.transform(x_test))
-    clean_test_arr = _to_dense_array(preprocessor.transform(x_test))
+    clean_test_arr = test_arr.copy()
     columns = preprocessor.get_feature_names_out().tolist()
     x_train_prepped = pd.DataFrame(train_arr, columns=columns).reset_index(drop=True)
     x_test_prepped = pd.DataFrame(test_arr, columns=columns).reset_index(drop=True)
@@ -303,9 +304,14 @@ def _prepare_matrices(
 
     cfg = DFSConfig(**asdict(config))
     cfg.random_seed = perturbation_seed
+    generation_started = time.perf_counter()
     x_train_fe, x_test_fe, metadata = expand_features_with_dfs(
         x_train_prepped, x_test_prepped, y_train_series, config=cfg,
     )
+    preparation_finished = time.perf_counter()
+    metadata["generation_time_s"] = preparation_finished - generation_started
+    metadata["preprocessing_time_s"] = generation_started - preparation_started
+    metadata["preparation_time_s"] = preparation_finished - preparation_started
     return (
         x_train_fe.reset_index(drop=True), x_test_fe.reset_index(drop=True),
         y_train_encoded, encoder, metadata, x_test_clean,
@@ -1002,11 +1008,47 @@ def run_experiment(
     # while preserving one authoritative task ledger.
     executor: ProcessPoolExecutor | None = None
     pending_futures: list[tuple[Future, dict[str, Any]]] = []
+    deferred_cache_reclaims: dict[str, dict[str, Any]] = {}
     if workers > 1:
         executor = ProcessPoolExecutor(
             max_workers=workers,
             mp_context=mp.get_context("spawn"),
         )
+
+    def _reclaim_terminal_feature_group(meta: dict[str, Any]) -> bool:
+        """Remove only this group's payload after every planned consumer is terminal."""
+        if cache_manager is None:
+            return False
+        keys = meta["feature_consumer_task_keys"]
+        terminal_statuses = {"success", "failed", "skipped", "timed_out"}
+        if scheduler is not None:
+            placeholders = ",".join("?" for _ in keys)
+            with scheduler._connection() as connection:
+                states = dict(connection.execute(
+                    f"SELECT task_key, status FROM scheduler_tasks WHERE task_key IN ({placeholders})", keys,
+                ).fetchall())
+        else:
+            states = {row["task_key"]: row.get("status") for row in outcomes
+                      if row.get("task_key") in keys}
+        if len(states) != len(keys) or any(value not in terminal_statuses for value in states.values()):
+            return False
+        try:
+            removed = cache_manager.remove(meta["feature_cache_key"])
+        except (CacheBusyError, OSError) as exc:
+            # Deletion is regenerable housekeeping after durable publication;
+            # a transient file lock must not change a committed task's outcome.
+            deferred_cache_reclaims[meta["feature_cache_key"]] = meta
+            diagnostic = base_manifest.setdefault("cache_reclamation", {"deferred_errors": 0})
+            diagnostic["deferred_errors"] += 1
+            diagnostic["last_error"] = {"cache_key": meta["feature_cache_key"],
+                                        "error": f"{type(exc).__name__}: {exc}"[:500]}
+            return False
+        if not removed.get("skipped_leased"):
+            deferred_cache_reclaims.pop(meta["feature_cache_key"], None)
+        if removed.get("deleted") and meta.get("audit_record") is not None:
+            meta["audit_record"]["deletion_observed"] = True
+            meta["audit_record"]["deletion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        return bool(removed.get("deleted"))
 
     def _record_phase2(meta: dict[str, Any], fit: dict[str, Any]) -> None:
         """Publish one worker result or durable failure in the coordinator."""
@@ -1025,9 +1067,6 @@ def run_experiment(
         try:
             if fit.get("status") != "success":
                 raise RuntimeError(str(fit.get("error", "worker returned no result")))
-            x_train_fe = meta["x_train_fe"]
-            x_test_fe = meta["x_test_fe"]
-            x_test_clean = meta["x_test_clean"]
             y_pred = np.asarray(fit["y_pred"])
             test_metrics = fit["test_metrics"]
             result = {
@@ -1037,7 +1076,7 @@ def run_experiment(
                 "model_backend": fit.get("model_backend", "cpu"),
                 "experiment_scope": experiment_scope,
                 "split_status": meta["task_split_status"],
-                "n_original": int(x_test_clean.shape[1]),
+                "n_original": int(meta["n_original"]),
                 "train_time_s": float(fit.get("train_time_s", 0.0)),
                 "infer_time_s": float(fit.get("infer_time_s", 0.0)),
                 "worker_pid": int(fit.get("pid", -1)),
@@ -1045,9 +1084,11 @@ def run_experiment(
                 "worker_finished_unix": float(fit.get("worker_finished_unix", 0.0)),
                 "worker_elapsed_s": float(fit.get("worker_elapsed_s", 0.0)),
                 "autofe_gen_time_s": float(meta["fe_meta"].get("generation_time_s", 0.0)),
+                "preprocessing_time_s": meta["fe_meta"].get("preprocessing_time_s"),
+                "preparation_time_s": meta["fe_meta"].get("preparation_time_s"),
                 "autofe_cache_hit": bool(meta["cache_was_present"]),
                 "n_generated": int(meta["fe_meta"].get("n_generated", 0)),
-                "n_retained": int(meta["fe_meta"].get("n_retained", x_train_fe.shape[1])),
+                "n_retained": int(meta["fe_meta"].get("n_retained", meta["n_retained"])),
                 "ram_used_mb": float(meta["fe_meta"].get("ram_used_mb", 0.0)),
                 "operator_counts": meta["fe_meta"].get("operator_counts", {}),
                 "operator_candidate_counts": meta["fe_meta"].get("operator_candidate_counts", {}),
@@ -1062,8 +1103,8 @@ def run_experiment(
                 "wasserstein": None, "ks_stat": None,
                 "cache_fingerprint": meta["feature_cache_fp"],
                 "task_fingerprint": task_fp,
-                "train_matrix_sha256": frame_sha256(x_train_fe),
-                "test_matrix_sha256": frame_sha256(x_test_fe),
+                "train_matrix_sha256": meta["train_matrix_sha256"],
+                "test_matrix_sha256": meta["test_matrix_sha256"],
                 "prediction_sha256": stable_digest(np.asarray(y_pred).tolist()),
                 "train_auc": fit.get("train_auc"),
                 **test_metrics,
@@ -1098,13 +1139,17 @@ def run_experiment(
             _upsert_outcome(outcomes, dict(task_manifest, **failure))
         if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
             audit_record["terminal_consumer_task_keys"].append(task_key)
+        _reclaim_terminal_feature_group(meta)
         _save_run_manifest(run_dir, base_manifest, outcomes)
 
-    def _drain_one() -> None:
+    def _drain_one(additional_meta: dict[str, Any] | None = None) -> None:
         def heartbeat_pending() -> None:
             if scheduler is None:
                 return
-            for _, pending_meta in pending_futures:
+            heartbeat_metadata = [pending_meta for _, pending_meta in pending_futures]
+            if additional_meta is not None:
+                heartbeat_metadata.append(additional_meta)
+            for pending_meta in heartbeat_metadata:
                 lease = pending_meta.get("scheduler_lease")
                 if lease is None:
                     continue
@@ -1116,21 +1161,26 @@ def run_experiment(
                     # futures from being drained.
                     continue
 
-        future, meta = pending_futures[0]
         while True:
             heartbeat_pending()
+            completed, _ = wait(
+                [future for future, _ in pending_futures],
+                timeout=min(30.0, max(1.0, scheduler_lease_seconds / 3.0)),
+                return_when=FIRST_COMPLETED,
+            )
+            if not completed:
+                continue
+            position = next(index for index, (future, _) in enumerate(pending_futures) if future in completed)
+            future, meta = pending_futures.pop(position)
             try:
                 # Keep coordinator-owned scheduler leases alive while a
                 # child process is fitting.  This also bounds how long the
                 # parent can remain unresponsive to recovery signals.
-                fit = future.result(timeout=min(30.0, max(1.0, scheduler_lease_seconds / 3.0)))
+                fit = future.result()
                 break
-            except FutureTimeoutError:
-                continue
             except Exception as exc:
                 fit = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
                 break
-        pending_futures.pop(0)
         _record_phase2(meta, fit)
 
     has_transductive_partition = experiment_scope == "transductive_domain_partition"
@@ -1273,7 +1323,25 @@ def run_experiment(
                         "condition": condition, "dataset_checksum": task_checksum,
                     })[:20]
                     for pipeline_name in pipelines:
-                        feature_consumer_task_keys: list[str] = []
+                        feature_consumer_task_keys = [stable_digest({
+                            "dataset": dataset_name, "seed": seed, "fold": fold,
+                            "condition": condition, "pipeline": pipeline_name, "model": model,
+                            "split_policy": split_policy, "run_id": run_id,
+                        }) for model in models]
+                        prepared_group = None
+                        prepared_group_fingerprint = None
+                        prepared_numeric = None
+                        prepared_matrix_hashes = None
+                        generated_group: list[tuple[Any, ...]] = []
+
+                        def make_group_payload() -> tuple[Any, ...]:
+                            if not generated_group:
+                                generated_group.append(_prepare_matrices(
+                                    x_train, y_train, x_test, family=family, severity=severity,
+                                    perturbation_seed=perturb_seed, pipeline_name=pipeline_name,
+                                    config=PIPELINE_CONFIGS[pipeline_name],
+                                ))
+                            return generated_group[0]
                         for model_position, model_name in enumerate(models):
                             task = {
                                 "dataset": dataset_name, "seed": seed, "fold": fold,
@@ -1325,7 +1393,6 @@ def run_experiment(
                             feature_cache_fp = cache_fingerprint(feature_manifest)
                             task_manifest["task_fingerprint"] = task_fp
                             task_manifest["cache_fingerprint"] = feature_cache_fp
-                            feature_consumer_task_keys.append(task_key)
                             cache_audit_key = _bounded_cache_key(feature_key, pipeline_name, feature_cache_fp)
                             if cache_audit:
                                 cache_audit_artifacts = base_manifest["cache_audit"]["artifacts"]
@@ -1363,6 +1430,10 @@ def run_experiment(
                             else:
                                 audit_record = None
                                 cache_audit_event = None
+                            cache_lifecycle_meta = {
+                                "feature_consumer_task_keys": feature_consumer_task_keys,
+                                "feature_cache_key": cache_audit_key, "audit_record": audit_record,
+                            }
                             domain_auc_status = (
                                 domain_metadata.get(family, {}).get("auc_status")
                                 if family in domain_metadata else None
@@ -1417,6 +1488,7 @@ def run_experiment(
                                         _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
                                         if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                             audit_record["terminal_consumer_task_keys"].append(task_key)
+                                        _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                         _save_run_manifest(run_dir, base_manifest, outcomes)
                                         continue
                                     recovered = _recover_scheduler_payload(scheduler, task_key)
@@ -1446,6 +1518,7 @@ def run_experiment(
                                     _upsert_outcome(outcomes, dict(recovered, status="success", resumed=True))
                                     if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                         audit_record["terminal_consumer_task_keys"].append(task_key)
+                                    _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                     _save_run_manifest(run_dir, base_manifest, outcomes)
                                     continue
                                 if scheduler_state and scheduler_state.get("status") in {"failed", "timed_out"}:
@@ -1455,6 +1528,7 @@ def run_experiment(
                                     _upsert_outcome(outcomes, terminal_row)
                                     if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                         audit_record["terminal_consumer_task_keys"].append(task_key)
+                                    _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                     _save_run_manifest(run_dir, base_manifest, outcomes)
                                     continue
                             if (has_success(db_path, run_id, task_key, "phase2", task_fp)
@@ -1462,6 +1536,7 @@ def run_experiment(
                                 _upsert_outcome(outcomes, dict(task_manifest, status="success", resumed=True))
                                 if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                     audit_record["terminal_consumer_task_keys"].append(task_key)
+                                _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
                             if scheduler is not None:
@@ -1473,34 +1548,50 @@ def run_experiment(
                                     scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 if failure_hook:
                                     failure_hook("phase1", task)
-                                if cache_manager is None:
+                                if prepared_group is not None:
+                                    if prepared_group_fingerprint != feature_cache_fp:
+                                        raise ValueError("Prepared feature group identity changed between classifier consumers")
+                                    payload = prepared_group
+                                    cache_was_present = True
+                                    if audit_record is not None:
+                                        audit_record["hit_count"] += 1
+                                        audit_record["memory_hit_count"] = audit_record.get("memory_hit_count", 0) + 1
+                                elif cache_manager is None:
                                     cache_path, cache_manifest_path = _cache_paths(run_dir, feature_key, pipeline_name)
                                     cache_was_present = cache_path.exists() and cache_manifest_path.exists()
                                     payload = _load_or_create_feature_cache(
                                         run_dir, feature_key, pipeline_name, feature_manifest,
-                                        lambda: _prepare_matrices(
-                                            x_train, y_train, x_test,
-                                            family=family, severity=severity,
-                                            perturbation_seed=perturb_seed,
-                                            pipeline_name=pipeline_name,
-                                            config=PIPELINE_CONFIGS[pipeline_name],
-                                        ),
+                                        make_group_payload,
                                     )
                                 else:
-                                    payload, cache_was_present = _load_or_create_bounded_feature_cache(
-                                        cache_manager,
-                                        feature_task_key=feature_key,
-                                        pipeline_name=pipeline_name,
-                                        expected_manifest=feature_manifest,
-                                        make_payload=lambda: _prepare_matrices(
-                                            x_train, y_train, x_test,
-                                            family=family, severity=severity,
-                                            perturbation_seed=perturb_seed,
-                                            pipeline_name=pipeline_name,
-                                            config=PIPELINE_CONFIGS[pipeline_name],
-                                        ),
-                                        audit_callback=cache_audit_event,
-                                    )
+                                    while True:
+                                        try:
+                                            payload, cache_was_present = _load_or_create_bounded_feature_cache(
+                                                cache_manager,
+                                                feature_task_key=feature_key,
+                                                pipeline_name=pipeline_name,
+                                                expected_manifest=feature_manifest,
+                                                make_payload=make_group_payload,
+                                                audit_callback=cache_audit_event,
+                                            )
+                                            break
+                                        except CacheCapacityError:
+                                            # Existing groups may await a slow classifier.
+                                            # Publish completed work and reclaim terminal
+                                            # groups before declaring a valid task failed.
+                                            if not pending_futures:
+                                                reclaimed = False
+                                                for deferred_meta in list(deferred_cache_reclaims.values()):
+                                                    reclaimed = _reclaim_terminal_feature_group(deferred_meta) or reclaimed
+                                                if not reclaimed:
+                                                    raise
+                                                continue
+                                            current_lease_meta = {"scheduler_lease": scheduler_lease}
+                                            _drain_one(current_lease_meta)
+                                            scheduler_lease = current_lease_meta["scheduler_lease"]
+                                prepared_group = payload
+                                generated_group.clear()
+                                prepared_group_fingerprint = feature_cache_fp
                                 (x_train_fe, x_test_fe, y_train_enc, encoder,
                                  fe_meta, x_test_clean) = payload
                                 record_task(
@@ -1526,6 +1617,7 @@ def run_experiment(
                                     fingerprint=task_fp, exc=exc, result_index_path=result_index_path,
                                 )
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
+                                _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
                                 continue
                             try:
@@ -1533,14 +1625,19 @@ def run_experiment(
                                     scheduler_lease = scheduler.heartbeat(scheduler_lease)
                                 if failure_hook:
                                     failure_hook("phase2", task)
-                                xtr = np.nan_to_num(x_train_fe.to_numpy(dtype=np.float32), nan=0.0,
-                                                    posinf=1e10, neginf=-1e10)
-                                xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0,
-                                                    posinf=1e10, neginf=-1e10)
-                                try:
-                                    y_test_enc = encoder.transform(y_test.astype(str))
-                                except ValueError as exc:
-                                    raise ValueError("Held-out labels contain a class absent from training labels") from exc
+                                if prepared_numeric is None:
+                                    xtr = np.nan_to_num(x_train_fe.to_numpy(dtype=np.float32), nan=0.0,
+                                                        posinf=1e10, neginf=-1e10)
+                                    xte = np.nan_to_num(x_test_fe.to_numpy(dtype=np.float32), nan=0.0,
+                                                        posinf=1e10, neginf=-1e10)
+                                    try:
+                                        y_test_enc = encoder.transform(y_test.astype(str))
+                                    except ValueError as exc:
+                                        raise ValueError("Held-out labels contain a class absent from training labels") from exc
+                                    prepared_numeric = (xtr, xte, np.asarray(y_train_enc),
+                                                        np.asarray(y_test_enc), np.asarray(encoder.classes_))
+                                    prepared_matrix_hashes = (frame_sha256(x_train_fe), frame_sha256(x_test_fe))
+                                xtr, xte, y_train_enc, y_test_enc, classes = prepared_numeric
                                 phase2_meta = {
                                     "task_manifest": task_manifest, "task": task, "task_key": task_key,
                                     "task_fp": task_fp, "feature_cache_fp": feature_cache_fp,
@@ -1548,15 +1645,18 @@ def run_experiment(
                                     "dataset_name": dataset_name, "seed": seed, "fold": fold,
                                     "condition": condition, "pipeline_name": pipeline_name,
                                     "model_name": model_name, "task_split_status": task_split_status,
-                                    "x_train_fe": x_train_fe, "x_test_fe": x_test_fe,
-                                    "x_test_clean": x_test_clean, "fe_meta": fe_meta,
+                                    "n_original": x_test_clean.shape[1], "n_retained": x_train_fe.shape[1],
+                                    "train_matrix_sha256": prepared_matrix_hashes[0],
+                                    "test_matrix_sha256": prepared_matrix_hashes[1], "fe_meta": fe_meta,
+                                    "feature_cache_key": cache_audit_key,
+                                    "feature_consumer_task_keys": feature_consumer_task_keys,
                                     "cache_was_present": cache_was_present,
                                     "n_train": len(xtr), "n_test": len(xte),
                                 }
                                 fit_payload = {
                                     "model": model_name, "seed": seed, "use_gpu": use_gpu,
-                                    "xtr": xtr, "xte": xte, "y_train_enc": np.asarray(y_train_enc),
-                                    "y_test_enc": np.asarray(y_test_enc), "classes": np.asarray(encoder.classes_),
+                                    "xtr": xtr, "xte": xte, "y_train_enc": y_train_enc,
+                                    "y_test_enc": y_test_enc, "classes": classes,
                                 }
                                 if executor is not None:
                                     pending_futures.append((
@@ -1567,7 +1667,11 @@ def run_experiment(
                                     if len(pending_futures) >= max(1, workers * 2):
                                         _drain_one()
                                 else:
-                                    _record_phase2(phase2_meta, _fit_and_score_worker(fit_payload))
+                                    # Each serial estimator gets the same independent
+                                    # inputs that spawned workers receive by pickle.
+                                    isolated_payload = {name: value.copy() if isinstance(value, np.ndarray) else value
+                                                        for name, value in fit_payload.items()}
+                                    _record_phase2(phase2_meta, _fit_and_score_worker(isolated_payload))
                             except Exception as exc:
                                 if scheduler is not None and scheduler_lease is not None:
                                     try:
@@ -1583,38 +1687,8 @@ def run_experiment(
                                 _upsert_outcome(outcomes, dict(task_manifest, **failure))
                                 if audit_record is not None and task_key not in audit_record["terminal_consumer_task_keys"]:
                                     audit_record["terminal_consumer_task_keys"].append(task_key)
+                                _reclaim_terminal_feature_group(cache_lifecycle_meta)
                                 _save_run_manifest(run_dir, base_manifest, outcomes)
-                            if cache_manager is not None and model_position == len(models) - 1:
-                                # All compatible classifiers for this
-                                # feature-task have reached a terminal phase.
-                                # Lease-aware cleanup can now reclaim the
-                                # regenerated artifact without affecting
-                                # resumption or any active reader.
-                                terminal_statuses = {"success", "failed", "skipped", "timed_out"}
-                                terminal = True
-                                for consumer_key in feature_consumer_task_keys:
-                                    if scheduler is not None:
-                                        state = scheduler.task_state(consumer_key)
-                                        consumer_status = state.get("status") if state else None
-                                    else:
-                                        row = next((item for item in outcomes if item.get("task_key") == consumer_key), None)
-                                        consumer_status = row.get("status") if row else None
-                                    if consumer_status not in terminal_statuses:
-                                        terminal = False
-                                        break
-                                if terminal:
-                                    cleanup_report = cache_manager.cleanup(max_age_seconds=0, dry_run=False)
-                                    if cache_audit:
-                                        deleted = set(cleanup_report.get("deleted_digests", []))
-                                        for record in base_manifest["cache_audit"]["artifacts"].values():
-                                            if CacheManager._digest(record["cache_key"]) in deleted:
-                                                record["deletion_observed"] = True
-                                                record["deletion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                                elif cache_audit and audit_record is not None:
-                                    audit_record["pending_or_retryable_consumer_task_keys"] = [
-                                        key for key in feature_consumer_task_keys
-                                        if key not in audit_record["terminal_consumer_task_keys"]
-                                    ]
     # Finish all queued worker fits before final cache reconciliation.  This is
     # also the durable boundary for the bounded feature fan-out: no artifact
     # may be deleted while an outstanding classifier future can still read it.

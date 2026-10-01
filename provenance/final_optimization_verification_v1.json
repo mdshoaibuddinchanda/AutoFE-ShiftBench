@@ -1,0 +1,221 @@
+{
+  "artifact_type": "final_optimization_verification_v1",
+  "baseline_code_fingerprint": "c885acd8d832c6cfb0659056e725bc3c2ecda8b70c3726c349a3229bd9271ed8",
+  "baseline_commit": "d874fd43694d0d2f49b589e26d67056d6b47ef40",
+  "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+  "data_hashes": {
+    "covertype": "be5adda3ce3827c02d18f11f68017340acd4f357a026b87c4faa89382f89b56a",
+    "haberman": "74984cac06e6026c4d330428fef101893e2349d8d1aa15b61fcb47691db0b7af",
+    "heart-disease": "d0eb82e29f70cbbdd73789209674ab609151e96ce5ffd5ef0666ca0113798c03",
+    "ionosphere": "9cb05353326e0803d8d8651d7731a20ae44fac9df42582a86270e8c2723b3bc6",
+    "sonar": "3c68a7327e052bc027b5ff59702d959439759023b21baf5fcaee12f081741baf"
+  },
+  "interrupted_diagnostic": "optimization-covertype-row_level-001:19/20completed; deliberately interrupted before the expensive AutoFE linear-SVM fit finished; historical fit about50minutes. Both policies use complete Raw ten-model checks; AutoFE all-ten large-data coverage is provided separately by Airlines recovery. Full campaign retains all tasks.",
+  "large_dataset_parity": [
+    {
+      "compared_cells": 10,
+      "mismatches": [],
+      "policy": "row_level",
+      "run_id": "optimization-covertype-raw-row_level-002"
+    },
+    {
+      "compared_cells": 10,
+      "mismatches": [],
+      "policy": "group_aware",
+      "run_id": "optimization-covertype-raw-group_aware-002"
+    }
+  ],
+  "limits": "Bounded one-seed/one-fold clean workload, not a full-grid speedup or statistical result. Baseline ran first; OS cache and host variation may affect timing. RSS sums process resident memory and may double count shared pages. Historical calibration has other conditions/ablations; no timing ratio is inferred for its Covertype subset. Fresh Covertype verification is Raw only; expensive AutoFE linear-SVM pair was not rerun.",
+  "measurements": [
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 0,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T11:43:18.257585Z",
+        "observed_epoch": 1790854998.1466048,
+        "over_limit": false
+      },
+      "code_fingerprint": "c885acd8d832c6cfb0659056e725bc3c2ecda8b70c3726c349a3229bd9271ed8",
+      "elapsed_s": 182.71376870002132,
+      "expected": 560,
+      "label": "baseline",
+      "policy": "row_level",
+      "process_tree_rss_bytes": 1096564736,
+      "run_id": "optimization-baseline-row_level-001",
+      "success": 560
+    },
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 1241279,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T11:45:07.897888Z",
+        "observed_epoch": 1790855107.8398666,
+        "over_limit": false
+      },
+      "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+      "elapsed_s": 107.82548629998928,
+      "expected": 560,
+      "label": "optimized",
+      "policy": "row_level",
+      "process_tree_rss_bytes": 1156329472,
+      "run_id": "optimization-optimized-row_level-001",
+      "success": 560
+    },
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 0,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T11:48:29.743049Z",
+        "observed_epoch": 1790855309.638857,
+        "over_limit": false
+      },
+      "code_fingerprint": "c885acd8d832c6cfb0659056e725bc3c2ecda8b70c3726c349a3229bd9271ed8",
+      "elapsed_s": 200.35203379997984,
+      "expected": 560,
+      "label": "baseline",
+      "policy": "group_aware",
+      "process_tree_rss_bytes": 1097392128,
+      "run_id": "optimization-baseline-group_aware-001",
+      "success": 560
+    },
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 931132,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T11:50:53.172026Z",
+        "observed_epoch": 1790855453.1119878,
+        "over_limit": false
+      },
+      "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+      "elapsed_s": 133.13289599999553,
+      "expected": 560,
+      "label": "optimized",
+      "policy": "group_aware",
+      "process_tree_rss_bytes": 1127743488,
+      "run_id": "optimization-optimized-group_aware-001",
+      "success": 560
+    },
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 52166426,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T12:02:57.457379Z",
+        "observed_epoch": 1790856177.3673675,
+        "over_limit": false
+      },
+      "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+      "elapsed_s": 143.30979020002997,
+      "expected": 10,
+      "label": "optimized_covertype",
+      "policy": "row_level",
+      "process_tree_rss_bytes": 2506711040,
+      "run_id": "optimization-covertype-raw-row_level-002",
+      "success": 10
+    },
+    {
+      "cache_high_water": {
+        "current_bytes": 0,
+        "high_water_bytes": 52157868,
+        "limit_bytes": 8589934592,
+        "observed_at": "2026-10-01T12:06:23.334885Z",
+        "observed_epoch": 1790856383.2751372,
+        "over_limit": false
+      },
+      "code_fingerprint": "35502d6cbe0d2e83183e3aee51825f9d42cc05d3230afba71fd9af5bd76ae98b",
+      "elapsed_s": 204.25970289995894,
+      "expected": 10,
+      "label": "optimized_covertype",
+      "policy": "group_aware",
+      "process_tree_rss_bytes": 2493849600,
+      "run_id": "optimization-covertype-raw-group_aware-002",
+      "success": 10
+    }
+  ],
+  "numerical_thread_environment": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "per_run_evidence": [
+    {
+      "manifest_sha256": "a29ce26fb448d62fcfa3f510305e007711efeb15c9144c2b77e9f8c5eb3c3304",
+      "results_sha256": "74997635266c7ca36211272487e67b949fd4fc15719cf91d8e7beaf98295ff65",
+      "run_id": "optimization-baseline-row_level-001"
+    },
+    {
+      "manifest_sha256": "133f79a810808ddd9dc62213b7f1d1a8f6711ba97048adbe06b7bc1c11f5674d",
+      "results_sha256": "4ee8ba077100242080289e1dc27b8b9d7f6d6e71e7fee6298f31a64582180e6b",
+      "run_id": "optimization-optimized-row_level-001"
+    },
+    {
+      "manifest_sha256": "1d834f26de5a539ee3f8a76334f4e7db60e31f32cf983deee678eb89d97fd5fc",
+      "results_sha256": "52ad4f13bda024b48e1b3ab7cf7c8d8fa9cce86d9ef29cd9ff4a25929d2c9737",
+      "run_id": "optimization-baseline-group_aware-001"
+    },
+    {
+      "manifest_sha256": "31102e66eb64216feee063f765ab2b27fade3237163a9f1691cfc3cf50cc43e0",
+      "results_sha256": "fac1389653547ab8f9c4ebdd24366f88875d2af755d75d94fc0575b15b4569d0",
+      "run_id": "optimization-optimized-group_aware-001"
+    },
+    {
+      "manifest_sha256": "c8f3da4151e6d8091baad5066980a72b7029d4a61eb120430521e51fe84dba24",
+      "results_sha256": "23f49fca5d4e9ab6bc624cbe5a89665483606d359dbb51ade8b8cb14fc3b4a60",
+      "run_id": "optimization-covertype-raw-row_level-002"
+    },
+    {
+      "manifest_sha256": "563b125669be3d3ffcee08ac0ef19b9abaa2c7e08fbe0679629e32fe02d600a8",
+      "results_sha256": "a7039e8df7bc67bddc9311247e83217c49f678f85e95f448634d84c91ccb83df",
+      "run_id": "optimization-covertype-raw-group_aware-002"
+    }
+  ],
+  "scientific_fields": [
+    "train_matrix_sha256",
+    "test_matrix_sha256",
+    "prediction_sha256",
+    "roc_auc",
+    "train_auc",
+    "pr_auc",
+    "log_loss",
+    "brier_score",
+    "accuracy",
+    "balanced_accuracy",
+    "f1",
+    "precision",
+    "recall",
+    "mcc",
+    "ks_stat",
+    "wasserstein",
+    "operator_candidate_counts",
+    "operator_configuration",
+    "n_original",
+    "n_retained",
+    "n_generated",
+    "n_train",
+    "n_test",
+    "model_backend"
+  ],
+  "scientific_status": "PENDING CORRECTED RUN",
+  "small_dataset_parity": [
+    {
+      "compared_cells": 560,
+      "elapsed_ratio_baseline_over_optimized": 1.6945322944491972,
+      "mismatches": [],
+      "policy": "row_level"
+    },
+    {
+      "compared_cells": 560,
+      "elapsed_ratio_baseline_over_optimized": 1.5049025433953347,
+      "mismatches": [],
+      "policy": "group_aware"
+    }
+  ],
+  "status": "passed",
+  "verification_script_sha256": "9e81dc4f498d638be1bc710aade54cd2cef4809dbddb63c3dfcac1faf8016143",
+  "workers": 4
+}

@@ -27,7 +27,7 @@ Featuretools arithmetic map `f(u)` and its Jacobian is the one-row gradient
 `J_f(u) = [df/da, df/db]`. The supported analytic maps are:
 
 | Operator | Map | Jacobian |
-|---|---|---|
+| --- | --- | --- |
 | `add_numeric` | `a + b` | `[1, 1]` |
 | `subtract_numeric` | `a - b` | `[1, -1]` |
 | `multiply_numeric` | `a * b` | `[b, a]` |
@@ -90,7 +90,7 @@ not observed benchmark measurements; a short preflight must measure actual
 records before a long run. For the 612,500-task historical grid:
 
 | Candidate records per task | Records | Uncompressed | Gzip planning estimate |
-|---:|---:|---:|---:|
+| ---: | ---: | ---: | ---: |
 | 100 | 61,250,000 | 24.0 GiB | 8.4 GiB |
 | 1,000 | 612,500,000 | 239.6 GiB | 83.9 GiB |
 | 2,000 | 1,225,000,000 | 479.2 GiB | 167.7 GiB |

@@ -33,6 +33,10 @@ class CacheBusyError(CacheError):
     """Raised when a writer or cleanup operation encounters an active lease."""
 
 
+class CacheCapacityError(CacheBusyError):
+    """Raised when a ready artifact cannot fit the configured byte limit."""
+
+
 _KEY_RE = re.compile(r"^[A-Za-z0-9_.:/@+=,-]{1,512}$")
 
 
@@ -285,18 +289,6 @@ class CacheManager:
         """Publish while the caller holds the per-artifact lock."""
         digest, payload_path, manifest_path, ready_path = self._paths(key)
         now = _now_seconds()
-        if enforce_limit and self.max_bytes is not None:
-            existing_bytes = sum(
-                path.stat().st_size for path in (payload_path, manifest_path, ready_path) if path.exists()
-            )
-            projected = self._usage_bytes() - existing_bytes + len(payload)
-            if projected > self.max_bytes:
-                # Admission control is checked before writing. The caller
-                # must reclaim unleased artifacts before retrying; an in-use
-                # group is never evicted to make room for a new one.
-                raise CacheBusyError(
-                    f"Cache admission denied for {key}: projected {projected} bytes exceeds limit {self.max_bytes}"
-                )
         base = dict(metadata or {})
         base.update({
             "key": key, "digest": digest, "state": "ready", "schema_version": 1,
@@ -304,6 +296,24 @@ class CacheManager:
             "created_epoch": now, "created_at": _utc_now(),
             "last_access_epoch": now, "last_access_at": _utc_now(),
         })
+        manifest_bytes = (json.dumps(base, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+        ready = {
+            "state": "ready", "key": key, "digest": digest,
+            "manifest_sha256": _sha256_bytes(manifest_bytes),
+        }
+        ready_bytes = (json.dumps(ready, sort_keys=True) + "\n").encode("utf-8")
+        if enforce_limit and self.max_bytes is not None:
+            existing_bytes = sum(
+                path.stat().st_size for path in (payload_path, manifest_path, ready_path) if path.exists()
+            )
+            projected = self._usage_bytes() - existing_bytes + len(payload) + len(manifest_bytes) + len(ready_bytes)
+            if projected > self.max_bytes:
+                # Admission bounds final ready payload and metadata. A
+                # replacement's staged copy is separately observed by the
+                # high-water monitor. In-use groups are never evicted here.
+                raise CacheCapacityError(
+                    f"Cache admission denied for {key}: projected {projected} bytes exceeds limit {self.max_bytes}"
+                )
         temp_payload = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.payload.tmp"
         temp_manifest = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.manifest.tmp"
         temp_ready = self.root / f".{digest}.{os.getpid()}.{secrets.token_hex(8)}.ready.tmp"
@@ -313,13 +323,15 @@ class CacheManager:
                 stream.flush()
                 os.fsync(stream.fileno())
             with temp_manifest.open("wb") as stream:
-                stream.write((json.dumps(base, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"))
+                stream.write(manifest_bytes)
                 stream.flush()
                 os.fsync(stream.fileno())
+            # Observe staged bytes before replacement can reclaim an old
+            # payload.  Sampling only after cleanup hides the actual peak.
+            self.high_water()
             _replace_with_retry(temp_payload, payload_path)
             _replace_with_retry(temp_manifest, manifest_path)
-            ready = {"state": "ready", "key": key, "digest": digest, "manifest_sha256": _sha256_bytes(manifest_path.read_bytes())}
-            temp_ready.write_text(json.dumps(ready, sort_keys=True) + "\n", encoding="utf-8")
+            temp_ready.write_bytes(ready_bytes)
             with temp_ready.open("r+b") as stream:
                 os.fsync(stream.fileno())
             _replace_with_retry(temp_ready, ready_path)
@@ -327,7 +339,9 @@ class CacheManager:
             temp_payload.unlink(missing_ok=True)
             temp_manifest.unlink(missing_ok=True)
             temp_ready.unlink(missing_ok=True)
-        return self._read_record(key)
+        record = self._read_record(key)
+        self.high_water()
+        return record
 
     def put_bytes(self, key: str, payload: bytes, metadata: Mapping[str, Any] | None = None) -> CacheRecord:
         """Atomically publish one ready artifact, refusing replacement while leased."""
@@ -406,6 +420,33 @@ class CacheManager:
         digest, _, _, _ = self._paths(key)
         active, invalid = self._active_lease_files(digest, _now_seconds())
         return len(active) + len(invalid)
+
+    def remove(self, key: str) -> dict[str, Any]:
+        """Remove one artifact only after its readers release their leases.
+
+        The runner owns the decision that all classifier consumers have
+        terminated.  This method fences that decision against lease
+        acquisition and deletes only this key, without scanning or reading
+        any other artifact's payload.  Unknown lease state remains protected.
+        """
+        digest, payload_path, manifest_path, ready_path = self._paths(key)
+        with self._artifact_lock(digest):
+            active, invalid = self._active_lease_files(digest, _now_seconds())
+            report: dict[str, Any] = {
+                "key": key, "digest": digest, "deleted": False,
+                "reclaimed_bytes": 0, "skipped_leased": bool(active or invalid),
+            }
+            if active or invalid:
+                return report
+            self.high_water()
+            paths = (payload_path, manifest_path, ready_path)
+            existing = [path for path in paths if path.exists()]
+            report["reclaimed_bytes"] = sum(path.stat().st_size for path in existing)
+            for path in existing:
+                path.unlink(missing_ok=True)
+            report["deleted"] = bool(existing)
+            report["high_water"] = self.high_water()
+            return report
 
     def _artifact_digests(self) -> set[str]:
         digests = {path.name[:-len(".payload")] for path in self.root.glob("*.payload")}
@@ -521,6 +562,9 @@ class CacheManager:
         if age_limit < 0 or (byte_limit is not None and byte_limit < 0):
             raise ValueError("Cleanup age and byte limits must be nonnegative")
         before = self.reconcile(now=now)
+        # Preserve bytes that are about to be reclaimed, including artifacts
+        # left by a terminated writer before any publication sample occurred.
+        self.high_water(limit_bytes=byte_limit, now=now)
         candidates: list[tuple[str, str, int, float]] = []
         for item in before["ready"]:
             age = now - item["last_access_epoch"]

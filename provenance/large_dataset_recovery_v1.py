@@ -198,6 +198,8 @@ def main() -> None:
     parser.add_argument("--policy", choices=("row_level", "group_aware"), help=argparse.SUPPRESS)
     parser.add_argument("--run-id", help=argparse.SUPPRESS)
     parser.add_argument("--version", default="001", help="Three-digit diagnostic ID version")
+    parser.add_argument("--scope", type=Path, default=ROOT / "provenance" / "reviewer1_launch_scope_v3.json")
+    parser.add_argument("--report", type=Path, default=ROOT / "provenance" / "large_dataset_recovery_v3.json")
     args = parser.parse_args()
     if len(args.version) != 3 or not args.version.isdecimal():
         parser.error("--version must be three decimal digits")
@@ -212,7 +214,7 @@ def main() -> None:
         os.environ[name] = value
     from src.provenance import code_fingerprint, file_sha256
 
-    scope = json.loads((ROOT / "provenance" / "reviewer1_launch_scope_v2.json").read_text(encoding="utf-8"))
+    scope = json.loads(args.scope.read_text(encoding="utf-8"))
     source_fingerprint = code_fingerprint(ROOT)
     if source_fingerprint != scope["code_fingerprint"]:
         raise RuntimeError("Frozen source fingerprint changed before recovery proof")
@@ -236,7 +238,22 @@ def main() -> None:
         "task_design": "one seed, one fold, clean, Raw and AutoFE_Baseline, ten classifiers",
         "runs": results,
     }
-    REPORT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    # Verify exact outputs against the preceding large calibration, keeping
+    # the historical source/result identity and timing evidence separate.
+    from provenance.final_optimization_verification import rows, FIELDS
+    parity = []
+    for policy, old_version, result in zip(('row_level', 'group_aware'), ('002', '003'), results):
+        current = rows(OUTPUT_ROOT / result['run_id'] / 'results.jsonl')
+        previous = rows(ROOT / 'corrected_runs' / 'large_calibration' /
+                        f'calibration-{policy}-{old_version}' / 'results.jsonl')
+        mismatches = [{'cell': key, 'field': field} for key in current for field in FIELDS
+                      if current[key].get(field) != previous[key].get(field)]
+        parity.append({'policy': policy, 'compared_cells': len(current), 'mismatches': mismatches})
+        if mismatches:
+            raise ValueError(f'Recovered large-dataset output parity failed: {mismatches[:5]}')
+    report['historical_calibration_scientific_parity'] = parity
+    report['scope_sha256'] = file_sha256(args.scope)
+    args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
 
 

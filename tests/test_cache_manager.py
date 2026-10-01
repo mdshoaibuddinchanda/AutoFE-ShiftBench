@@ -8,7 +8,7 @@ import time
 import pytest
 
 import src.cache_manager as cache_module
-from src.cache_manager import CacheBusyError, CacheManager, CacheNotReadyError
+from src.cache_manager import CacheBusyError, CacheCapacityError, CacheManager, CacheNotReadyError
 
 
 def test_put_publishes_only_atomic_ready_artifact_and_reads_through_lease(tmp_path):
@@ -215,3 +215,76 @@ def test_admission_control_does_not_evict_an_in_use_artifact(tmp_path):
         assert manager._paths("in-use")[1].exists()
     finally:
         lease.release()
+
+
+def test_key_specific_removal_preserves_readers_and_other_artifacts(tmp_path):
+    manager = CacheManager(tmp_path / "cache")
+    manager.put_bytes("finished", b"finished-payload")
+    other = manager.put_bytes("other", b"other-payload")
+    reader = manager.acquire("finished", owner="still-reading")
+    try:
+        blocked = manager.remove("finished")
+        assert blocked["skipped_leased"] is True
+        assert blocked["deleted"] is False
+        assert reader.read_bytes() == b"finished-payload"
+    finally:
+        reader.release()
+    removed = manager.remove("finished")
+    assert removed["deleted"] is True
+    assert removed["reclaimed_bytes"] >= len(b"finished-payload")
+    assert other.payload_path.exists()
+    with manager.lease("other") as other_reader:
+        assert other_reader.read_bytes() == b"other-payload"
+    assert manager.remove("finished")["deleted"] is False
+
+
+def test_key_specific_removal_retains_malformed_lease_state(tmp_path):
+    manager = CacheManager(tmp_path / "cache")
+    artifact = manager.put_bytes("protected", b"keep-me")
+    bad_lease = manager.leases_dir / f"{artifact.digest}.bad.lease.json"
+    bad_lease.write_text("invalid json", encoding="utf-8")
+    blocked = manager.remove("protected")
+    assert blocked["skipped_leased"] is True
+    assert blocked["deleted"] is False
+    assert artifact.payload_path.exists() and bad_lease.exists()
+
+
+def test_cleanup_records_peak_before_removing_unpublished_crash_debris(tmp_path):
+    manager = CacheManager(tmp_path / "cache")
+    partial = manager._paths("interrupted-writer")[1]
+    partial.write_bytes(b"x" * 4096)
+    assert not manager.high_water_path.exists()
+    report = manager.cleanup(max_age_seconds=0, now=time.time() + 1)
+    assert report["before_bytes"] == 4096
+    assert report["after_bytes"] == 0
+    assert report["high_water"]["high_water_bytes"] >= 4096
+    assert report["high_water"]["current_bytes"] == 0
+
+
+def test_publication_records_staged_replacement_peak_before_reclamation(tmp_path):
+    manager = CacheManager(tmp_path / "cache")
+    manager.put_bytes("replace", b"x" * 4096)
+    manager.put_bytes("replace", b"y" * 4096)
+    report = json.loads(manager.high_water_path.read_text(encoding="utf-8"))
+    assert report["high_water_bytes"] > 2 * 4096
+    removed = manager.remove("replace")
+    assert removed["high_water"]["current_bytes"] == 0
+    assert removed["high_water"]["high_water_bytes"] == report["high_water_bytes"]
+
+
+def test_capacity_denial_can_be_retried_after_terminal_group_removal(tmp_path):
+    manager = CacheManager(tmp_path / "cache", max_bytes=2048)
+    manager.get_or_create_bytes("first", lambda: b"x" * 900)
+    with pytest.raises(CacheCapacityError):
+        manager.get_or_create_bytes("next", lambda: b"y" * 900)
+    assert manager.remove("first")["deleted"] is True
+    payload, hit = manager.get_or_create_bytes("next", lambda: b"y" * 900)
+    assert payload == b"y" * 900 and hit is False
+
+
+def test_admission_accounts_for_ready_metadata_as_well_as_payload(tmp_path):
+    manager = CacheManager(tmp_path / "cache", max_bytes=100)
+    with pytest.raises(CacheCapacityError):
+        manager.get_or_create_bytes("too-large-with-metadata", lambda: b"x" * 50)
+    assert manager.reconcile()["ready_count"] == 0
+    assert manager.reconcile()["current_bytes"] == 0

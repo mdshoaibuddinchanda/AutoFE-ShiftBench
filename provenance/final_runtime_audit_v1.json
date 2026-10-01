@@ -1,0 +1,135 @@
+{
+  "artifact_type": "bounded_final_runtime_optimization_audit_v1",
+  "code_freeze_implication": "Source changes alter code_fingerprint. Existing green freeze cannot describe changed source; preserve old scope/calibrations and version the updated execution scope with bounded parity, recovery and resource evidence.",
+  "created_utc": "2026-10-01T11:26:28.606571+00:00",
+  "final_read_only_code_review": {
+    "blocking_findings_remaining": [],
+    "checked_paths": [
+      "All planned classifier consumer keys must exist and be terminal before key-specific deletion.",
+      "Resumed/recovered successes and terminal failures revisit feature-cache reclamation.",
+      "Retryable failures remain pending and cannot cause premature deletion.",
+      "Admission pressure drains completed workers and renews the current task lease.",
+      "Memoized preparation is released after successful cache read.",
+      "Any-completed publication retains worker and pending-queue bounds.",
+      "Serial models receive independent arrays; spawned workers receive independent serialized inputs.",
+      "Optional reclamation locks or file errors do not reclassify committed model results."
+    ],
+    "focused_validation": {
+      "command": "D:\\Conda\\p12\\python.exe -m pytest tests/test_cache_manager.py -q",
+      "elapsed_seconds": 4.7,
+      "passed": 20
+    },
+    "limitations": [
+      "Transient retryable task failures retain artifacts until resumed attempts terminate; many such failures can still consume the byte cap and require recovery.",
+      "Active or malformed external cache-reader lease state conservatively prevents deletion.",
+      "Updated source requires frozen identity and integrated parity/recovery/resource validation before launch approval."
+    ],
+    "reviewed_utc": "2026-10-01T11:33:19.195266+00:00",
+    "source_sha256": {
+      "src/cache_manager.py": "a355e6ec244b3028611087d673e78c8543b0c20a4763bdeea84a338d9c935c81",
+      "src/pipeline_runner.py": "a0feaf34afaa7f5daca8a7208532c4430838daf18bc9d1f95d466cf08f740b45"
+    }
+  },
+  "findings": [
+    {
+      "description": "Per-feature cleanup was checked at last classifier submission while consumers were still running. Both 120-cell calibrations retained all twelve feature artifacts until final cleanup, creating a risk of full-grid capacity rejection. Terminal consumer completion must revisit key-specific lease-safe deletion.",
+      "kind": "correctness"
+    },
+    {
+      "description": "Historical peak cache bytes were zero because peak sampling happened after cleanup, despite more than 2.3GB of artifacts immediately before final cleanup.",
+      "kind": "measurement"
+    },
+    {
+      "description": "FIFO draining left only one worker active for most large calibration time. Any-completed draining can publish and replace finished work promptly under the same worker and queue bounds.",
+      "kind": "optimization"
+    },
+    {
+      "description": "The audited baseline bounded cache hit reads the whole payload four times and hashes it three times. Compatible classifiers repeated prepared-tuple loading, float32 conversion and frame digests. Updated runner code now reuses a prepared group and precomputes numeric matrices and digests; integrated parity and resource evidence remain required.",
+      "kind": "baseline_optimization_opportunity"
+    }
+  ],
+  "observations": [
+    {
+      "cache_bytes_before_final_cleanup": 2331103024,
+      "cache_feature_groups": 12,
+      "cache_hit_cells": 108,
+      "historical_recorded_high_water_bytes": 0,
+      "model_worker_elapsed_s": {
+        "catboost": 380.08187210018514,
+        "extra_trees": 909.0698661000351,
+        "gaussian_nb": 22.602119199815206,
+        "knn": 2464.0691073001944,
+        "lightgbm": 179.91054489987437,
+        "linear_svm": 10471.935718000052,
+        "logistic_regression": 340.3986841000151,
+        "mlp": 202.40471520001302,
+        "random_forest": 1455.5228474999312,
+        "xgboost": 250.39421439991565
+      },
+      "occupancy_seconds": {
+        "0": 18.098518133163452,
+        "1": 9686.670259714127,
+        "2": 982.7508444786072,
+        "3": 454.4635679721832,
+        "4": 915.2079417705536
+      },
+      "queue_bound": 8,
+      "run_id": "calibration-row_level-002",
+      "simulation_fifo_seconds": 11995.347368400136,
+      "simulation_first_completed_seconds": 4703.285332799889,
+      "simulation_saved_seconds": 7292.062035600247,
+      "simulation_speedup_ratio": 2.55041880719987,
+      "source_code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
+      "successful_cells": 120,
+      "worker_capacity_used_percent": 34.5776935875963,
+      "worker_elapsed_sum_s": 16676.38968880003,
+      "worker_span_observed_s": 12057.191132068634,
+      "workers": 4
+    },
+    {
+      "cache_bytes_before_final_cleanup": 2333649174,
+      "cache_feature_groups": 12,
+      "cache_hit_cells": 108,
+      "historical_recorded_high_water_bytes": 0,
+      "model_worker_elapsed_s": {
+        "catboost": 306.0617746000062,
+        "extra_trees": 779.5020576000679,
+        "gaussian_nb": 20.214423800003715,
+        "knn": 2122.053060000064,
+        "lightgbm": 156.54959770012647,
+        "linear_svm": 10136.372127699957,
+        "logistic_regression": 365.1231555000413,
+        "mlp": 123.2088078999659,
+        "random_forest": 1176.2288437000243,
+        "xgboost": 210.66468040004838
+      },
+      "occupancy_seconds": {
+        "0": 74.92938613891602,
+        "1": 9252.055142402649,
+        "2": 697.6480884552002,
+        "3": 450.0603828430176,
+        "4": 849.6131844520569
+      },
+      "queue_bound": 8,
+      "run_id": "calibration-group_aware-003",
+      "simulation_fifo_seconds": 11215.024608399952,
+      "simulation_first_completed_seconds": 4131.570271600271,
+      "simulation_saved_seconds": 7083.454336799681,
+      "simulation_speedup_ratio": 2.7144702549270847,
+      "source_code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
+      "successful_cells": 120,
+      "worker_capacity_used_percent": 33.988804601129544,
+      "worker_elapsed_sum_s": 15395.978528900305,
+      "worker_span_observed_s": 11324.30618429184,
+      "workers": 4
+    }
+  ],
+  "scientific_use": "execution diagnostics only; no corrected performance conclusion",
+  "simulation_definition": "Read successful result rows in existing FIFO publication order. Assign fixed observed worker_elapsed_s durations to four workers with a bound of eight pending futures. Compare draining oldest submitted with draining earliest completed. No new models or benchmark cells ran.",
+  "simulation_limitations": [
+    "Excludes coordinator feature preparation, cache I/O, serialization, durable publication and process startup.",
+    "Treats task durations as fixed; different overlap can change CPU and memory contention.",
+    "The ratios are opportunities to investigate, not forecasts or guaranteed speedups."
+  ],
+  "theoretical_only": true
+}

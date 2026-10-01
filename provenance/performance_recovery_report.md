@@ -21,7 +21,7 @@ The local Windows 11 host is an Intel i5-11260H with 4 physical and 8 logical co
 The bounded stage profile used seed 42, fold 1 of 5, clean data:
 
 | Dataset/pipeline | Preparation (s) | Fit (s) | Total (s) | RSS after (MiB) | Feature result |
-|---|---:|---:|---:|---:|---|
+| --- | ---: | ---: | ---: | ---: | --- |
 | Sonar / Raw | 0.0115 | 0.0042 | 0.0239 | 153.59 | 60 |
 | Sonar / AutoFE_Baseline | 1.2782 | 0.0882 | 1.3812 | 175.85 | 100 retained / 970 generated |
 | Airlines / Raw | 1.7667 | 6.2752 | 8.6129 | 1,337.91 | 605 one-hot |
@@ -30,7 +30,7 @@ The bounded stage profile used seed 42, fold 1 of 5, clean data:
 The profile's complete 8-pipeline × 10-model Sonar mix had 80 successful tasks at each worker count:
 
 | Workers | Elapsed (s) | Throughput (tasks/s) | Speedup vs 1 | P95 task (s) | Max child RSS (MiB) |
-|---:|---:|---:|---:|---:|---:|
+| ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 91.1865 | 0.8773 | 1.000x | 3.6219 | 228.11 |
 | 2 | 46.4736 | 1.7214 | 1.962x | 3.1928 | 228.95 |
 | 4 | 30.6148 | 2.6131 | 2.979x | 3.5834 | 227.45 |

@@ -1,45 +1,20 @@
-# Corrected results note
+# Corrected results note template
 
-Status: **PENDING CORRECTED RUN**. No full corrected campaign has been launched. A bounded `sonar` preflight and a large `airlines` scale preflight passed under both split policies; exact AUC policy, task counts, runtime projections, and storage gate are frozen in `provenance/reviewer1_scope_manifest.json`.
+Status: **PENDING CORRECTED RUN**. The historical ledger/manuscript is separate. Bounded pilots, optimizer parity, synthetic tables/figures and forced-restart diagnostics verify code paths and supply resource evidence; none is a corrected 25-dataset result.
 
-This file is reserved for the machine-checked result record. It must be generated from a frozen run manifest and explicit result ledger, never from the historical ledger.
+The current seven-run v3 scope contains2,275,000 intended performance cells and84,000 prespecified group-AUC skips, leaving at most 2,191,000 eligible before condition-specific domain skips. Its primary component is1,750,000 intended cells with70,000 group skips. Primary complete-seed group AUC covers at most 23 datasets; wine-quality-red/kddcup99 remain visible without substitute folds. Separate clean mechanism scope:1,250 feature tasks,50 skips,1,200 executable histories.
 
-## Frozen record fields
+## Machine-checked record after the run
 
-- Run ID: `PENDING CORRECTED RUN`
-- Code commit and source fingerprint: `PENDING CORRECTED RUN`
-- Environment/package versions: `PENDING CORRECTED RUN`
-- Dataset source/version, CSV checksum, sidecar checksum: `PENDING CORRECTED RUN`
-- Split policies: `row_level` legacy-comparable and `group_aware` exact raw-feature groups
-- Canonical grouping rule: target-excluded, unperturbed raw predictors; type/missing/numeric/categorical canonicalization and collision checks recorded in the group audit
-- Conditions/pipelines/models/seeds/folds: frozen scope manifest records 10 primary conditions, 14 pipelines (2 core plus 12 added ablation/fairness pipelines), 5 seeds, 5 folds, and 10 models; intended two-policy denominator is 1,750,000 task cells.
-- Task denominator: `PENDING FROZEN MANIFEST`
-- Interval method and confidence level: `PENDING FROZEN ANALYSIS`
-- Multiplicity families and adjustment: dataset-level paired contrasts with prespecified Holm families
+`python -m provenance.generate_corrected_assets` writes the actual record to `corrected_runs/paper_assets/corrected_results_note.md`, alongside14 primary CSVs,7PNG/PDF figure pairs and `asset_manifest.json`. It includes source/scope/data/run/config/runtime identities and hashes, expected/success/skipped/failed/timed-out counts, finite and complete-dataset denominators, prespecified dataset ROC-AUC contrasts with uncertainty/Holm, per-dataset and common-set row/group comparisons, missing-outcome identification bounds, exact table/figure paths, and limitations. Optional mechanism/sensitivity exports add separate evidence. The statistical family named F1 is not the classifier F1 metric.
 
-## Required side-by-side table
+Running/partial ledgers are rejected. Terminal failures receive explicit unknown-outcome labels and `scientific_complete=false`; bounds do not impute AUC, assign undefined structural group AUC, or permit a claim that the full campaign succeeded. History and manuscript numeric revision remain pending until suitable completed evidence exists.
 
-For every applicable dataset and overall aggregate, report:
+## Required final claims
 
-| Dataset / aggregate | Metric | Row-level estimate | Group-aware estimate | Group minus row difference | Valid dataset count | Completed tasks / denominator | Missing/failed/skipped count | Interval | Adjusted p-value |
-|---|---|---:|---:|---:|---:|---:|---:|---|---:|
-| all applicable datasets | Raw | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING | PENDING | PENDING | PENDING | PENDING |
-| all applicable datasets | AutoFE central contrast | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING | PENDING | PENDING | PENDING | PENDING |
-| all applicable datasets | matched-cap Raw contrast | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING CORRECTED RUN | PENDING | PENDING | PENDING | PENDING | PENDING |
-
-Per-dataset values must be preserved below the aggregate table so reversals and dataset-specific failures remain visible.
-
-## Duplicate and fold diagnostics
-
-- Duplicate-group prevalence: recorded in `dataset_schema_audit.json`; all-dataset group artifact: `provenance/group_fold_audit.json`.
-- Row-level cross-fold overlap: recorded in `dataset_schema_audit.md` and `group_fold_audit.md` (e.g. PhishingWebsites 65.418363%, KDDCup99 67.007%).
-- Conflicting-label group counts: recorded in `dataset_schema_audit.json` and `group_fold_audit.json`.
-- Group-aware shared-group overlap: zero by assertion on all feasible preflight folds; two datasets are explicitly AUC-infeasible and are not substituted.
-
-## Mechanism/operator and coverage sections
-
-Candidate/Jacobian summaries and operator-isolation benchmark values remain `PENDING CORRECTED RUN`. The bounded preflight recorded 950 training-only candidate-history records and estimated approximately 79.7 GiB compressed for the original planning grid. The large-dataset cache gate projects approximately 47,378 GiB for the full two-policy ablation scope under current retention, so full task coverage, failures, retries, timeouts, complete-case analysis, and missingness sensitivity remain pending.
-
-## Historical ledger (separate)
-
-The historical ledger has 560,002 rows and the manuscript reports a 538,972-row subset. Those values are preserved in `provenance/original_run.json` and are not corrected estimates, not group-aware estimates, and not evidence for the pending two-track comparison.
+- All reported values come from corrected ledgers with frozen identities, not historical560,002records or the manuscript538,972subset.
+- Dataset is the independent unit. Row/group folds and predictions are never treated as paired held-out samples.
+- Candidate generated/rejected/duplicate/eligible/selected counts use unique feature tasks, not ten classifier copies.
+- Measured feature-generation/preprocessing/preparation costs are shared across classifiers; sum at unique feature-task level when reporting total preparation cost. Missing old timing fields remain null.
+- Mechanism evidence is clean-condition exploratory association, not causal proof.
+- Storage uses bounded/regenerable cache and separate limited mechanism history. Historical79.66GiB history and47,378 GiB retained-cache projections are superseded planning evidence.

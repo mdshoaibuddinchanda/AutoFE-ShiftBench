@@ -53,7 +53,7 @@ This artifact is execution and recovery evidence, not a corrected performance re
 ## Historical checkpoint snapshot during execution (2026-09-30)
 
 | Split policy | Intended | Valid recovered before continuation | Newly executed after recovery | Terminal successes | Retry/failure attempts retained | Remaining |
-|---|---:|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `row_level` | 5,600 | 5,422 | 178 successful cells; 12 failed attempts were retried | 5,600 | 12 failed attempt rows, 0 terminal failures | 0 |
 | `group_aware` | 5,600 | 905 retained before lease migration | in progress (scheduler snapshot: 1,302 successes) | 1,302 at snapshot | 0 terminal failures at snapshot | 4,298 at snapshot |
 
@@ -62,4 +62,3 @@ At this snapshot, the row-level JSONL contained 5,600 unique successful logical 
 ## Final reconciled outcome
 
 The group-aware coordinator exited normally at 18:16 UTC on 2026-09-30. Final scheduler result artifacts, phase-2 checkpoint successes, unique successful JSONL rows, and manifest successes each number 5,600 under each policy, with zero disagreements and zero duplicate successful attempts. The group final cache cleanup removed 562 physical artifact digests, reclaimed 101,056,731 bytes, and left zero payload files. The row cache also has zero remaining payload files. Historical retry attempts remain visible: row-level 12 failed JSONL rows plus 16 intentional `WorkerReplaced` scheduler attempts, and group-aware seven intentional replacement attempts. Neither run had a `LeaseExpired` attempt or refit a previously committed cell. The prior snapshot table above is retained as a dated execution record, not a current count.
-

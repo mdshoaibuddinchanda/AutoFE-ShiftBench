@@ -20,10 +20,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import wilcoxon
 
 from src.pipeline_runner import PIPELINE_CONFIGS
 from src.provenance import atomic_write_json, file_sha256
-from src.stats_analysis import PRIMARY_CONDITIONS
+from src.reviewer1_analysis import BOOTSTRAP_REPLICATES, BOOTSTRAP_SEED, paired_dataset_bootstrap
+from src.stats_analysis import PRIMARY_CONDITIONS, PRESPECIFIED_PIPELINES, _holm_adjust
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,8 +36,18 @@ SECONDARY_METRICS = (
     "accuracy", "balanced_accuracy", "precision", "recall", "f1", "mcc",
     "pr_auc", "log_loss", "brier_score", "train_auc", "train_time_s",
     "infer_time_s", "autofe_gen_time_s", "ram_used_mb", "n_generated",
-    "n_retained",
+    "n_retained", "n_original", "preprocessing_time_s", "preparation_time_s",
 )
+
+
+def _auc_ineligibility(scope: dict, policy: str, dataset: str) -> str | None:
+    """Prespecified undefined AUC cells have no missing-outcome bounds."""
+    if policy == "group_aware":
+        item = next(item for item in scope["datasets"] if item["name"] == dataset)
+        seeds = item.get("group_auc_infeasible_seeds", [])
+        if seeds:
+            return "all_configured_seed_group_auc_infeasibility; seeds=" + ",".join(map(str, seeds))
+    return None
 
 
 def _write_csv(path: Path, fields: list[str], rows: list[dict]) -> None:
@@ -82,7 +94,7 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
     target = run_record or next(item for item in scope["runs"]
                                 if item["scope"] == "primary" and item["split_policy"] == policy)
     expected_id = target["run_id"]
-    if (manifest.get("status") != "complete" or manifest.get("run_id") != expected_id
+    if (manifest.get("status") not in {"complete", "completed_with_failures"} or manifest.get("run_id") != expected_id
             or manifest.get("code_fingerprint") != scope["code_fingerprint"]
             or manifest.get("configuration", {}).get("split_policy") != policy):
         raise ValueError(f"Primary run is incomplete or has a different frozen identity: {run_dir}")
@@ -91,6 +103,7 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
     lookup, connection = _terminal_lookup(run_dir, manifest)
     aggregate = defaultdict(lambda: {"success": 0, "skipped": 0, "failed": 0,
                                      "timed_out": 0, "auc_sum": 0.0, "reasons": set(),
+                                     "outcome_reasons": set(),
                                      "metric_sum": defaultdict(float),
                                      "metric_count": defaultdict(int)})
     conditions = defaultdict(lambda: {"success": 0, "auc_sum": 0.0})
@@ -128,9 +141,12 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                 if status == "skipped":
                     bucket["reasons"].add(str(row.get("skip_reason", "unspecified")))
                 if status != "success":
+                    bucket["outcome_reasons"].add(status + ": " + str(
+                        row.get("skip_reason") or row.get("exception_type")
+                        or row.get("error_summary") or "unspecified"))
                     continue
                 auc = row.get("roc_auc")
-                if auc is None or not math.isfinite(float(auc)):
+                if auc is None or not math.isfinite(float(auc)) or not 0 <= float(auc) <= 1:
                     raise ValueError(f"Successful cell lacks finite ROC-AUC: {key}")
                 bucket["auc_sum"] += float(auc)
                 condition_bucket = conditions[(dataset, pipeline, str(row["condition"]))]
@@ -188,6 +204,9 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                 "mean_roc_auc": bucket["auc_sum"] / success if success else None,
                 "complete_auc": success == expected_cells,
                 "skip_reasons": "; ".join(sorted(bucket["reasons"])),
+                "outcome_reasons": "; ".join(sorted(bucket["outcome_reasons"])),
+                "auc_eligible": _auc_ineligibility(scope, policy, dataset) is None,
+                "auc_ineligibility_reason": _auc_ineligibility(scope, policy, dataset),
                 **{f"mean_{metric}": bucket["metric_sum"][metric] / bucket["metric_count"][metric]
                    if bucket["metric_count"][metric] else None for metric in SECONDARY_METRICS},
                 **{f"n_{metric}_cells": bucket["metric_count"][metric]
@@ -221,8 +240,14 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
             })
     return dataset_rows, condition_rows, operator_rows, {
         "run_id": expected_id, "manifest_sha256": file_sha256(manifest_path),
+        "manifest_path": str(manifest_path), "results_path": str(result_path),
+        "code_commit": manifest.get("code_commit"),
+        "configuration_fingerprint": manifest.get("configuration_fingerprint"),
+        "runtime_fingerprint": manifest.get("runtime_fingerprint"),
         "results_sha256": file_sha256(result_path), "terminal_rows": included_rows,
-        "counts_by_status": manifest.get("counts_by_status"),
+        "counts_by_status": {status: sum(bucket[status] for bucket in aggregate.values())
+                             for status in ("success", "failed", "skipped", "timed_out")},
+        "terminal_manifest_status": manifest["status"],
     }
 
 
@@ -276,10 +301,213 @@ def condition_summary(rows: list[dict], scope: dict) -> list[dict]:
     return output
 
 
-def _save_figure(fig, stem: Path, *, diagnostic: bool = False) -> list[str]:
-    if diagnostic:
+def _dataset_statistics(differences: list[float]) -> dict:
+    """Each input is one complete dataset, never a fold or prediction pair."""
+    values = np.asarray(differences, dtype=float)
+    interval = paired_dataset_bootstrap(values) if len(values) >= 2 else (None, None)
+    return {
+        "n_complete_datasets": len(values),
+        "mean_delta": float(values.mean()) if len(values) else None,
+        "median_delta": float(np.median(values)) if len(values) else None,
+        "win_count": int((values > 0).sum()), "tie_count": int((values == 0).sum()),
+        "loss_count": int((values < 0).sum()), "ci_low": interval[0], "ci_high": interval[1],
+        "ci_method": "paired_dataset_bootstrap_percentile", "ci_level": 0.95,
+        "bootstrap_seed": BOOTSTRAP_SEED, "bootstrap_replicates": BOOTSTRAP_REPLICATES,
+        "independent_unit": "dataset", "tie_tolerance": 0.0,
+    }
+
+
+def _contrast_definitions(scope: dict) -> list[tuple[str, str, str, str]]:
+    definitions = [(f"roc_auc_raw_{pipeline.removeprefix('AutoFE_').lower()}",
+                    "Raw", pipeline, "F1_primary_roc_auc")
+                   for pipeline in PRESPECIFIED_PIPELINES]
+    definitions.extend([
+        ("roc_auc_raw_capmatched", "Raw", "Raw_CapMatched", "descriptive_matched_cap"),
+        ("roc_auc_capmatched_baseline", "Raw_CapMatched", "AutoFE_Baseline", "descriptive_matched_cap"),
+    ])
+    definitions.extend((f"roc_auc_full_arithmetic_{pipeline.removeprefix('AutoFE_').lower()}",
+                        "AutoFE_Baseline", pipeline, "descriptive_operator_ablation")
+                       for pipeline in scope["pipelines"]
+                       if pipeline.startswith(("AutoFE_Isolate_", "AutoFE_LeaveOut_"))
+                       or pipeline == "AutoFE_NoMultiply")
+    return definitions
+
+
+def dataset_contrasts(dataset_rows: list[dict], scope: dict) -> tuple[list[dict], list[dict]]:
+    """F1 remains the frozen four-contrast family within each split policy."""
+    indexed = {(row["split_policy"], row["dataset"], row["pipeline"]): row for row in dataset_rows}
+    per_dataset, summaries = [], []
+    definitions = _contrast_definitions(scope)
+    for policy in POLICIES:
+        local_f1 = []
+        for contrast_id, reference, candidate, family in definitions:
+            differences = []
+            eligible = 0
+            for item in scope["datasets"]:
+                name = item["name"]
+                a, b = indexed[(policy, name, reference)], indexed[(policy, name, candidate)]
+                eligible += int(a["auc_eligible"] and b["auc_eligible"])
+                complete = a["complete_auc"] and b["complete_auc"] and a["auc_eligible"] and b["auc_eligible"]
+                delta = b["mean_roc_auc"] - a["mean_roc_auc"] if complete else None
+                if complete:
+                    differences.append(delta)
+                per_dataset.append({
+                    "split_policy": policy, "dataset": name, "contrast_id": contrast_id,
+                    "family_id": family, "pipeline_a": reference, "pipeline_b": candidate,
+                    "expected_cells_per_pipeline": a["expected_cells"],
+                    "success_cells_a": a["success_cells"], "success_cells_b": b["success_cells"],
+                    "mean_auc_a": a["mean_roc_auc"], "mean_auc_b": b["mean_roc_auc"],
+                    "complete_dataset_pair": complete, "delta_b_minus_a": delta,
+                    "auc_eligible": a["auc_eligible"] and b["auc_eligible"],
+                    "outcome_reasons_a": a["outcome_reasons"], "outcome_reasons_b": b["outcome_reasons"],
+                    "auc_ineligibility_reason": a["auc_ineligibility_reason"] or b["auc_ineligibility_reason"],
+                })
+            row = {
+                "split_policy": policy, "contrast_id": contrast_id, "family_id": family,
+                "pipeline_a": reference, "pipeline_b": candidate,
+                "configured_datasets": len(scope["datasets"]), "auc_eligible_datasets": eligible,
+                **_dataset_statistics(differences), "p_value": None,
+                "holm_adjusted_p_value": None,
+                "family_size": len(PRESPECIFIED_PIPELINES) if family == "F1_primary_roc_auc" else None,
+                "interpretation": "confirmatory complete-dataset contrast" if family == "F1_primary_roc_auc"
+                                  else "descriptive complete-dataset contrast; no multiplicity family",
+            }
+            if family == "F1_primary_roc_auc":
+                if len(differences) >= 2:
+                    row["p_value"] = 1.0 if np.all(np.asarray(differences) == 0) else float(
+                        wilcoxon(differences, alternative="two-sided").pvalue)
+                local_f1.append(row)
+            summaries.append(row)
+        adjusted = _holm_adjust([row["p_value"] if row["p_value"] is not None else float("nan")
+                                 for row in local_f1])
+        for row, value in zip(local_f1, adjusted):
+            row["holm_adjusted_p_value"] = float(value) if math.isfinite(value) else None
+    return per_dataset, summaries
+
+
+def row_group_comparisons(dataset_rows: list[dict], scope: dict) -> tuple[list[dict], list[dict], list[dict]]:
+    """Compare dataset summaries on the common complete set across policies."""
+    indexed = {(row["split_policy"], row["dataset"], row["pipeline"]): row for row in dataset_rows}
+    dataset_pairs, pipeline_pairs, contrast_pairs = [], [], []
+    for pipeline in scope["pipelines"]:
+        differences, row_values, group_values = [], [], []
+        for item in scope["datasets"]:
+            name = item["name"]
+            a, b = indexed[("row_level", name, pipeline)], indexed[("group_aware", name, pipeline)]
+            comparable = a["complete_auc"] and b["complete_auc"] and a["auc_eligible"] and b["auc_eligible"]
+            difference = b["mean_roc_auc"] - a["mean_roc_auc"] if comparable else None
+            if comparable:
+                row_values.append(a["mean_roc_auc"])
+                group_values.append(b["mean_roc_auc"])
+                differences.append(difference)
+            dataset_pairs.append({
+                "dataset": name, "pipeline": pipeline, "row_run_id": a["run_id"], "group_run_id": b["run_id"],
+                "row_mean_auc": a["mean_roc_auc"], "group_mean_auc": b["mean_roc_auc"],
+                "common_complete_dataset": comparable, "group_minus_row": difference,
+                **{f"{prefix}_{field}": record[field] for prefix, record in (("row", a), ("group", b))
+                   for field in ("expected_cells", "success_cells", "skipped_cells", "failed_cells",
+                                 "timed_out_cells", "complete_auc", "auc_eligible", "outcome_reasons")},
+                "auc_ineligibility_reason": a["auc_ineligibility_reason"] or b["auc_ineligibility_reason"],
+            })
+        pipeline_pairs.append({
+            "pipeline": pipeline, "configured_datasets": len(scope["datasets"]),
+            "row_complete_datasets": sum(indexed[("row_level", item["name"], pipeline)]["complete_auc"] for item in scope["datasets"]),
+            "group_complete_datasets": sum(indexed[("group_aware", item["name"], pipeline)]["complete_auc"] for item in scope["datasets"]),
+            "common_complete_dataset_names": ";".join(row["dataset"] for row in dataset_pairs
+                                                       if row["pipeline"] == pipeline and row["common_complete_dataset"]),
+            "mean_row_auc_common_datasets": float(np.mean(row_values)) if row_values else None,
+            "mean_group_auc_common_datasets": float(np.mean(group_values)) if group_values else None,
+            **_dataset_statistics(differences), "delta_definition": "group_mean_auc_minus_row_mean_auc",
+            "interpretation": "descriptive comparison; no pairing of predictions or folds",
+        })
+    for pipeline in PRESPECIFIED_PIPELINES:
+        row_deltas, group_deltas, differences, names = [], [], [], []
+        for item in scope["datasets"]:
+            name = item["name"]
+            records = [indexed[(policy, name, candidate)] for policy in POLICIES for candidate in ("Raw", pipeline)]
+            if not all(row["complete_auc"] and row["auc_eligible"] for row in records):
+                continue
+            row_delta = records[1]["mean_roc_auc"] - records[0]["mean_roc_auc"]
+            group_delta = records[3]["mean_roc_auc"] - records[2]["mean_roc_auc"]
+            names.append(name)
+            row_deltas.append(row_delta)
+            group_deltas.append(group_delta)
+            differences.append(group_delta - row_delta)
+        contrast_pairs.append({
+            "pipeline_a": "Raw", "pipeline_b": pipeline, "configured_datasets": len(scope["datasets"]),
+            "common_complete_dataset_names": ";".join(names),
+            "mean_row_delta_common_datasets": float(np.mean(row_deltas)) if row_deltas else None,
+            "mean_group_delta_common_datasets": float(np.mean(group_deltas)) if group_deltas else None,
+            **_dataset_statistics(differences), "delta_definition": "group_candidate_minus_raw_delta_minus_row_delta",
+            "interpretation": "descriptive difference of dataset contrasts; no cross-policy fold/prediction pairing",
+        })
+    return dataset_pairs, pipeline_pairs, contrast_pairs
+
+
+def missingness_sensitivity(dataset_rows: list[dict], scope: dict) -> tuple[list[dict], list[dict], list[dict]]:
+    """AUC [0,1] partial-identification bounds; no imputation or p-values."""
+    score_bounds, contrast_bounds, summaries = [], [], []
+    indexed = {}
+    for row in dataset_rows:
+        expected, observed = row["expected_cells"], row["success_cells"]
+        if observed > expected:
+            raise ValueError("Observed AUC cells exceed the declared grid")
+        eligible = bool(row["auc_eligible"])
+        total = (row["mean_roc_auc"] or 0.0) * observed
+        lower, upper = (total / expected, (total + expected - observed) / expected) if eligible and expected else (None, None)
+        record = {
+            "split_policy": row["split_policy"], "dataset": row["dataset"], "pipeline": row["pipeline"],
+            "auc_eligible": eligible, "expected_eligible_cells": expected if eligible else 0,
+            "observed_finite_auc_cells": observed, "unknown_eligible_cells": expected - observed if eligible else 0,
+            "skipped_cells": row["skipped_cells"], "failed_cells": row["failed_cells"],
+            "timed_out_cells": row["timed_out_cells"], "mean_auc_lower_bound": lower, "mean_auc_upper_bound": upper,
+            "outcome_reasons": row["outcome_reasons"], "auc_ineligibility_reason": row["auc_ineligibility_reason"],
+            "bound_method": "unknown eligible AUC cells individually range from 0 to 1; no outcome imputation",
+        }
+        score_bounds.append(record)
+        indexed[(row["split_policy"], row["dataset"], row["pipeline"])] = record
+    for policy in POLICIES:
+        for contrast_id, reference, candidate, family in _contrast_definitions(scope):
+            eligible_records = []
+            for item in scope["datasets"]:
+                name = item["name"]
+                a, b = indexed[(policy, name, reference)], indexed[(policy, name, candidate)]
+                eligible = a["auc_eligible"] and b["auc_eligible"]
+                lower = b["mean_auc_lower_bound"] - a["mean_auc_upper_bound"] if eligible else None
+                upper = b["mean_auc_upper_bound"] - a["mean_auc_lower_bound"] if eligible else None
+                record = {
+                    "split_policy": policy, "dataset": name, "contrast_id": contrast_id,
+                    "family_id": family, "pipeline_a": reference, "pipeline_b": candidate,
+                    "auc_eligible": eligible, "delta_lower_bound": lower, "delta_upper_bound": upper,
+                    "unknown_cells_a": a["unknown_eligible_cells"], "unknown_cells_b": b["unknown_eligible_cells"],
+                    "outcome_reasons_a": a["outcome_reasons"], "outcome_reasons_b": b["outcome_reasons"],
+                    "auc_ineligibility_reason": a["auc_ineligibility_reason"] or b["auc_ineligibility_reason"],
+                }
+                contrast_bounds.append(record)
+                if eligible:
+                    eligible_records.append(record)
+            summaries.append({
+                "split_policy": policy, "contrast_id": contrast_id, "family_id": family,
+                "pipeline_a": reference, "pipeline_b": candidate, "configured_datasets": len(scope["datasets"]),
+                "auc_eligible_datasets": len(eligible_records),
+                "datasets_with_unknown_outcomes": sum(row["unknown_cells_a"] > 0 or row["unknown_cells_b"] > 0
+                                                      for row in eligible_records),
+                "unknown_eligible_cells_a": sum(row["unknown_cells_a"] for row in eligible_records),
+                "unknown_eligible_cells_b": sum(row["unknown_cells_b"] for row in eligible_records),
+                "mean_dataset_delta_lower_bound": float(np.mean([row["delta_lower_bound"] for row in eligible_records])) if eligible_records else None,
+                "mean_dataset_delta_upper_bound": float(np.mean([row["delta_upper_bound"] for row in eligible_records])) if eligible_records else None,
+                "interpretation": "equal-weight eligible-dataset bounds; undefined group AUC datasets excluded visibly; no confidence interval or p-value",
+            })
+    return score_bounds, contrast_bounds, summaries
+
+
+def _save_figure(fig, stem: Path, *, diagnostic: bool = False, missing_outcomes: bool = False) -> list[str]:
+    if diagnostic or missing_outcomes:
         prior_title = fig._suptitle.get_text() if fig._suptitle is not None else ""
-        fig.suptitle("PILOT DIAGNOSTIC — NOT A CORRECTED RESULT\n" + prior_title,
+        warnings = (["PILOT DIAGNOSTIC — NOT A CORRECTED RESULT"] if diagnostic else [])
+        if missing_outcomes:
+            warnings.append("TERMINAL MISSING OUTCOMES — COMPLETE-CASE ESTIMATES; SEE AUC BOUNDS")
+        fig.suptitle("\n".join(warnings + [prior_title]),
                      color="#8b3e29", fontsize=14, weight="bold")
     paths = []
     for suffix in (".png", ".pdf"):
@@ -290,7 +518,8 @@ def _save_figure(fig, stem: Path, *, diagnostic: bool = False) -> list[str]:
     return paths
 
 
-def plot_primary(summary: list[dict], output_dir: Path, *, diagnostic: bool = False) -> list[str]:
+def plot_primary(summary: list[dict], output_dir: Path, *, diagnostic: bool = False,
+                 missing_outcomes: bool = False) -> list[str]:
     fig, axes = plt.subplots(1, 2, figsize=(15, 7), sharey=True, constrained_layout=True)
     variants = [row["pipeline"] for row in summary if row["split_policy"] == "row_level"
                 and row["pipeline"] != "AutoFE_Baseline"]
@@ -315,11 +544,11 @@ def plot_primary(summary: list[dict], output_dir: Path, *, diagnostic: bool = Fa
         ax.set_axisbelow(True)
     axes[0].invert_yaxis()
     fig.suptitle("Primary pipeline comparisons: complete dataset pairs only")
-    return _save_figure(fig, output_dir / "primary_auc_ablation", diagnostic=diagnostic)
+    return _save_figure(fig, output_dir / "primary_auc_ablation", diagnostic=diagnostic, missing_outcomes=missing_outcomes)
 
 
 def plot_operator_counts(rows: list[dict], scope: dict, output_dir: Path,
-                         *, diagnostic: bool = False) -> list[str]:
+                         *, diagnostic: bool = False, missing_outcomes: bool = False) -> list[str]:
     variants = [name for name in scope["pipelines"] if name.startswith("AutoFE_")]
     fig, axes = plt.subplots(1, 2, figsize=(14, 8), constrained_layout=True, sharey=True)
     selected = {(row["split_policy"], row["pipeline"], row["operator"]): row for row in rows}
@@ -343,10 +572,11 @@ def plot_operator_counts(rows: list[dict], scope: dict, output_dir: Path,
         ax.set_yticks(range(len(variants)), variants)
         ax.set_title(policy.replace("_", " ").title())
     fig.suptitle("Selected candidates per observed feature task; disabled operators marked off")
-    return _save_figure(fig, output_dir / "operator_selected_candidates", diagnostic=diagnostic)
+    return _save_figure(fig, output_dir / "operator_selected_candidates", diagnostic=diagnostic, missing_outcomes=missing_outcomes)
 
 
-def plot_operator_funnel(rows: list[dict], output_dir: Path, *, diagnostic: bool = False) -> list[str]:
+def plot_operator_funnel(rows: list[dict], output_dir: Path, *, diagnostic: bool = False,
+                         missing_outcomes: bool = False) -> list[str]:
     """Show each candidate stage for the full arithmetic reference."""
     indexed = {(row["split_policy"], row["pipeline"], row["operator"]): row for row in rows}
     fig, axes = plt.subplots(2, 4, figsize=(15, 7), constrained_layout=True)
@@ -368,11 +598,11 @@ def plot_operator_funnel(rows: list[dict], output_dir: Path, *, diagnostic: bool
             for position, value in enumerate(values):
                 ax.text(value, position, f" {value:.1f}", va="center", fontsize=8)
     fig.suptitle("Full arithmetic candidate counts by operator and stage")
-    return _save_figure(fig, output_dir / "baseline_operator_candidate_stages", diagnostic=diagnostic)
+    return _save_figure(fig, output_dir / "baseline_operator_candidate_stages", diagnostic=diagnostic, missing_outcomes=missing_outcomes)
 
 
 def plot_coverage(rows: list[dict], scope: dict, output_dir: Path,
-                  *, diagnostic: bool = False) -> list[str]:
+                  *, diagnostic: bool = False, missing_outcomes: bool = False) -> list[str]:
     datasets = [item["name"] for item in scope["datasets"]]
     lookup = {(row["split_policy"], row["dataset"], row["pipeline"]): row for row in rows}
     matrix = np.asarray([[lookup[(policy, dataset, "AutoFE_Baseline")]["coverage_fraction"]
@@ -389,7 +619,62 @@ def plot_coverage(rows: list[dict], scope: dict, output_dir: Path,
                     color="white" if value > 0.55 else "#222222")
     fig.colorbar(image, ax=ax, label="Successful ROC-AUC cells / configured cells")
     ax.set_title("Primary AUC coverage by dataset; full arithmetic pipeline")
-    return _save_figure(fig, output_dir / "primary_auc_coverage", diagnostic=diagnostic)
+    return _save_figure(fig, output_dir / "primary_auc_coverage", diagnostic=diagnostic, missing_outcomes=missing_outcomes)
+
+
+def plot_dataset_estimates(rows: list[dict], output_dir: Path, stem: str, title: str,
+                          *, policy_panels: bool = True, bounds: bool = False,
+                          diagnostic: bool = False, missing_outcomes: bool = False) -> list[str]:
+    """Show dataset contrasts or identification ranges; never task-row errors."""
+    panels = [(policy, [row for row in rows if row.get("split_policy") == policy])
+              for policy in POLICIES] if policy_panels else [("common complete datasets", rows)]
+    fig, axes = plt.subplots(1, len(panels), figsize=(15 if policy_panels else 11,
+                                                    max(5, len(panels[0][1]) * 0.42)),
+                             constrained_layout=True, squeeze=False)
+    for ax, (policy, subset) in zip(axes[0], panels):
+        labels = []
+        plotted_values = []
+        for position, row in enumerate(subset):
+            labels.append(row.get("pipeline_b", row.get("pipeline", row.get("contrast_id"))))
+            if bounds:
+                low, high = row["mean_dataset_delta_lower_bound"], row["mean_dataset_delta_upper_bound"]
+                if low is None:
+                    ax.text(0, position, "NA", va="center")
+                    continue
+                ax.plot([low, high], [position, position], color="#b67748", linewidth=3)
+                ax.plot([low, high], [position, position], "|", color="#b67748", markersize=10)
+                plotted_values.extend((low, high))
+                label = f" [{0.0 if abs(low) < 0.0005 else low:+.3f}, {0.0 if abs(high) < 0.0005 else high:+.3f}]; missing={row['datasets_with_unknown_outcomes']}"
+                ax.text(high, position, label, va="center", fontsize=8)
+            else:
+                value, low, high = row["mean_delta"], row["ci_low"], row["ci_high"]
+                if value is None:
+                    ax.text(0, position, "NA (n=0)", va="center")
+                    continue
+                if low is not None:
+                    ax.plot([low, high], [position, position], color="#315d82", linewidth=2)
+                    plotted_values.extend((low, high))
+                ax.plot(value, position, "o", color="#315d82", markersize=5)
+                plotted_values.append(value)
+                label = f" {0.0 if abs(value) < 0.0005 else value:+.3f}; n={row['n_complete_datasets']}"
+                adjusted = row.get("holm_adjusted_p_value")
+                if adjusted is not None:
+                    label += f"; Holm p={adjusted:.3g}"
+                elif low is None:
+                    label += "; CI NA"
+                ax.text(high if high is not None else value, position, label, va="center", fontsize=8)
+        ax.set_yticks(range(len(subset)), labels)
+        ax.invert_yaxis()
+        ax.axvline(0, color="#555555", linewidth=0.8)
+        ax.set_title(policy.replace("_", " ").title())
+        ax.grid(axis="x", color="#dddddd", linewidth=0.5)
+        ax.set_axisbelow(True)
+        scale = max(0.01, max((abs(value) for value in plotted_values), default=0))
+        ax.set_xlim(-scale * 1.25, scale * 2.3)
+        ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+        ax.set_xlabel("Mean dataset ROC-AUC difference" + ("; AUC [0,1] bounds" if bounds else "; 95% dataset bootstrap CI"))
+    fig.suptitle(title)
+    return _save_figure(fig, output_dir / stem, diagnostic=diagnostic, missing_outcomes=missing_outcomes)
 
 
 def add_sensitivities(run_root: Path, scope: dict, output_dir: Path) -> tuple[list[str], dict]:
@@ -506,10 +791,54 @@ def add_mechanism(association_path: Path, output_dir: Path) -> tuple[list[str], 
                    "dataset_table": "mechanism_dataset_records.csv"}
 
 
+def _write_result_record(output_dir: Path, scope: dict, manifest: dict,
+                         f1: list[dict], policy_rows: list[dict], contrast_rows: list[dict],
+                         bounds: list[dict]) -> None:
+    """Durable human-readable record from the same checked table values."""
+    def table(rows: list[dict], fields: list[str]) -> list[str]:
+        def value(item):
+            if item is None:
+                return "NA"
+            if isinstance(item, float):
+                return f"{item:.8g}"
+            return str(item).replace("|", "\\|").replace("\n", " ")
+        return ["| " + " | ".join(fields) + " |", "| " + " | ".join("---" for _ in fields) + " |",
+                *("| " + " | ".join(value(row.get(field)) for field in fields) + " |" for row in rows)]
+    lines = ["# Corrected result record", "", "Status: **" + manifest["status"] + "**.", "",
+             f"Scientific completeness flag: `{manifest['scientific_complete']}`; terminal unknown outcomes: `{manifest['has_terminal_missing_outcomes']}`.", "",
+             "This record is generated from terminal, identity-checked ledgers. Historical ledgers are excluded.", "",
+             f"Frozen source fingerprint: `{scope['code_fingerprint']}`.",
+             f"Scope SHA-256: `{manifest['scope_sha256']}`.",
+             f"Dataset hash digest: `{scope.get('dataset_hash_digest', 'diagnostic scope')}`.", "",
+             "## Source identity and terminal coverage", ""]
+    lines.extend(table([{**row, **row["counts_by_status"]} for row in manifest["source_runs"]],
+                       ["run_id", "code_commit", "terminal_manifest_status", "terminal_rows", "success", "failed", "skipped", "timed_out",
+                        "manifest_sha256", "results_sha256", "configuration_fingerprint", "runtime_fingerprint"]))
+    lines.extend(["", "## Frozen F1 dataset contrasts", "",
+                  "AUC difference is candidate minus Raw. Datasets are the inferential and bootstrap units. Complete expected finite-cell grids are required; intervals use 10,000 percentile bootstrap replicates with seed 20260929. Holm covers the four finite prespecified p-values within each split policy. Fewer than two complete datasets gives NA inference.", ""])
+    lines.extend(table(f1, ["split_policy", "pipeline_b", "configured_datasets", "auc_eligible_datasets", "n_complete_datasets",
+                            "mean_delta", "ci_low", "ci_high", "p_value", "holm_adjusted_p_value"]))
+    lines.extend(["", "## Row-level and group-aware values on common complete datasets", "",
+                  "Each dataset contributes one mean to each policy; predictions and fold samples are not paired across policies. Cross-policy intervals are descriptive dataset bootstrap intervals.", ""])
+    lines.extend(table(policy_rows, ["pipeline", "row_complete_datasets", "group_complete_datasets", "n_complete_datasets",
+                                    "mean_row_auc_common_datasets", "mean_group_auc_common_datasets", "mean_delta", "ci_low", "ci_high"]))
+    lines.extend(["", "## Common-dataset changes in the Raw-versus-AutoFE contrast", ""])
+    lines.extend(table(contrast_rows, ["pipeline_b", "n_complete_datasets", "mean_row_delta_common_datasets",
+                                      "mean_group_delta_common_datasets", "mean_delta", "ci_low", "ci_high"]))
+    lines.extend(["", "## Missing-outcome sensitivity", "",
+                  "Unknown eligible AUC cells range over [0,1]. Bounds average each eligible dataset equally and are identification ranges, not confidence intervals or imputed results. Prespecified undefined group AUC datasets remain visible in coverage tables and receive no artificial bounds.", ""])
+    lines.extend(table([row for row in bounds if row["family_id"] == "F1_primary_roc_auc"],
+                       ["split_policy", "pipeline_b", "auc_eligible_datasets", "datasets_with_unknown_outcomes",
+                        "unknown_eligible_cells_a", "unknown_eligible_cells_b", "mean_dataset_delta_lower_bound", "mean_dataset_delta_upper_bound"]))
+    lines.extend(["", "## Artifact paths", "", *[f"- [{name}]({name})" for name in manifest["tables"] + manifest["figures"]], "",
+                  "Per-dataset values, all status counts, exclusion/failure reasons, individual operator counts, matched-cap descriptive comparisons, and condition/resource measurements remain inspectable in the linked CSVs. Candidate counts are deduplicated across classifier copies. Optional mechanism and separate sensitivity assets retain their own source identities and denominators.", ""])
+    (output_dir / "corrected_results_note.md").write_text("\n".join(lines), encoding="utf-8")
+
+
 def generate(row_dir: Path, group_dir: Path, output_dir: Path,
              association_path: Path | None = None, scope_path: Path | None = None,
              sensitivity_root: Path | None = None) -> dict:
-    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v2.json"
+    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v3.json"
     scope_path = scope_path or frozen_scope
     scope = json.loads(scope_path.read_text(encoding="utf-8"))
     diagnostic = scope_path.resolve() != frozen_scope.resolve()
@@ -527,17 +856,46 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
         sources.append(source)
     summary = pipeline_summary(dataset_rows, scope)
     condition_summaries = condition_summary(condition_rows, scope)
+    contrasts, contrast_summaries = dataset_contrasts(dataset_rows, scope)
+    f1 = [row for row in contrast_summaries if row["family_id"] == "F1_primary_roc_auc"]
+    descriptive = [row for row in contrast_summaries if row["family_id"] != "F1_primary_roc_auc"]
+    row_group_datasets, row_group_pipelines, row_group_contrasts = row_group_comparisons(dataset_rows, scope)
+    auc_bounds, contrast_bounds, bound_summaries = missingness_sensitivity(dataset_rows, scope)
+    missing_outcomes = any(row["unknown_eligible_cells"] for row in auc_bounds)
     output_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(output_dir / "primary_dataset_auc_coverage.csv", list(dataset_rows[0]), dataset_rows)
-    _write_csv(output_dir / "primary_pipeline_auc_summary.csv", list(summary[0]), summary)
-    _write_csv(output_dir / "primary_operator_candidate_counts.csv", list(operator_rows[0]), operator_rows)
+    tables = {
+        "primary_dataset_auc_coverage.csv": dataset_rows,
+        "primary_pipeline_auc_summary.csv": summary,
+        "primary_operator_candidate_counts.csv": operator_rows,
+        "primary_dataset_contrasts.csv": contrasts,
+        "primary_f1_contrasts.csv": f1,
+        "primary_descriptive_contrasts.csv": descriptive,
+        "row_group_dataset_auc.csv": row_group_datasets,
+        "row_group_pipeline_auc_summary.csv": row_group_pipelines,
+        "row_group_f1_contrast_comparison.csv": row_group_contrasts,
+        "primary_missingness_auc_bounds.csv": auc_bounds,
+        "primary_missingness_contrast_bounds.csv": contrast_bounds,
+        "primary_missingness_contrast_summary.csv": bound_summaries,
+    }
     if condition_rows:
-        _write_csv(output_dir / "primary_dataset_condition_auc.csv", list(condition_rows[0]), condition_rows)
-        _write_csv(output_dir / "primary_condition_auc_summary.csv", list(condition_summaries[0]), condition_summaries)
-    figures = (plot_primary(summary, output_dir, diagnostic=diagnostic)
-               + plot_operator_counts(operator_rows, scope, output_dir, diagnostic=diagnostic)
-               + plot_operator_funnel(operator_rows, output_dir, diagnostic=diagnostic)
-               + plot_coverage(dataset_rows, scope, output_dir, diagnostic=diagnostic))
+        tables["primary_dataset_condition_auc.csv"] = condition_rows
+        tables["primary_condition_auc_summary.csv"] = condition_summaries
+    for name, rows in tables.items():
+        _write_csv(output_dir / name, list(rows[0]), rows)
+    plot_options = {"diagnostic": diagnostic, "missing_outcomes": missing_outcomes}
+    figures = (plot_primary(summary, output_dir, **plot_options)
+               + plot_operator_counts(operator_rows, scope, output_dir, **plot_options)
+               + plot_operator_funnel(operator_rows, output_dir, **plot_options)
+               + plot_coverage(dataset_rows, scope, output_dir, **plot_options)
+               + plot_dataset_estimates(f1, output_dir, "primary_f1_contrasts",
+                                       "Frozen F1: AutoFE minus Raw; Holm within each policy", **plot_options)
+               + plot_dataset_estimates(row_group_pipelines, output_dir, "row_group_auc_difference",
+                                       "Group minus row AUC on common complete datasets; descriptive",
+                                       policy_panels=False, **plot_options)
+               + plot_dataset_estimates([row for row in bound_summaries if row["family_id"] == "F1_primary_roc_auc"],
+                                       output_dir, "primary_missingness_auc_bounds",
+                                       "AUC [0,1] identification bounds; structurally undefined datasets excluded",
+                                       bounds=True, **plot_options))
     mechanism = None
     if association_path is not None:
         more, mechanism = add_mechanism(association_path, output_dir)
@@ -545,15 +903,28 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
     manifest = {
         "artifact_type": "reviewer1_reporting_diagnostic_assets" if diagnostic else "reviewer1_corrected_paper_assets",
         "scope_sha256": file_sha256(scope_path), "source_runs": sources,
-        "tables": ["primary_dataset_auc_coverage.csv", "primary_pipeline_auc_summary.csv",
-                   "primary_operator_candidate_counts.csv"],
+        "tables": list(tables),
         "figures": figures, "mechanism": mechanism,
         "primary_estimand": "dataset mean over complete 5 seeds x 5 folds x 10 conditions x 10 models; row and group separate",
         "candidate_count_unit": "unique dataset x seed x fold x condition x pipeline feature task; classifier copies deduplicated",
-        "status": "pilot code verification; not corrected performance" if diagnostic else "corrected primary runs complete",
+        "scientific_complete": not diagnostic and not missing_outcomes,
+        "has_terminal_missing_outcomes": missing_outcomes,
+        "status": "pilot code verification; not corrected performance" if diagnostic else (
+            "terminal corrected primary runs with missing outcomes; complete-case and bounded sensitivity only"
+            if missing_outcomes else "corrected primary runs complete"),
+        "analysis_contract": {
+            "F1": {"reference": "Raw", "pipelines": list(PRESPECIFIED_PIPELINES),
+                   "family": "F1_primary_roc_auc", "family_size": len(PRESPECIFIED_PIPELINES),
+                   "multiplicity": "Holm within each split policy across finite prespecified p-values",
+                   "test": "two-sided dataset-level Wilcoxon; exact zero differences are ties",
+                   "ci_method": "paired_dataset_bootstrap_percentile", "ci_level": 0.95,
+                   "bootstrap_seed": BOOTSTRAP_SEED, "bootstrap_replicates": BOOTSTRAP_REPLICATES,
+                   "minimum_complete_datasets_for_inference": 2},
+            "row_group": "compare separate dataset means on common complete datasets; never pair predictions or fold samples",
+            "secondary": "matched-cap and individual operator contrasts descriptive; dataset bootstrap intervals; no p-values",
+            "missingness": "eligible dataset mean bounds: known finite AUC sum/N through (sum+unknown cells)/N; AUC range [0,1]; contrast [candidate lower-reference upper,candidate upper-reference lower]; average bounds equally over all eligible datasets; prespecified undefined group AUC has no artificial bound; no missing-outcome imputation, p-value, or sampling CI",
+        },
     }
-    if condition_rows:
-        manifest["tables"].extend(["primary_dataset_condition_auc.csv", "primary_condition_auc_summary.csv"])
     if mechanism:
         manifest["tables"].extend([mechanism["association_table"], mechanism["dataset_table"]])
     if sensitivity_root is not None:
@@ -561,21 +932,24 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
         manifest["sensitivity"] = sensitivity
         manifest["tables"].extend(sensitivity["tables"])
         manifest["figures"].extend(extra_figures)
+    manifest["result_record"] = "corrected_results_note.md"
+    _write_result_record(output_dir, scope, manifest, f1, row_group_pipelines, row_group_contrasts, bound_summaries)
     atomic_write_json(output_dir / "asset_manifest.json", manifest)
     return manifest
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v2-primary-row")
-    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v2-primary-group")
+    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v3-primary-row")
+    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v3-primary-group")
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json')
     parser.add_argument("--output-dir", type=Path, default=ROOT / "corrected_runs" / "paper_assets")
     parser.add_argument("--mechanism-association", type=Path)
     parser.add_argument("--sensitivity-root", type=Path,
                         help="Root containing all five completed frozen sensitivity run IDs")
     args = parser.parse_args()
     print(json.dumps(generate(args.row_run_dir, args.group_run_dir, args.output_dir,
-                              args.mechanism_association,
+                              args.mechanism_association, scope_path=args.scope,
                               sensitivity_root=args.sensitivity_root), indent=2))
 
 

@@ -1,3 +1,7 @@
+# Historical v2 command sheet
+
+The final optimization changes source/analysis identity. Use [v3 commands](launch_commands_v3.md) and the fresh v3 gate. This sheet preserves the preceding freeze; do not launch current code under v2 IDs.
+
 # Reviewer #1 seven-run command sheet
 
 This sheet is the executable plan for the corrected primary and separate sensitivity tracks. The [dated readiness report](reviewer1_launch_readiness_v2.json) records a passing gate for all seven IDs on this host; **run the verifier again immediately before each run** because disk, dependencies, source identity, and concurrent work can change. The all-seed audit and both scope manifests are already frozen; do not regenerate them just to launch. Use the existing `p12`; no new environment is created. The two primary runs are the paper's corrected benchmark. The five sensitivity runs have their own result identities and are never pooled into the primary estimand. Run one heavy coordinator at a time.

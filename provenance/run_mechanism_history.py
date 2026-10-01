@@ -168,6 +168,7 @@ def run_mechanism(
     *, run_id: str, split_policy: str, max_datasets: int | None = None,
     max_seeds: int | None = None, max_folds: int | None = None,
     output_root: Path = ROOT / "corrected_runs",
+    scope_path: Path = ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json',
 ) -> dict:
     if split_policy not in {"row_level", "group_aware"}:
         raise ValueError("split_policy must be row_level or group_aware")
@@ -202,7 +203,7 @@ def run_mechanism(
         row["dataset"] for row in group_audit["records"]
         if any(row["seeds"][str(seed)]["auc_status"] != "supported" for seed in SEEDS)
     }
-    frozen_scope = json.loads((ROOT / "provenance" / "reviewer1_launch_scope_v2.json").read_text(encoding="utf-8"))
+    frozen_scope = json.loads(scope_path.read_text(encoding="utf-8"))
     frozen_datasets = {item["name"]: item for item in frozen_scope["datasets"]}
     if source_fingerprint != frozen_scope["code_fingerprint"]:
         raise ValueError("Mechanism run source fingerprint differs from the frozen benchmark")
@@ -295,11 +296,12 @@ def main() -> None:
     parser.add_argument("--max-datasets", type=int)
     parser.add_argument("--max-seeds", type=int)
     parser.add_argument("--max-folds", type=int)
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json')
     args = parser.parse_args()
     print(json.dumps(run_mechanism(
         run_id=args.run_id, split_policy=args.split_policy,
         max_datasets=args.max_datasets, max_seeds=args.max_seeds,
-        max_folds=args.max_folds,
+        max_folds=args.max_folds, scope_path=args.scope,
     ), indent=2))
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import spearmanr
 
-from src.provenance import atomic_write_json, file_sha256
+from src.provenance import atomic_write_json, file_sha256, stable_digest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,26 +75,65 @@ def _paired_clean_auc(results_path: Path, expected_pairs_per_dataset: int) -> tu
     return dataset_scores, baseline_hashes
 
 
-def _mechanism_exposures(run_dir: Path, expected_folds_per_dataset: int) -> tuple[dict[str, dict], dict[tuple[str, int, int], tuple[str, str]]]:
+def _validate_mechanism_manifest(manifest: dict, scope: dict, split_policy: str) -> None:
+    """Require the exact frozen source and clean mechanism sampling grid."""
+    configuration = manifest.get("configuration", {})
+    expected_script = scope.get("analysis_sha256", {}).get("provenance/run_mechanism_history.py")
+    expected_datasets = [item["name"] for item in scope["datasets"]]
+    if (manifest.get("status") != "complete" or not expected_script
+            or configuration.get("code_fingerprint") != scope["code_fingerprint"]
+            or configuration.get("mechanism_script_sha256") != expected_script
+            or configuration.get("split_policy") != split_policy
+            or configuration.get("condition") != "clean"
+            or configuration.get("pipeline") != "AutoFE_Baseline"
+            or configuration.get("datasets") != expected_datasets
+            or list(configuration.get("seeds", [])) != list(scope["seeds"])
+            or list(configuration.get("folds", [])) != list(scope["folds"])
+            or configuration.get("numerical_thread_environment") != scope["required_numerical_thread_environment"]
+            or manifest.get("configuration_fingerprint") != stable_digest(configuration)):
+        raise ValueError("Mechanism manifest differs from the selected frozen source, policy or grid")
+
+
+def _mechanism_exposures(run_dir: Path, expected_folds_per_dataset: int, *,
+                        scope: dict, split_policy: str) -> tuple[dict[str, dict], dict[tuple[str, int, int], tuple[str, str]]]:
     """Aggregate selected-candidate fold medians, then average within dataset."""
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("status") != "complete":
-        raise ValueError(f"Mechanism run is not complete: {run_dir}")
+    _validate_mechanism_manifest(manifest, scope, split_policy)
+    dataset_identity = {item["name"]: item for item in scope["datasets"]}
+    expected_keys = {(name, int(seed), int(fold)) for name in dataset_identity
+                     for seed in scope["seeds"] for fold in scope["folds"]}
+    ineligible = set(scope.get("group_auc_ineligible_datasets", [])) if split_policy == "group_aware" else set()
+    seen_keys = set()
     fold_values: dict[str, list[float]] = defaultdict(list)
     skipped: dict[str, int] = defaultdict(int)
     matrix_hashes: dict[tuple[str, int, int], tuple[str, str]] = {}
     for path in (run_dir / "tasks").rglob("status.json"):
         task = json.loads(path.read_text(encoding="utf-8"))
         dataset = str(task["dataset"])
+        key = (dataset, int(task["seed"]), int(task["fold"]))
+        identity = dataset_identity.get(dataset, {})
+        if (key not in expected_keys or key in seen_keys
+                or task.get("configuration_fingerprint") != manifest["configuration_fingerprint"]
+                or task.get("split_policy") != split_policy
+                or task.get("condition") != "clean" or task.get("pipeline") != "AutoFE_Baseline"
+                or task.get("csv_sha256") != identity.get("csv_sha256")
+                or task.get("sidecar_sha256") != identity.get("sidecar_sha256")
+                or task.get("status") != ("skipped" if dataset in ineligible else "complete")):
+            raise ValueError(f"Mechanism task differs from frozen identity or is duplicated: {path}")
+        seen_keys.add(key)
         if task["status"] == "skipped":
             skipped[dataset] += 1
             continue
-        matrix_hashes[(dataset, int(task["seed"]), int(task["fold"]))] = (
+        matrix_hashes[key] = (
             task["train_matrix_sha256"], task["test_matrix_sha256"],
         )
+        for path_field, hash_field in (("history_path", "history_sha256"),
+                                       ("jacobian_path", "jacobian_sha256")):
+            artifact_path = (path.parent / task[path_field]).resolve()
+            if (not artifact_path.is_relative_to(run_dir.resolve()) or not artifact_path.is_file()
+                    or file_sha256(artifact_path) != task[hash_field]):
+                raise ValueError(f"Mechanism artifact missing or changed: {artifact_path}")
         jacobian_path = path.parent / task["jacobian_path"]
-        if file_sha256(jacobian_path) != task["jacobian_sha256"]:
-            raise ValueError(f"Mechanism Jacobian artifact changed: {jacobian_path}")
         selected_norms = []
         with gzip.open(jacobian_path, "rt", encoding="utf-8") as stream:
             for line in stream:
@@ -106,6 +145,10 @@ def _mechanism_exposures(run_dir: Path, expected_folds_per_dataset: int) -> tupl
                     selected_norms.append(float(median))
         if selected_norms:
             fold_values[dataset].append(float(np.median(selected_norms)))
+    if (seen_keys != expected_keys or manifest.get("expected_tasks") != len(expected_keys)
+            or manifest.get("counts") != {"complete": len(expected_keys) - sum(skipped.values()),
+                                          "skipped": sum(skipped.values())}):
+        raise ValueError("Mechanism task coverage/counts do not match the complete frozen grid")
     exposures = {
         dataset: {
             "n_finite_folds": len(fold_values.get(dataset, [])),
@@ -153,8 +196,8 @@ def _association(x: list[float], y: list[float], *, seed: int = ANALYSIS_SEED) -
 
 
 def analyze(row_results: Path, group_results: Path, row_mechanism: Path,
-            group_mechanism: Path, output: Path) -> dict:
-    scope = json.loads((ROOT / "provenance" / "reviewer1_launch_scope_v2.json").read_text(encoding="utf-8"))
+            group_mechanism: Path, output: Path, scope_path: Path | None = None) -> dict:
+    scope = json.loads((scope_path or ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json').read_text(encoding="utf-8"))
     expected_pairs = len(scope["seeds"]) * len(scope["folds"]) * len(scope["models"])
     expected_folds = len(scope["seeds"]) * len(scope["folds"])
     records = []
@@ -169,9 +212,12 @@ def analyze(row_results: Path, group_results: Path, row_mechanism: Path,
                 or performance_manifest.get("split_policy") != policy):
             raise ValueError(f"Primary run is incomplete or has different identity: {results}")
         performance, baseline_hashes = _paired_clean_auc(results, expected_pairs)
-        exposures, mechanism_hashes = _mechanism_exposures(mechanism, expected_folds)
+        exposures, mechanism_hashes = _mechanism_exposures(
+            mechanism, expected_folds, scope=scope, split_policy=policy)
+        if set(mechanism_hashes) != set(baseline_hashes):
+            raise ValueError("Mechanism and primary baseline fold coverage differ")
         for key, matrices in mechanism_hashes.items():
-            if key in baseline_hashes and baseline_hashes[key] != matrices:
+            if baseline_hashes[key] != matrices:
                 raise ValueError(f"Mechanism feature matrices differ from primary run: {key}")
         x, y = [], []
         for item in scope["datasets"]:
@@ -226,9 +272,10 @@ def main() -> None:
     parser.add_argument("--row-mechanism", required=True, type=Path)
     parser.add_argument("--group-mechanism", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v3.json')
     args = parser.parse_args()
     result = analyze(args.row_results, args.group_results, args.row_mechanism,
-                     args.group_mechanism, args.output)
+                     args.group_mechanism, args.output, args.scope)
     print(json.dumps({"output": str(args.output), "associations": result["associations"]}, indent=2))
 
 
