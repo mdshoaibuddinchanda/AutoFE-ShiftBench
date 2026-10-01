@@ -1,6 +1,6 @@
 # Reviewer #1 seven-run command sheet
 
-This sheet is the executable plan for the corrected primary and separate sensitivity tracks. **It does not authorize a launch yet.** Run the all-seed audit, freeze `reviewer1_launch_scope_v2.json`, inspect the intended host calibration and disk margin, then run one policy at a time. Use the existing `p12`; no new environment is created. The two primary runs are the paper's corrected benchmark. The five sensitivity runs have their own result identities and are never pooled into the primary estimand.
+This sheet is the executable plan for the corrected primary and separate sensitivity tracks. The [dated readiness report](reviewer1_launch_readiness_v2.json) records a passing gate for all seven IDs on this host; **run the verifier again immediately before each run** because disk, dependencies, source identity, and concurrent work can change. The all-seed audit and both scope manifests are already frozen; do not regenerate them just to launch. Use the existing `p12`; no new environment is created. The two primary runs are the paper's corrected benchmark. The five sensitivity runs have their own result identities and are never pooled into the primary estimand. Run one heavy coordinator at a time.
 
 From `D:\DR2\AutoFE_Submission` in PowerShell:
 
@@ -10,12 +10,6 @@ $env:OMP_NUM_THREADS = '1'
 $env:MKL_NUM_THREADS = '1'
 $env:OPENBLAS_NUM_THREADS = '1'
 $env:NUMEXPR_NUM_THREADS = '1'
-& $py -m provenance.audit_group_seed_grid
-& $py -m provenance.freeze_reviewer1_launch_v2
-& $py -m provenance.freeze_mechanism_scope_v1
-# One-time gate, only after clean group calibration -003 is complete:
-# & $py -m provenance.large_dataset_recovery_v1 --version 002
-
 $common = @(
   '--cache-policy','bounded','--cache-max-gib','8',
   '--durable-scheduler','--manifest-policy','compact',
@@ -28,16 +22,34 @@ $common = @(
   'gaussian_nb','mlp','lightgbm','xgboost','catboost'
 )
 
-# Run the next line only after auditing the preceding run's terminal counts.
-# First verify its exact ID: & $py -m provenance.verify_reviewer1_launch_v2 --run-id <ID>
-# Stop if verification exits nonzero.
-& $py -m src.pipeline_runner @common --run-id r1-v2-primary-row --scope primary --split-policy row_level
-& $py -m src.pipeline_runner @common --run-id r1-v2-primary-group --scope primary --split-policy group_aware
-& $py -m src.pipeline_runner @common --run-id r1-v2-domain-row --scope transductive_domain_partition --split-policy row_level
-& $py -m src.pipeline_runner @common --run-id r1-v2-availability-row --scope feature_availability_ablation --split-policy row_level
-& $py -m src.pipeline_runner @common --run-id r1-v2-availability-group --scope feature_availability_ablation --split-policy group_aware
-& $py -m src.pipeline_runner @common --run-id r1-v2-relabel-row --scope majority_label_relabeling --split-policy row_level
-& $py -m src.pipeline_runner @common --run-id r1-v2-relabel-group --scope majority_label_relabeling --split-policy group_aware
+function Invoke-FrozenRun {
+  param([string]$RunId, [string]$Scope, [string]$Policy)
+  & $py -m provenance.verify_reviewer1_launch_v2 --run-id $RunId
+  if ($LASTEXITCODE -ne 0) { throw "Launch gate failed for $RunId" }
+  & $py -m src.pipeline_runner @common --run-id $RunId --scope $Scope --split-policy $Policy
+  if ($LASTEXITCODE -ne 0) { throw "Runner failed for $RunId; inspect and resume the identical command" }
+  $manifestPath = Join-Path (Join-Path 'corrected_runs' $RunId) 'manifest.json'
+  $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+  $counts = $manifest.counts_by_status
+  if ($manifest.status -ne 'complete' -or $counts.pending -ne 0 -or
+      $counts.failed -ne 0 -or $counts.timed_out -ne 0 -or
+      ($counts.success + $counts.skipped) -ne $manifest.expected_tasks) {
+    throw "Incomplete or failed run: $RunId; inspect $manifestPath"
+  }
+  & $py -m src.check_progress --run-dir (Join-Path 'corrected_runs' $RunId)
+}
+```
+
+Invoke the following **one line at a time**, reviewing the preceding run's terminal counts and skip reasons before proceeding. The function stops on a failed gate, nonzero runner exit, or incomplete terminal accounting.
+
+```powershell
+Invoke-FrozenRun r1-v2-primary-row primary row_level
+Invoke-FrozenRun r1-v2-primary-group primary group_aware
+Invoke-FrozenRun r1-v2-domain-row transductive_domain_partition row_level
+Invoke-FrozenRun r1-v2-availability-row feature_availability_ablation row_level
+Invoke-FrozenRun r1-v2-availability-group feature_availability_ablation group_aware
+Invoke-FrozenRun r1-v2-relabel-row majority_label_relabeling row_level
+Invoke-FrozenRun r1-v2-relabel-group majority_label_relabeling group_aware
 ```
 
 **Counts:** primary row 875,000 intended; primary group 875,000 intended with 70,000 prespecified AUC skips; domain row 175,000 intended, with any condition-specific AUC skips recorded at execution; each availability/relabeling policy 87,500 intended, and each group policy has 7,000 prespecified AUC skips. Total: **2,275,000 intended cells**, **84,000 prespecified group-AUC skips**, at most **2,191,000 eligible cells** before domain-condition skips. This count includes all 14 pipelines and ten classifiers in every run. Group-aware transductive conditions are deliberately absent because no group-constrained partition rule is prespecified.

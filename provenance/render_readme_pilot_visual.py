@@ -1,18 +1,21 @@
 """Render the README's bounded-pilot execution chart from the audited report.
 
-This chart shows task completion and same-cell runtime only. It does not plot
-corrected benchmark performance or infer results for the 25-dataset campaign.
+This chart shows task completion, same-cell runtime, and the last recorded
+launch-gate state. It does not plot corrected benchmark performance or infer
+results for the 25-dataset campaign.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "provenance" / "four_dataset_pilot_diagnosis.md"
 DEFAULT_OUTPUT = ROOT / "provenance" / "figures" / "four_dataset_pilot_status.svg"
+READINESS_SOURCE = ROOT / "provenance" / "reviewer1_launch_readiness_v2.json"
 
 
 def _cells(report: str, label: str) -> list[str]:
@@ -59,10 +62,20 @@ def render(source: Path = SOURCE, output: Path = DEFAULT_OUTPUT) -> Path:
     baseline_width = baseline_seconds * scale
     optimized_width = optimized_seconds * scale
     speedup = baseline_seconds / optimized_seconds
+    readiness = json.loads(READINESS_SOURCE.read_text(encoding="utf-8")) if READINESS_SOURCE.exists() else {}
+    recorded_ready = (
+        readiness.get("all_seven_ready") is True
+        and len(readiness.get("runs", [])) == 7
+        and all(item.get("ready_for_frozen_command") is True for item in readiness["runs"])
+    )
+    gate_label = (
+        "Last recorded gate: READY; full run not started" if recorded_ready
+        else "25-dataset campaign: launch gate pending"
+    )
 
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="420" viewBox="0 0 1100 420" role="img" aria-labelledby="title desc">
   <title id="title">Bounded four-dataset pilot execution status</title>
-  <desc id="desc">Row-level and group-aware policies each completed {policies['row_level'][1]:,} of {policies['row_level'][0]:,} tasks with zero terminal failures. On a separate matched 560-task profile, baseline runtime was {baseline_seconds:.1f} seconds and the committed implementation took {optimized_seconds:.1f} seconds. These are code-verification measurements, not corrected scientific results.</desc>
+  <desc id="desc">Row-level and group-aware policies each completed {policies['row_level'][1]:,} of {policies['row_level'][0]:,} tasks with zero terminal failures. On a separate matched 560-task profile, baseline runtime was {baseline_seconds:.1f} seconds and the committed implementation took {optimized_seconds:.1f} seconds. {gate_label}. These are code-verification measurements, not corrected scientific results.</desc>
   <style>
     text {{ font-family: Arial, Helvetica, sans-serif; fill: #152438; }}
     .title {{ font-size: 25px; font-weight: 700; }}
@@ -103,8 +116,8 @@ def render(source: Path = SOURCE, output: Path = DEFAULT_OUTPUT) -> Path:
   <text class="note" x="574" y="304">{speedup:.2f}× faster in this bounded profile; exact output parity</text>
 
   <rect x="40" y="352" width="1020" height="43" rx="10" fill="#fff2d6" stroke="#e9c98a"/>
-  <text class="warning" x="58" y="379" font-size="14" font-weight="700">25-dataset campaign: DO NOT LAUNCH</text>
-  <text class="warning" x="401" y="379" font-size="13">Scientific effects remain PENDING CORRECTED RUN.</text>
+  <text class="warning" x="58" y="379" font-size="14" font-weight="700">{gate_label}</text>
+  <text class="warning" x="520" y="379" font-size="13">Scientific effects remain PENDING CORRECTED RUN.</text>
 </svg>
 '''
     output.parent.mkdir(parents=True, exist_ok=True)

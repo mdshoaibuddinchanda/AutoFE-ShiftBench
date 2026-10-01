@@ -1,0 +1,320 @@
+{
+  "artifact_type": "reviewer1_launch_readiness_v2",
+  "checked_utc": "2026-10-01T10:50:05.717910+00:00",
+  "all_seven_ready": true,
+  "full_suite": "109 passed, 26 warnings in p12",
+  "calibration_evidence": "row_level-002 and group_aware-003 each 120/120 success",
+  "recovery_evidence": "row-002 and group-002 each 20/20 success after forced stop; committed outputs retained without refit",
+  "scientific_use": "launch verification only; corrected effects pending",
+  "runs": [
+    {
+      "run_id": "r1-v2-primary-row",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-primary-group",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-domain-row",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-availability-row",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-availability-group",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-relabel-row",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    },
+    {
+      "run_id": "r1-v2-relabel-group",
+      "ready_for_frozen_command": true,
+      "checks": {
+        "existing_p12": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "group_seed_audit": true,
+        "datasets": true,
+        "analysis_definitions": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "host_probe_hash": true,
+        "host_identity": true,
+        "disk_margin": true,
+        "requirements_pins": true,
+        "large_calibration": true,
+        "large_dataset_forced_restart": true,
+        "mechanism_history_scope": true,
+        "run_identity": true
+      },
+      "free_gib": 433.14,
+      "minimum_free_gib": 63.26,
+      "package_mismatches": [],
+      "large_calibration": {
+        "row_level": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        },
+        "group_aware": {
+          "status": "complete",
+          "expected": 120,
+          "success": 120,
+          "code_fingerprint_matches": true,
+          "threads_match": true
+        }
+      },
+      "large_dataset_recovery": "passed",
+      "active_heavy_coordinators": [],
+      "mechanism_history_status": "ready"
+    }
+  ],
+  "code_commit_at_freeze": "a0e8e220ad81104b9501acc0dc1a242379a7ee56"
+}
