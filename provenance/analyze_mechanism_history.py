@@ -197,7 +197,7 @@ def _association(x: list[float], y: list[float], *, seed: int = ANALYSIS_SEED) -
 
 def analyze(row_results: Path, group_results: Path, row_mechanism: Path,
             group_mechanism: Path, output: Path, scope_path: Path | None = None) -> dict:
-    scope = json.loads((scope_path or ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json').read_text(encoding="utf-8"))
+    scope = json.loads((scope_path or ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json').read_text(encoding="utf-8"))
     expected_pairs = len(scope["seeds"]) * len(scope["folds"]) * len(scope["models"])
     expected_folds = len(scope["seeds"]) * len(scope["folds"])
     records = []
@@ -272,7 +272,7 @@ def main() -> None:
     parser.add_argument("--row-mechanism", required=True, type=Path)
     parser.add_argument("--group-mechanism", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json')
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json')
     args = parser.parse_args()
     result = analyze(args.row_results, args.group_results, args.row_mechanism,
                      args.group_mechanism, args.output, args.scope)

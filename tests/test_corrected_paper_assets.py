@@ -77,6 +77,9 @@ def _fixture(tmp_path):
                         "model": "synthetic-model",
                         "n_original": 20, "preprocessing_time_s": 1.25,
                         "autofe_gen_time_s": 2.5, "preparation_time_s": 3.75,
+                        "train_infer_time_s": .5, "scoring_time_s": .25,
+                        "input_open_time_s": .125, "worker_elapsed_s": 4.,
+                        "array_transport": "mapped", "preprocessing_reused": pipeline != "Raw",
                         "roc_auc": 0.81 if pipeline == "AutoFE_LeaveOut_Multiply" else
                                    (0.77 if pipeline == "AutoFE_Isolate_Divide" else 0.70),
                         "operator_configuration": {"enabled_operators": list(enabled)},
@@ -100,6 +103,8 @@ def test_corrected_values_reach_tables_and_figures(tmp_path):
     assert float(multiply["mean_dataset_n_original"]) == 20
     assert float(multiply["mean_dataset_preprocessing_time_s"]) == 1.25
     assert float(multiply["mean_dataset_preparation_time_s"]) == 3.75
+    assert float(multiply['mean_dataset_train_infer_time_s']) == .5
+    assert float(multiply['mean_dataset_input_open_time_s']) == .125
     counts = _rows(output / "primary_operator_candidate_counts.csv")
     divide = next(row for row in counts if row["split_policy"] == "row_level"
                   and row["pipeline"] == "AutoFE_LeaveOut_Multiply"
@@ -117,6 +122,10 @@ def test_corrected_values_reach_tables_and_figures(tmp_path):
     assert len(manifest['tables']) == 15
     resources = _rows(output/'primary_resource_policy_and_use.csv')
     assert resources[0]['ram_budget_gib'] == ''
+    assert resources[0]['mapped_success_cells'] == '14'
+    assert float(resources[0]['sum_train_infer_time_s']) == 7
+    assert float(resources[0]['sum_scoring_time_s']) == 3.5
+    assert resources[0]['preprocessing_reused_feature_tasks'] == '13'
     assert len(_rows(output / "primary_f1_contrasts.csv")) == 8
     assert len(_rows(output / "row_group_dataset_auc.csv")) == 14
     assert len(_rows(output / "primary_missingness_auc_bounds.csv")) == 28
@@ -140,12 +149,22 @@ def test_resource_budget_and_observed_numbers_reach_resource_table_and_figure(tm
                                   gpu_devices=[dict(total_bytes=4*1024**3)])),
                 resource_usage=dict(observed_process_tree_rss_bytes=20*1024**3),
                 maximum_worker_sampled_rss_bytes=2*1024**3,
+                array_transport_usage=dict(peak_disk_bytes=1024**3,budget_bytes=12*1024**3,
+                                           threshold_bytes=128*1024**2),
+                transport_counts=dict(mapped=80,pickle=20),
+                execution_timing=dict(train_infer_time_s=dict(sum=8,count=100),
+                                      scoring_time_s=dict(sum=4,count=100),
+                                      input_open_time_s=dict(sum=2,count=100)),
+                preprocessing_reused_features=9,preprocessing_recorded_features=10,
                 model_backend_counts=dict(cpu=80,gpu=20))
     rows=resource_summary([source,source])
     assert rows[0]['ram_budget_gib']==pytest.approx(25.6)
     assert rows[0]['observed_process_tree_rss_gib']==20
     assert rows[0]['configured_worker_ceiling']==6 and rows[0]['gpu_success_cells']==20
     assert rows[0]['vram_admission_budget_gib']==pytest.approx(3.2)
+    assert rows[0]['array_transport_peak_disk_gib']==1
+    assert rows[0]['mapped_success_cells']==80 and rows[0]['pickle_success_cells']==20
+    assert rows[0]['sum_train_infer_time_s']==8 and rows[0]['sum_input_open_time_s']==2
     files=plot_resource_summary(rows,tmp_path,diagnostic=True,missing_outcomes=False)
     assert len(files)==2 and all((tmp_path/p).stat().st_size>1000 for p in files)
 
@@ -159,6 +178,25 @@ def test_primary_export_rejects_mixed_backends_within_operator_comparison(tmp_pa
     path.write_text(''.join(json.dumps(row)+'\n' for row in rows))
     with pytest.raises(ValueError,match='different backends'):
         collect_primary(row_dir,json.loads(scope_path.read_text()),'row_level')
+
+
+def test_primary_export_binds_frozen_execution_reuse_policy(tmp_path):
+    scope_path,(row_dir,_)=_fixture(tmp_path)
+    scope=json.loads(scope_path.read_text(encoding='utf-8'))
+    scope['execution_reuse']=dict(preprocessing_reuse=True,array_transport='auto',
+        array_transport_budget_bytes=1000,array_transport_threshold_bytes=10)
+    with pytest.raises(ValueError,match='execution reuse policy'):
+        collect_primary(row_dir,scope,'row_level')
+    path=row_dir/'manifest.json'
+    manifest=json.loads(path.read_text(encoding='utf-8'))
+    manifest['configuration'].update(reuse_preprocessing=True,array_transport='auto',
+        array_transport_policy=dict(budget_bytes=1000,threshold_bytes=10))
+    path.write_text(json.dumps(manifest),encoding='utf-8')
+    collect_primary(row_dir,scope,'row_level')
+    manifest['configuration']['array_transport']='pickle'
+    path.write_text(json.dumps(manifest),encoding='utf-8')
+    with pytest.raises(ValueError,match='execution reuse policy'):
+        collect_primary(row_dir,scope,'row_level')
 
 
 def _dataset_summary_fixture():

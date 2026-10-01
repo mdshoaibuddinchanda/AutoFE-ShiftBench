@@ -17,7 +17,7 @@ from src.provenance import code_fingerprint, file_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v4.json"
+SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v5.json"
 HEAVY_COORDINATOR_MODULES = {
     "src.pipeline_runner", "provenance.large_dataset_calibration",
     "provenance.large_dataset_calibration_group_v3",

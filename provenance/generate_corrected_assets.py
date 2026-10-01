@@ -37,7 +37,7 @@ SECONDARY_METRICS = (
     "pr_auc", "log_loss", "brier_score", "train_auc", "train_time_s",
     "infer_time_s", "autofe_gen_time_s", "ram_used_mb", "n_generated",
     "n_retained", "n_original", "preprocessing_time_s", "preparation_time_s",
-    'worker_peak_rss_bytes', 'gpu_ram_part',
+    'worker_peak_rss_bytes', 'gpu_ram_part', 'train_infer_time_s', 'scoring_time_s', 'input_open_time_s', 'worker_elapsed_s',
 )
 
 
@@ -105,6 +105,15 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
         raise ValueError('Primary run differs from the frozen adaptive resource plan')
     if scope.get('_resource_profile_sha256') and manifest.get('configuration', {}).get('resource_profile_sha256') != scope['_resource_profile_sha256']:
         raise ValueError('Primary run used a different frozen resource profile')
+    if scope.get('execution_reuse'):
+        configuration=manifest.get('configuration',{})
+        frozen=scope['execution_reuse']
+        policy_settings=configuration.get('array_transport_policy',{})
+        if (configuration.get('reuse_preprocessing')!=frozen['preprocessing_reuse']
+                or configuration.get('array_transport')!=frozen['array_transport']
+                or policy_settings.get('budget_bytes')!=frozen['array_transport_budget_bytes']
+                or policy_settings.get('threshold_bytes')!=frozen['array_transport_threshold_bytes']):
+            raise ValueError('Primary run differs from the frozen execution reuse policy')
     lookup, connection = _terminal_lookup(run_dir, manifest)
     aggregate = defaultdict(lambda: {"success": 0, "skipped": 0, "failed": 0,
                                      "timed_out": 0, "auc_sum": 0.0, "reasons": set(),
@@ -118,6 +127,10 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
     included_rows = 0
     parameter_catalog = {}
     backend_counts = defaultdict(int)
+    transport_counts = defaultdict(int)
+    execution_timing = {k: {"sum":0.0,"count":0} for k in ("train_infer_time_s","scoring_time_s","input_open_time_s")}
+    preprocessing_reused_features = 0
+    preprocessing_recorded_features = 0
     comparison_backends = {}
     fallback_cells = 0
     worker_peak = None
@@ -160,6 +173,12 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                     raise ValueError(f"Successful cell lacks finite ROC-AUC: {key}")
                 bucket["auc_sum"] += float(auc)
                 backend_counts[str(row.get('model_backend', 'unrecorded'))] += 1
+                transport_counts[str(row.get('array_transport', 'unrecorded'))] += 1
+                for field, summary in execution_timing.items():
+                    value = row.get(field)
+                    if value is not None and math.isfinite(float(value)):
+                        summary['sum'] += float(value)
+                        summary['count'] += 1
                 comparison = tuple(row.get(field) for field in ('dataset', 'seed', 'fold', 'condition', 'model'))
                 backend = row.get('model_backend', 'unrecorded')
                 if comparison_backends.setdefault(comparison, backend) != backend:
@@ -201,6 +220,9 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
                         raise ValueError(f"Candidate counts differ across classifiers: {feature_key}")
                     continue
                 feature_seen[feature_key] = signature
+                if "preprocessing_reused" in row:
+                    preprocessing_recorded_features += 1
+                    preprocessing_reused_features += bool(row["preprocessing_reused"])
                 feature_count[pipeline] += 1
                 for operator in OPERATORS:
                     values = candidate.get(operator, {})
@@ -280,6 +302,10 @@ def collect_primary(run_dir: Path, scope: dict, policy: str,
         "terminal_manifest_status": manifest["status"],
         'resource_plan': manifest.get('configuration', {}).get('resource_plan'),
         'resource_usage': manifest.get('resource_usage'),
+        'array_transport_usage': manifest.get('array_transport_usage'),
+        'transport_counts': dict(transport_counts), 'execution_timing': execution_timing,
+        'preprocessing_reused_features': preprocessing_reused_features if preprocessing_recorded_features else None,
+        'preprocessing_recorded_features': preprocessing_recorded_features or None,
         'configured_workers': manifest.get('configuration', {}).get('workers'),
         'model_backend_counts': dict(backend_counts),
         'capacity_cpu_fallback_cells': fallback_cells,
@@ -293,6 +319,8 @@ def resource_summary(sources: list[dict]) -> list[dict]:
     for policy, source in zip(POLICIES, sources):
         plan = source.get('resource_plan') or {}
         usage = source.get('resource_usage') or {}
+        transport = source.get('array_transport_usage') or {}
+        timing = source.get('execution_timing') or {}
         settings = plan.get('settings', {})
         hardware = plan.get('hardware', {})
         devices = hardware.get('gpu_devices', [])
@@ -320,18 +348,32 @@ def resource_summary(sources: list[dict]) -> list[dict]:
             gpu_admission_waits=usage.get('gpu_waits'),
             preparation_waits=usage.get('preparation_waits'),
             distinct_parameter_records=len(source.get('model_parameter_catalog_sha256', {})),
+            mapped_success_cells=source.get('transport_counts', {}).get('mapped',0),
+            pickle_success_cells=source.get('transport_counts', {}).get('pickle',0),
+            private_copy_success_cells=source.get('transport_counts', {}).get('private_copy',0),
+            unrecorded_transport_cells=source.get('transport_counts', {}).get('unrecorded',0),
+            array_transport_peak_disk_gib=transport.get('peak_disk_bytes',0)/1024**3 if transport else None,
+            array_transport_budget_gib=transport.get('budget_bytes',0)/1024**3 if transport else None,
+            array_transport_threshold_mib=transport.get('threshold_bytes',0)/1024**2 if transport else None,
+            preprocessing_reused_feature_tasks=source.get('preprocessing_reused_features'),
+            preprocessing_recorded_feature_tasks=source.get('preprocessing_recorded_features'),
+            **{f'sum_{field}': timing[field]['sum'] if timing.get(field, {}).get('count') else None
+               for field in ('train_infer_time_s','scoring_time_s','input_open_time_s')},
             measurement='RAM: sampled RSS; GPU budget: estimate, not observed allocation; native allocation is not forcibly capped',
         ))
     return rows
 
 
 def plot_resource_summary(rows: list[dict], output_dir: Path, **options) -> list[str]:
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axes = plt.subplots(2, 2, figsize=(12, 7))
+    axes=axes.flat
     labels = [r['split_policy'].replace('_', ' ') for r in rows]
     x = np.arange(len(rows))
     for ax, fields, title, unit in (
         (axes[0], ('ram_budget_gib', 'observed_process_tree_rss_gib'), 'RAM budget and sampled use', 'GiB'),
         (axes[1], ('cpu_success_cells', 'gpu_success_cells', 'unrecorded_backend_cells'), 'Actual successful fit backends', 'Cells'),
+        (axes[2], ('mapped_success_cells','pickle_success_cells','private_copy_success_cells','unrecorded_transport_cells'), 'Actual array transport per successful fit', 'Cells'),
+        (axes[3], ('sum_train_infer_time_s','sum_scoring_time_s','sum_input_open_time_s'), 'Sum of worker phase times (not wall time)', 'Seconds'),
     ):
         for index, field in enumerate(fields):
             values = [r.get(field) for r in rows]
@@ -342,7 +384,7 @@ def plot_resource_summary(rows: list[dict], output_dir: Path, **options) -> list
             ax.text(.5, .5, 'Resource policy not recorded', ha='center', transform=ax.transAxes)
         ax.set_xticks(x, labels); ax.set_ylabel(unit); ax.set_title(title)
         ax.legend(fontsize=7); ax.grid(axis='y', alpha=.2)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0,0,1,.89))
     return _save_figure(fig, output_dir/'primary_resource_budget_and_use', **options)
 
 
@@ -933,7 +975,7 @@ def _write_result_record(output_dir: Path, scope: dict, manifest: dict,
 def generate(row_dir: Path, group_dir: Path, output_dir: Path,
              association_path: Path | None = None, scope_path: Path | None = None,
              sensitivity_root: Path | None = None) -> dict:
-    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v4.json"
+    frozen_scope = ROOT / "provenance" / "reviewer1_launch_scope_v5.json"
     scope_path = scope_path or frozen_scope
     scope = json.loads(scope_path.read_text(encoding="utf-8"))
     diagnostic = scope_path.resolve() != frozen_scope.resolve()
@@ -1039,9 +1081,9 @@ def generate(row_dir: Path, group_dir: Path, output_dir: Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v4-primary-row")
-    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v4-primary-group")
-    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json')
+    parser.add_argument("--row-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v5-primary-row")
+    parser.add_argument("--group-run-dir", type=Path, default=ROOT / "corrected_runs" / "r1-v5-primary-group")
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json')
     parser.add_argument("--output-dir", type=Path, default=ROOT / "corrected_runs" / "paper_assets")
     parser.add_argument("--mechanism-association", type=Path)
     parser.add_argument("--sensitivity-root", type=Path,

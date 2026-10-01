@@ -168,7 +168,7 @@ def run_mechanism(
     *, run_id: str, split_policy: str, max_datasets: int | None = None,
     max_seeds: int | None = None, max_folds: int | None = None,
     output_root: Path = ROOT / "corrected_runs",
-    scope_path: Path = ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json',
+    scope_path: Path = ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json',
 ) -> dict:
     if split_policy not in {"row_level", "group_aware"}:
         raise ValueError("split_policy must be row_level or group_aware")
@@ -296,7 +296,7 @@ def main() -> None:
     parser.add_argument("--max-datasets", type=int)
     parser.add_argument("--max-seeds", type=int)
     parser.add_argument("--max-folds", type=int)
-    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json')
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json')
     args = parser.parse_args()
     print(json.dumps(run_mechanism(
         run_id=args.run_id, split_policy=args.split_policy,

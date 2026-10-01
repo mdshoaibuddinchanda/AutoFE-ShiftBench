@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from importlib.metadata import version, PackageNotFoundError
+from packaging.requirements import Requirement
 import json
 import os
 from pathlib import Path
@@ -34,14 +35,17 @@ def verify(run_id,scope_path):
     checks['one_heavy_coordinator']=not active
     mismatches=[]
     for line in (ROOT/'requirements.txt').read_text().splitlines():
-        if '==' not in line or line.lstrip().startswith('#'):continue
-        name,pin=line.split('==',1)
-        try:installed=version(name.strip())
+        line=line.strip()
+        if not line or line.startswith('#'):continue
+        requirement=Requirement(line)
+        if requirement.marker and not requirement.marker.evaluate():continue
+        try:installed=version(requirement.name)
         except PackageNotFoundError:installed=None
-        if installed!=pin.strip():mismatches.append(dict(package=name,required=pin,installed=installed))
+        if installed is None or installed not in requirement.specifier:
+            mismatches.append(dict(package=requirement.name,required=str(requirement.specifier),installed=installed))
     checks['requirements_pins']=not mismatches
     storage=scope['storage']
-    minimum=2*storage['scaled_results_checkpoints_projection_gib_all_seven_runs']+storage['bounded_live_cache_cap_gib_per_run']+storage['cache_publication_temporary_allowance_gib']+storage['separate_mechanism_history_reservation_gib']
+    minimum=2*storage['scaled_results_checkpoints_projection_gib_all_seven_runs']+storage['bounded_live_cache_cap_gib_per_run']+storage['cache_publication_temporary_allowance_gib']+storage.get('array_transport_temporary_cap_gib',0)+storage['separate_mechanism_history_reservation_gib']
     free=shutil.disk_usage(ROOT).free/1024**3
     checks['disk_margin']=free>=minimum
     report_path=ROOT/scope['adaptive_verification_path']
@@ -68,6 +72,14 @@ def verify(run_id,scope_path):
                                 and prior['configuration'].get('resource_profile_sha256')==file_sha256(scope_path)
                                 and prior['configuration'].get('split_policy')==run['split_policy']
                                 and prior.get('experiment_scope')==('primary_training_corruption' if run['scope']=='primary' else run['scope']))
+        if scope.get('execution_reuse'):
+            frozen=scope['execution_reuse'];config=prior['configuration']
+            policy=config.get('array_transport_policy',{})
+            checks['run_identity'] = checks['run_identity'] and (
+                config.get('reuse_preprocessing')==frozen['preprocessing_reuse']
+                and config.get('array_transport')==frozen['array_transport']
+                and policy.get('budget_bytes')==frozen['array_transport_budget_bytes']
+                and policy.get('threshold_bytes')==frozen['array_transport_threshold_bytes'])
     else:checks['run_identity']=not existing.parent.exists()
     return dict(run_id=run_id,ready_for_frozen_command=all(checks.values()),checks=checks,
                 free_gib=round(free,2),minimum_free_gib=round(minimum,2),package_mismatches=mismatches,

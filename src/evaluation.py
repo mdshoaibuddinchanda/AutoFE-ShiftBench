@@ -19,6 +19,51 @@ from sklearn.metrics import (
 )
 
 
+def _probability_label_indices(y_true, unique_classes):
+    """Use the same original-label/encoded-label mapping in both AUC paths."""
+    y_values = np.asarray(y_true)
+    class_lookup = {value: index for index, value in enumerate(unique_classes.tolist())}
+    try:
+        return np.asarray([class_lookup[value] for value in y_values], dtype=int)
+    except (KeyError, TypeError):
+        if np.issubdtype(y_values.dtype, np.integer) and np.all((y_values >= 0) & (y_values < len(unique_classes))):
+            return y_values.astype(int)
+        raise ValueError("y_true labels do not match the supplied probability class order")
+
+
+def _auc_metrics(y_indices, y_proba, unique_classes):
+    """Preserve the historical joint ROC/PR exception boundary."""
+    labels = np.arange(len(unique_classes), dtype=int)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if len(unique_classes) == 2:
+                roc = float(roc_auc_score(y_indices, y_proba[:, 1]))
+                pr = float(average_precision_score(y_indices, y_proba[:, 1]))
+            else:
+                roc = float(roc_auc_score(y_indices, y_proba, labels=labels, multi_class="ovr", average="macro"))
+                pr_scores = [average_precision_score((y_indices == i).astype(int), y_proba[:, i])
+                             for i in labels if (y_indices == i).sum() > 0]
+                pr = float(np.mean(pr_scores)) if pr_scores else np.nan
+        return {"roc_auc": roc, "pr_auc": pr}
+    except Exception:
+        return {"roc_auc": np.nan, "pr_auc": np.nan}
+
+
+def compute_training_roc_auc(y_true, y_proba, classes=None):
+    """Compute only the retained training metric, without hard predictions.
+
+    PR-AUC remains part of the shared exception guard so an exceptional input
+    cannot turn a formerly undefined training ROC-AUC into a finite value.
+    No unused classification, log-loss or Brier computations are performed.
+    """
+    unique_classes = np.asarray(classes) if classes is not None else np.unique(y_true)
+    if len(unique_classes) < 2 or y_proba is None or y_proba.size == 0:
+        return np.nan
+    indices = _probability_label_indices(y_true, unique_classes)
+    return _auc_metrics(indices, y_proba, unique_classes)["roc_auc"]
+
+
 def compute_classification_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
@@ -61,15 +106,7 @@ def compute_classification_metrics(
         metrics["brier_score"] = np.nan
         return metrics
 
-    y_values = np.asarray(y_true)
-    class_lookup = {value: index for index, value in enumerate(unique_classes.tolist())}
-    try:
-        y_indices = np.asarray([class_lookup[value] for value in y_values], dtype=int)
-    except (KeyError, TypeError):
-        if np.issubdtype(y_values.dtype, np.integer) and np.all((y_values >= 0) & (y_values < len(unique_classes))):
-            y_indices = y_values.astype(int)
-        else:
-            raise ValueError("y_true labels do not match the supplied probability class order")
+    y_indices = _probability_label_indices(y_true, unique_classes)
     probability_labels = np.arange(len(unique_classes), dtype=int)
 
     # Log Loss
@@ -88,28 +125,7 @@ def compute_classification_metrics(
     except Exception:
         metrics["brier_score"] = np.nan
         
-    # ROC-AUC and PR-AUC
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            if is_binary:
-                metrics["roc_auc"] = float(roc_auc_score(y_indices, y_proba[:, 1]))
-                metrics["pr_auc"] = float(average_precision_score(y_indices, y_proba[:, 1]))
-            else:
-                metrics["roc_auc"] = float(roc_auc_score(
-                    y_indices, y_proba, labels=probability_labels, multi_class="ovr", average="macro",
-                ))
-                # PR-AUC multiclass is not natively "macro" in sklearn average_precision_score for labels.
-                # Compute OVR PR-AUC manually
-                pr_scores = []
-                for i in probability_labels:
-                    y_true_binary = (y_indices == i).astype(int)
-                    if y_true_binary.sum() > 0:
-                        pr_scores.append(average_precision_score(y_true_binary, y_proba[:, i]))
-                metrics["pr_auc"] = float(np.mean(pr_scores)) if pr_scores else np.nan
-    except Exception:
-        metrics["roc_auc"] = np.nan
-        metrics["pr_auc"] = np.nan
+    metrics.update(_auc_metrics(y_indices, y_proba, unique_classes))
 
     return metrics
 

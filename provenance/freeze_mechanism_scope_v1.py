@@ -18,11 +18,11 @@ THREAD_ENV = {
 }
 
 
-def _pilot_result(policy: str, dataset: str, source_fingerprint: str, adaptive: bool = False) -> dict:
+def _pilot_result(policy: str, dataset: str, source_fingerprint: str, adaptive_report: str | None = None) -> dict:
     path = (ROOT / 'corrected_runs' / 'final_optimization'
             / f'optimization-optimized-{policy}-001' / 'results.jsonl')
-    if adaptive:
-        report = json.loads((ROOT/'provenance'/'adaptive_resource_verification_v1.json').read_text())
+    if adaptive_report:
+        report = json.loads((ROOT/adaptive_report).read_text())
         run = next(r for r in report['runs'] if r['kind']=='small' and r['policy']==policy)
         path = ROOT/'corrected_runs'/'adaptive_verification'/run['run_id']/'results.jsonl'
     manifest = json.loads((path.parent / "manifest.json").read_text(encoding="utf-8"))
@@ -78,9 +78,9 @@ def _validate_smoke_task(path: Path, task: dict, manifest: dict, primary: dict,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v4.json')
-    parser.add_argument('--output', type=Path, default=ROOT / 'provenance' / 'mechanism_history_scope_v3.json')
-    parser.add_argument('--smoke-version', default='005')
+    parser.add_argument('--scope', type=Path, default=ROOT / 'provenance' / 'reviewer1_launch_scope_v5.json')
+    parser.add_argument('--output', type=Path, default=ROOT / 'provenance' / 'mechanism_history_scope_v4.json')
+    parser.add_argument('--smoke-version', default='006')
     args = parser.parse_args()
     if Path(sys.executable).resolve() != Path(r"D:\Conda\p12\python.exe").resolve():
         raise RuntimeError("Freeze in the existing p12 environment")
@@ -103,7 +103,7 @@ def main() -> None:
         for dataset in DATASETS:
             task_path, task = next((path, task) for path, task in tasks if task["dataset"] == dataset)
             _validate_smoke_task(task_path, task, manifest, primary, policy, dataset)
-            pilot = _pilot_result(policy, dataset, fingerprint, bool(primary.get('resource_plan')))
+            pilot = _pilot_result(policy, dataset, fingerprint, primary.get('adaptive_verification_path'))
             parity = (
                 task["train_matrix_sha256"] == pilot["train_matrix_sha256"]
                 and task["test_matrix_sha256"] == pilot["test_matrix_sha256"]
@@ -121,16 +121,16 @@ def main() -> None:
                 sonar_bytes.append((task_path.parent / task["history_path"]).stat().st_size
                                    + (task_path.parent / task["jacobian_path"]).stat().st_size)
     commands = [
-        {"run_id": f"r1-v4-mechanism-{label}", "split_policy": policy,
+        {"run_id": f"r1-v5-mechanism-{label}", "split_policy": policy,
          "intended_tasks": 625, "prespecified_group_auc_skips": 50 if policy == "group_aware" else 0,
          "command_argv": [str(Path(sys.executable).resolve()), "-m",
                           "provenance.run_mechanism_history", "--run-id",
-                          f"r1-v4-mechanism-{label}", "--split-policy", policy,
+                          f"r1-v5-mechanism-{label}", "--split-policy", policy,
                           '--scope', str(args.scope.resolve())]}
         for label, policy in (("row", "row_level"), ("group", "group_aware"))
     ]
     payload = {
-        "artifact_type": "reviewer1_clean_arithmetic_mechanism_scope_v3",
+        "artifact_type": "reviewer1_clean_arithmetic_mechanism_scope_v4",
         "status": "ready", "full_mechanism_runs_started": False,
         "code_fingerprint": fingerprint,
         "dataset_hash_digest": primary["dataset_hash_digest"],

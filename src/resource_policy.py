@@ -278,6 +278,11 @@ class ResourceAdmission:
                 self.telemetry['admissions']+=1
                 return reservation
             occupied={p.get('gpu_device') for p in pending if p.get('gpu_device') is not None}
+            if all(d['device_index'] in occupied for d in devices):
+                # No device can admit work yet; probing the driver cannot
+                # change this coordinator-owned occupancy decision.
+                self.telemetry['gpu_waits'] += 1
+                return None
             current={d['uuid']:d for d in gpu_inventory()}
             for device in devices:
                 ordinal=device['device_index']

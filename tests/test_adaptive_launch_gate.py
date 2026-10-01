@@ -28,9 +28,11 @@ def test_adaptive_gate_requires_current_evidence_and_host(tmp_path,monkeypatch):
                storage=dict(scaled_results_checkpoints_projection_gib_all_seven_runs=1,
                             bounded_live_cache_cap_gib_per_run=1,
                             cache_publication_temporary_allowance_gib=1,
+                            array_transport_temporary_cap_gib=2,
                             separate_mechanism_history_reservation_gib=1))
     path=tmp_path/'scope.json';path.write_text(json.dumps(scope))
     first=gate.verify('test',path)
+    assert first['minimum_free_gib']==7
     assert not first['ready_for_frozen_command']
     assert not first['checks']['adaptive_cpu_gpu_large_and_recovery_evidence']
     evidence=dict(status='passed',scope_sha256=file_sha256(path),resource_plan=scope['resource_plan'])
@@ -40,3 +42,8 @@ def test_adaptive_gate_requires_current_evidence_and_host(tmp_path,monkeypatch):
     assert not second['checks']['mechanism_history_scope']
     monkeypatch.setattr(gate,'detect_hardware',lambda root:{'logical_cpus':16})
     assert not gate.verify('test',path)['checks']['adaptive_hardware']
+    (tmp_path/'requirements.txt').write_text('setuptools<81')
+    monkeypatch.setattr(gate,'version',lambda name:'81.0.0')
+    assert not gate.verify('test',path)['checks']['requirements_pins']
+    monkeypatch.setattr(gate,'version',lambda name:'80.10.2')
+    assert gate.verify('test',path)['checks']['requirements_pins']

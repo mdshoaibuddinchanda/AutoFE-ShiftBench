@@ -13,6 +13,8 @@ import os
 import pickle
 import platform
 import sqlite3
+import shutil
+import psutil
 import sys
 import time
 import traceback
@@ -32,11 +34,12 @@ import sklearn
 from threadpoolctl import threadpool_limits
 from sklearn.preprocessing import LabelEncoder
 
+from src.array_transport import ArrayTransport, task_arrays
 from src.checkpoint import has_success, init_db, record_task
 from src.cache_manager import CacheBusyError, CacheCapacityError, CacheManager, CacheNotReadyError
 from src.task_scheduler import Lease, LeaseLost, TaskScheduler, TaskSpec
 from src.data_loader import inspect_target_proxy_candidates, load_csv_dataset, load_dataset_names
-from src.evaluation import compute_classification_metrics
+from src.evaluation import compute_classification_metrics, compute_training_roc_auc
 from src.feature_engineering import DFSConfig, expand_features_with_dfs
 from src.group_splits import (
     GroupSplitInfeasibleError,
@@ -77,6 +80,16 @@ from src.splitters import (
 
 @measured_worker
 def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
+    started, unix_started = time.perf_counter(), time.time()
+    with task_arrays(payload) as prepared:
+        open_time = time.perf_counter()-started
+        result = _fit_and_score_arrays(prepared)
+    result.update(worker_started_unix=unix_started, worker_elapsed_s=time.perf_counter()-started,
+                  input_open_time_s=open_time)
+    return result
+
+
+def _fit_and_score_arrays(payload: dict[str, Any]) -> dict[str, Any]:
     """Fit one classifier task in a bounded child process.
 
     The parent process owns task leases, cache publication, checkpoints, and
@@ -114,12 +127,15 @@ def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
         (len(xte), len(classes))
     )
     infer_time = time.perf_counter() - infer_started
-    train_pred = model.predict(xtr)
+    train_infer_started = time.perf_counter()
     train_proba = model.predict_proba(xtr) if hasattr(model, "predict_proba") else np.zeros(
         (len(y_train_enc), len(classes))
     )
+    train_infer_time = time.perf_counter() - train_infer_started
+    scoring_started = time.perf_counter()
     test_metrics = compute_classification_metrics(y_test_enc, y_pred, y_proba, classes)
-    train_metrics = compute_classification_metrics(y_train_enc, train_pred, train_proba, classes)
+    train_auc = compute_training_roc_auc(y_train_enc, train_proba, classes)
+    scoring_time = time.perf_counter() - scoring_started
     def parameter_value(value):
         if value is None or isinstance(value, (str, bool, int)):
             return value
@@ -148,9 +164,11 @@ def _fit_and_score_worker(payload: dict[str, Any]) -> dict[str, Any]:
         'model_parameters': parameter_value(resolved_parameters),
         "train_time_s": train_time,
         "infer_time_s": infer_time,
-        "y_pred": np.asarray(y_pred),
+        "train_infer_time_s": train_infer_time,
+        "scoring_time_s": scoring_time,
+        "y_pred": np.asarray(y_pred).copy(),
         "test_metrics": test_metrics,
-        "train_auc": train_metrics.get("roc_auc"),
+        "train_auc": train_auc,
     }
 
 
@@ -296,18 +314,8 @@ def _stable_perturbation_seed(
     return stable_seed(safe_identity, repetition_seed, fold, condition)
 
 
-def _prepare_matrices(
-    x_train: pd.DataFrame,
-    y_train: pd.Series,
-    x_test: pd.DataFrame,
-    *,
-    family: str,
-    severity: float,
-    perturbation_seed: int,
-    pipeline_name: str,
-    config: DFSConfig,
-) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, LabelEncoder, dict[str, Any], pd.DataFrame]:
-    """Fit every learned step on training rows and transform held-out X only."""
+def _preprocess_task(x_train, y_train, x_test, *, family, severity, perturbation_seed):
+    """Fit training-only preprocessing once for identical pipeline inputs."""
     preparation_started = time.perf_counter()
     if not x_train.index.equals(y_train.index):
         raise ValueError("Training X/y row index and order differ before perturbation")
@@ -332,6 +340,33 @@ def _prepare_matrices(
     x_test_clean = pd.DataFrame(clean_test_arr, columns=columns).reset_index(drop=True)
     y_train_series = pd.Series(y_train_encoded, index=x_train_prepped.index)
 
+    return (x_train_prepped, x_test_prepped, y_train_encoded, encoder, x_test_clean, time.perf_counter()-preparation_started)
+
+
+def _prepare_matrices(
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    x_test: pd.DataFrame,
+    *,
+    family: str,
+    severity: float,
+    perturbation_seed: int,
+    pipeline_name: str,
+    config: DFSConfig,
+    preprocessed: tuple | None = None,
+    preprocessing_reused: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, LabelEncoder, dict[str, Any], pd.DataFrame]:
+    """Fit every learned step on training rows and transform held-out X only."""
+    preparation_started = time.perf_counter()
+    if preprocessed is None:
+        preprocessed = _preprocess_task(x_train, y_train, x_test, family=family,
+                                       severity=severity, perturbation_seed=perturbation_seed)
+    train_input, test_input, y_train_encoded, encoder, clean_input, preprocessing_time = preprocessed
+    # Every variant owns its DataFrames. Shared input cannot be mutated by DFS.
+    x_train_prepped, x_test_prepped = train_input.copy(deep=True), test_input.copy(deep=True)
+    x_test_clean = clean_input.copy(deep=True)
+    y_train_encoded = y_train_encoded.copy()
+    y_train_series = pd.Series(y_train_encoded, index=x_train_prepped.index)
     cfg = DFSConfig(**asdict(config))
     cfg.random_seed = perturbation_seed
     generation_started = time.perf_counter()
@@ -340,8 +375,10 @@ def _prepare_matrices(
     )
     preparation_finished = time.perf_counter()
     metadata["generation_time_s"] = preparation_finished - generation_started
-    metadata["preprocessing_time_s"] = generation_started - preparation_started
-    metadata["preparation_time_s"] = preparation_finished - preparation_started
+    metadata["preprocessing_time_s"] = 0.0 if preprocessing_reused else preprocessing_time
+    metadata["preprocessing_reused"] = preprocessing_reused
+    metadata["preparation_time_s"] = metadata["generation_time_s"] + metadata["preprocessing_time_s"]
+    metadata["preparation_wall_time_s"] = preparation_finished - preparation_started
     return (
         x_train_fe.reset_index(drop=True), x_test_fe.reset_index(drop=True),
         y_train_encoded, encoder, metadata, x_test_clean,
@@ -831,6 +868,8 @@ def run_experiment(
     gpu_policy: str = 'auto',
     adaptive_worker_cap: int | None = None,
     resource_profile: str | Path | None = None,
+    reuse_preprocessing: bool = True,
+    array_transport: str = "auto",
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a small or full grid with explicit task status and isolated outputs."""
@@ -838,6 +877,8 @@ def run_experiment(
         raise ValueError("split_policy must be 'row_level' or 'group_aware'")
     if resource_policy not in {'manual', 'adaptive'}:
         raise ValueError('resource_policy must be manual or adaptive')
+    if array_transport not in {"auto", "pickle", "mapped"}:
+        raise ValueError("Unknown array transport")
     if resource_profile is not None and resource_policy != 'adaptive':
         raise ValueError('A frozen resource profile requires adaptive execution')
     if cache_policy not in {"retain", "bounded"}:
@@ -968,6 +1009,13 @@ def run_experiment(
         admission = ResourceAdmission(resource_plan)
         if existing_manifest and existing_manifest.get('resource_usage'):
             admission.telemetry.update(existing_manifest['resource_usage'])
+    disk_probe = run_dir.resolve()
+    while not disk_probe.exists():
+        disk_probe = disk_probe.parent
+    transport_budget = (resource_plan['cache_max_bytes'] if resource_plan is not None
+                        else cache_max_bytes if cache_max_bytes is not None
+                        else int(min(psutil.virtual_memory().total*.4, shutil.disk_usage(disk_probe).total*.025)))
+    transport_threshold = max(1, transport_budget//max(1, workers*len(models)))
     config_data = {
         "protocol": PROTOCOL_VERSION, "datasets": list(normalized_data_paths),
         "conditions": [list(x) for x in conditions],
@@ -983,6 +1031,10 @@ def run_experiment(
         "manifest_policy": manifest_policy,
         "use_gpu": bool(use_gpu or (resource_plan is not None and 'gpu' in resource_plan['backend_by_model'].values())),
         "workers": int(workers),
+        "reuse_preprocessing": bool(reuse_preprocessing),
+        "array_transport": array_transport,
+        "array_transport_policy": {"budget_bytes":transport_budget, "threshold_bytes":transport_threshold,
+                                   "worker_views":"copy_on_write", "publication":"once_per_feature_group"},
         "numerical_thread_environment": thread_environment,
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
     }
@@ -1097,6 +1149,14 @@ def run_experiment(
     pending_futures: list[tuple[Future, dict[str, Any]]] = []
     gpu_executors: dict[int, ProcessPoolExecutor] = {}
     deferred_cache_reclaims: dict[str, dict[str, Any]] = {}
+    array_manager = (ArrayTransport(run_dir/'array_transport', budget_bytes=transport_budget,
+                                    threshold_bytes=transport_threshold,
+                                    prior_stats=(existing_manifest or {}).get('array_transport_usage'))
+                     if workers > 1 and array_transport != 'pickle' and (len(models)>1 or array_transport=='mapped') else None)
+    base_manifest['array_transport_usage'] = (array_manager.stats if array_manager is not None else
+        dict(groups_published=0,mapped_task_submissions=0,
+             serialized_task_submissions=(existing_manifest or {}).get('array_transport_usage', {}).get('serialized_task_submissions',0),
+             peak_disk_bytes=0,budget_bytes=transport_budget,threshold_bytes=transport_threshold))
     if workers > 1:
         pool_options = dict(max_workers=workers, mp_context=mp.get_context('spawn'),
                             initializer=initialize_worker,
@@ -1105,7 +1165,7 @@ def run_experiment(
 
     def _reclaim_terminal_feature_group(meta: dict[str, Any]) -> bool:
         """Remove only this group's payload after every planned consumer is terminal."""
-        if cache_manager is None:
+        if cache_manager is None and array_manager is None:
             return False
         keys = meta["feature_consumer_task_keys"]
         terminal_statuses = {"success", "failed", "skipped", "timed_out"}
@@ -1119,6 +1179,10 @@ def run_experiment(
             states = {row["task_key"]: row.get("status") for row in outcomes
                       if row.get("task_key") in keys}
         if len(states) != len(keys) or any(value not in terminal_statuses for value in states.values()):
+            return False
+        if array_manager is not None:
+            array_manager.release(meta["feature_cache_key"])
+        if cache_manager is None:
             return False
         try:
             removed = cache_manager.remove(meta["feature_cache_key"])
@@ -1209,6 +1273,11 @@ def run_experiment(
                 "test_matrix_sha256": meta["test_matrix_sha256"],
                 "prediction_sha256": stable_digest(np.asarray(y_pred).tolist()),
                 "train_auc": fit.get("train_auc"),
+                "input_open_time_s": fit.get("input_open_time_s"),
+                "array_transport": meta.get("array_transport", "pickle"),
+                "preprocessing_reused": meta["fe_meta"].get("preprocessing_reused", False),
+                "train_infer_time_s": fit.get("train_infer_time_s"),
+                "scoring_time_s": fit.get("scoring_time_s"),
                 **test_metrics,
             }
             _safe_result_write(run_dir / "results.jsonl", result, index_path=result_index_path)
@@ -1441,6 +1510,7 @@ def run_experiment(
                                     width = min(width,candidate_config.max_features)
                                 comparison_width = max(comparison_width,width)
                         comparison_matrix_bytes = int((len(x_train)+len(x_test))*(comparison_width*8+8)+1024)
+                    shared_preprocessing = None
                     for pipeline_name in pipelines:
                         config = PIPELINE_CONFIGS[pipeline_name]
                         feature_consumer_task_keys = [stable_digest({
@@ -1455,6 +1525,7 @@ def run_experiment(
                         generated_group: list[tuple[Any, ...]] = []
 
                         def make_group_payload() -> tuple[Any, ...]:
+                            nonlocal shared_preprocessing
                             if not generated_group and admission is not None:
                                 encoded_width = sum(1 if pd.api.types.is_numeric_dtype(x_train[column])
                                                     else x_train[column].nunique(dropna=False)+1
@@ -1486,10 +1557,17 @@ def run_experiment(
                                             last_heartbeat = now
                                         time.sleep(0.2)
                             if not generated_group:
+                                reused = reuse_preprocessing and shared_preprocessing is not None
+                                if reuse_preprocessing and shared_preprocessing is None:
+                                    shared_preprocessing = _preprocess_task(
+                                        x_train, y_train, x_test, family=family, severity=severity,
+                                        perturbation_seed=perturb_seed)
                                 generated_group.append(_prepare_matrices(
                                     x_train, y_train, x_test, family=family, severity=severity,
                                     perturbation_seed=perturb_seed, pipeline_name=pipeline_name,
                                     config=PIPELINE_CONFIGS[pipeline_name],
+                                    preprocessed=shared_preprocessing if reuse_preprocessing else None,
+                                    preprocessing_reused=reused,
                                 ))
                             return generated_group[0]
                         for model_position, model_name in enumerate(models):
@@ -1845,14 +1923,21 @@ def run_experiment(
                                         # in one device process instead of accumulating
                                         # in every CPU worker across a long campaign.
                                         task_executor = gpu_executors[device]
+                                    dispatched_payload, transport_kind = (array_manager.payload(
+                                        fit_payload, phase2_meta['feature_cache_key'], mode=array_transport)
+                                        if array_manager is not None else (fit_payload, 'pickle'))
+                                    phase2_meta['array_transport'] = transport_kind
+                                    if array_manager is None:
+                                        base_manifest['array_transport_usage']['serialized_task_submissions'] += 1
                                     pending_futures.append((
-                                        task_executor.submit(_fit_and_score_worker, fit_payload),
+                                        task_executor.submit(_fit_and_score_worker, dispatched_payload),
                                         phase2_meta,
                                     ))
                                     # Keep serialized matrices bounded in memory.
                                     if len(pending_futures) >= max(1, workers if admission is not None else workers*2):
                                         _drain_one()
                                 else:
+                                    phase2_meta['array_transport'] = 'private_copy'
                                     # Each serial estimator gets the same independent
                                     # inputs that spawned workers receive by pickle.
                                     isolated_payload = {name: value.copy() if isinstance(value, np.ndarray) else value
@@ -1884,6 +1969,8 @@ def run_experiment(
         executor.shutdown(wait=True, cancel_futures=False)
     for gpu_executor in gpu_executors.values():
         gpu_executor.shutdown(wait=True, cancel_futures=False)
+    if array_manager is not None:
+        array_manager.close()
 
     if cache_manager is not None:
         cache_reconciled = cache_manager.reconcile()
@@ -1953,6 +2040,10 @@ def main(argv: list[str] | None = None) -> None:
         "--cache-audit", action="store_true",
         help="Persist per-feature cache build/hit/consumer/reader/deletion evidence (bounded runs only)",
     )
+    parser.add_argument("--array-transport", choices=["auto","pickle","mapped"], default="auto",
+                        help="Host-derived large-array sharing; pickle/mapped modes support verification")
+    parser.add_argument("--no-preprocessing-reuse", action="store_true",
+                        help="Disable identical-input preprocessing reuse for verification")
     parser.add_argument("--use-gpu", action="store_true", help="Use CUDA for XGBoost/CatBoost cells when the host/backend supports it")
     args = parser.parse_args(argv)
     if args.resource_policy == 'adaptive':
@@ -1996,7 +2087,8 @@ def main(argv: list[str] | None = None) -> None:
         resource_policy=args.resource_policy, reserve_cpus=args.reserve_cpus,
         ram_target_fraction=args.ram_target_fraction, vram_target_fraction=args.vram_target_fraction,
         gpu_policy=args.gpu_policy, adaptive_worker_cap=args.adaptive_worker_cap,
-        resource_profile=args.resource_profile,
+        resource_profile=args.resource_profile, reuse_preprocessing=not args.no_preprocessing_reuse,
+        array_transport=args.array_transport,
     )
     print(json.dumps({"run_id": manifest["run_id"], "status": manifest["status"], "counts": manifest["counts"]}, indent=2))
 

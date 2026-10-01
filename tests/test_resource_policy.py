@@ -75,7 +75,11 @@ def test_gpu_vram_headroom_and_single_slot_per_device(monkeypatch):
     reservation=controller.reservation('xgboost',1024,[])
     assert reservation['gpu_device']==0
     assert 0<reservation['gpu_ram_part']<.8
+    def no_probe():
+        raise AssertionError('Occupied devices need no driver probe')
+    monkeypatch.setattr(resource,'gpu_inventory',no_probe)
     assert controller.reservation('xgboost',1024,[reservation]) is None
+    monkeypatch.setattr(resource,'gpu_inventory',lambda:[gpu])
     gpu['free_bytes']=512*1024**2
     assert controller.reservation('xgboost',1024,[]) is None
     assert controller.telemetry['gpu_waits']==2

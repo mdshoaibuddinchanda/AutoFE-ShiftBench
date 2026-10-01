@@ -49,7 +49,7 @@ RUN_CONDITIONS = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', choices=('2', '3', '4'), default='4')
+    parser.add_argument('--version', choices=('2', '3', '4', '5'), default='5')
     args = parser.parse_args()
     if Path(sys.executable).resolve() != Path(r"D:\Conda\p12\python.exe").resolve():
         raise RuntimeError("Freeze with the existing D:\\Conda\\p12\\python.exe")
@@ -87,7 +87,7 @@ def main() -> None:
         "--workers", "4", "--pipelines", *PIPELINES, "--models", *MODELS,
     ]
     resource_plan = None
-    if args.version == '4':
+    if args.version in ('4', '5'):
         from src.resource_policy import ResourceSettings, detect_hardware, probe_gpu_models, resolve_plan
         hardware = detect_hardware(ROOT)
         resource_plan = resolve_plan(ResourceSettings(), hardware, MODELS,
@@ -97,7 +97,8 @@ def main() -> None:
                         '--scheduler-lease-seconds', '600', '--resource-policy', 'adaptive',
                         '--reserve-cpus', '2', '--ram-target-fraction', '0.8',
                         '--vram-target-fraction', '0.8', '--gpu-policy', 'auto',
-                        '--resource-profile', str(ROOT/'provenance'/'reviewer1_launch_scope_v4.json'),
+                        '--array-transport', 'auto',
+                        '--resource-profile', str(ROOT/'provenance'/f'reviewer1_launch_scope_v{args.version}.json'),
                         '--pipelines', *PIPELINES, '--models', *MODELS]
     else:
         command_base.extend(['--resource-policy', 'manual'])
@@ -188,21 +189,27 @@ def main() -> None:
     }
     if resource_plan is not None:
         cache_gib = resource_plan['cache_max_bytes']/1024**3
+        evidence_path = f'provenance/adaptive_resource_verification_v{2 if args.version == "5" else 1}.json'
         payload.update(status='FROZEN_SCOPE_USE_DATED_READINESS_SNAPSHOT',resource_plan=resource_plan,
-                       adaptive_verification_path='provenance/adaptive_resource_verification_v1.json',
+                       adaptive_verification_path=evidence_path,
                        optimization_verification_path=None,
-                       recovery_evidence_path='provenance/adaptive_resource_verification_v1.json',
-                       mechanism_scope_path='provenance/mechanism_history_scope_v3.json')
+                       recovery_evidence_path=evidence_path,
+                       mechanism_scope_path=f'provenance/mechanism_history_scope_v{4 if args.version == "5" else 3}.json')
         payload['storage'].update(
             bounded_live_cache_cap_gib_per_run=cache_gib,
             cache_publication_temporary_allowance_gib=cache_gib,
+            array_transport_temporary_cap_gib=cache_gib if args.version == '5' else 0,
             scaled_results_checkpoints_projection_gib_all_seven_runs=31.13,
             added_timing_metadata_reservation_gib=1,
             added_adaptive_metadata_and_parameter_catalog_reservation_gib=3,
-            results_projection_basis='Historical 27.13 GiB plus 1 GiB measured-timing and 3 GiB resource/parameter-reference allowances; conservative planning estimate, not a guaranteed upper bound. Gate requires twice this volume plus live cache, staging cache and separate mechanism history.')
+            results_projection_basis='Historical 27.13 GiB plus 1 GiB measured-timing and 3 GiB resource/parameter-reference allowances; conservative planning estimate, not a guaranteed upper bound. Gate requires twice this volume plus live cache, staging cache, array transport and separate mechanism history.')
         payload['runtime'].update(
-            basis='Older 229.69-day fixed-four-worker scenario retained as historical; adaptive backend/concurrency changes require bounded v4 timings. No validated full-campaign ETA; ten-day limit waived.',
-            adaptive_runtime_evidence='provenance/adaptive_resource_verification_v1.json')
+            basis=f'Older 229.69-day fixed-four-worker scenario retained as historical; adaptive backend/concurrency changes require bounded v{args.version} timings. No validated full-campaign ETA; ten-day limit waived.',
+            adaptive_runtime_evidence=evidence_path)
+        payload['execution_reuse'] = dict(preprocessing_reuse=True,array_transport='auto',
+            array_transport_budget_bytes=resource_plan['cache_max_bytes'],
+            array_transport_threshold_bytes=max(1,resource_plan['cache_max_bytes']//(resource_plan['worker_ceiling']*len(MODELS))),
+            worker_views='copy_on_write',unused_training_metrics_removed=True)
     output = ROOT / "provenance" / f"reviewer1_launch_scope_v{args.version}.json"
     if output.exists():
         raise FileExistsError(f'Preserve prior freeze: {output}')

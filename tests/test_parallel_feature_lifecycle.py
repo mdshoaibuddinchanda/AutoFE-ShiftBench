@@ -125,11 +125,15 @@ def test_serial_estimators_cannot_mutate_inputs_for_later_classifier(tmp_path, m
 def test_resume_reclaims_terminal_group_left_before_delete_and_new_admission(tmp_path):
     path = _dataset(tmp_path / "resume.csv")
     script = f"""
-import os
+import os, json
 from src.pipeline_runner import run_experiment
 def stop(phase, task):
-    if phase == 'after_scheduler_publish' and task['condition'] == 'clean' and task['model'] == 'logistic_regression':
-        os._exit(77)
+    if phase == 'after_scheduler_publish' and task['condition'] == 'clean':
+        with open({str(tmp_path / 'resume' / 'results.jsonl')!r}, encoding='utf-8') as stream:
+            committed = {{row['model'] for row in map(json.loads, stream)
+                         if row['condition'] == 'clean' and row['status'] == 'success'}}
+        if committed == {{'gaussian_nb', 'logistic_regression'}}:
+            os._exit(77)
 run_experiment({{'resume': {str(path)!r}}}, run_id='resume', output_root={str(tmp_path)!r},
     seeds=[42], folds=[1], n_splits=3, workers=2,
     conditions=(('clean',0.0),('gaussian_noise',0.05),('gaussian_noise',0.1)),
@@ -152,6 +156,8 @@ run_experiment({{'resume': {str(path)!r}}}, run_id='resume', output_root={str(tm
     assert manifest["status"] == "complete"
     assert manifest["counts_by_status"]["success"] == 6
     assert not list((run_dir / "cache_bounded").glob("*.payload"))
+    assert not list((run_dir / "array_transport").rglob("*.npy"))
+    assert manifest['array_transport_usage']['mapped_task_submissions'] >= 6
     with sqlite3.connect(run_dir / "scheduler.sqlite") as connection:
         after = dict(connection.execute(
             "SELECT task_key, final_result_digest FROM scheduler_tasks WHERE status='success'"))

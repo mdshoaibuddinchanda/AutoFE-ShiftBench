@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "provenance" / "four_dataset_pilot_diagnosis.md"
 DEFAULT_OUTPUT = ROOT / "provenance" / "figures" / "four_dataset_pilot_status.svg"
-READINESS_SOURCE = ROOT / "provenance" / "reviewer1_launch_readiness_v4.json"
+READINESS_SOURCE = ROOT / "provenance" / "reviewer1_launch_readiness_v5.json"
 
 
 def _cells(report: str, label: str) -> list[str]:

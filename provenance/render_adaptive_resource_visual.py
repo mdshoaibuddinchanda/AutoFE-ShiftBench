@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
-    scope_path=ROOT/'provenance'/'reviewer1_launch_scope_v4.json'
+    scope_path=ROOT/'provenance'/'reviewer1_launch_scope_v5.json'
     plan=json.loads(scope_path.read_text())['resource_plan']
     hardware=plan['hardware'];settings=plan['settings']
     gpu_total=sum(d['total_bytes'] for d in hardware['gpu_devices'])/1024**3
