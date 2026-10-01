@@ -1,0 +1,39 @@
+{
+  "artifact_type": "clean_group_aware_large_calibration_v3",
+  "status": "complete",
+  "run_id": "calibration-group_aware-003",
+  "code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
+  "source_datasets": [
+    "airlines",
+    "covertype"
+  ],
+  "dataset_hashes": {
+    "airlines": {
+      "csv_sha256": "6d2f4f0cb3fc0f56d7361efdbef9284975f081bca1fd0ec76fc32aa88b79ab77",
+      "sidecar_sha256": "627c9894eb3f3489a5ce6609d6b8fa3fb44d33fc853c141220f2a8d1eaf4b767"
+    },
+    "covertype": {
+      "csv_sha256": "be5adda3ce3827c02d18f11f68017340acd4f357a026b87c4faa89382f89b56a",
+      "sidecar_sha256": "ac00678afc1511339ab3c4c6241a603af310f4866793c62c1f9658fc2a617d24"
+    }
+  },
+  "numerical_thread_environment": {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  },
+  "workers": 4,
+  "scheduler_lease_seconds": 3600,
+  "elapsed_s": 11414.265,
+  "counts_by_status": {
+    "failed": 0,
+    "pending": 0,
+    "skipped": 0,
+    "success": 120,
+    "timed_out": 0
+  },
+  "row_level_reference": "calibration-row_level-002",
+  "abandoned_concurrent_group_attempt": "calibration-group_aware-002",
+  "scientific_use": "diagnostic throughput and resource evidence only"
+}
