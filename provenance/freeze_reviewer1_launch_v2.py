@@ -109,6 +109,9 @@ def main() -> None:
         "analysis_sha256": {name: file_sha256(ROOT / name) for name in (
             "src/reviewer1_analysis.py", "src/stats_analysis.py", "src/generate_tables.py",
             "src/plotting_q1.py", "provenance/generate_corrected_assets.py",
+            "provenance/large_dataset_recovery_v1.py",
+            "provenance/large_dataset_calibration_group_v3.py",
+            "provenance/verify_reviewer1_launch_v2.py",
             "provenance/reviewer1_condition_crosswalk.md",
         )},
         "dataset_list_sha256": file_sha256(ROOT / "config" / "dataset_list.yaml"),

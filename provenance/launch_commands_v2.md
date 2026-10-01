@@ -13,6 +13,8 @@ $env:NUMEXPR_NUM_THREADS = '1'
 & $py -m provenance.audit_group_seed_grid
 & $py -m provenance.freeze_reviewer1_launch_v2
 & $py -m provenance.freeze_mechanism_scope_v1
+# One-time gate, only after clean group calibration -003 is complete:
+# & $py -m provenance.large_dataset_recovery_v1 --version 002
 
 $common = @(
   '--cache-policy','bounded','--cache-max-gib','8',

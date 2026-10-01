@@ -2,7 +2,7 @@
   "artifact_type": "reviewer1_launch_scope_v2",
   "status": "FROZEN_SCOPE_HOST_CALIBRATION_PENDING",
   "full_campaign_started": false,
-  "code_commit_at_freeze": "2077d731eb4609138d2fd76ca7efffcfb2df314f",
+  "code_commit_at_freeze": "a0e8e220ad81104b9501acc0dc1a242379a7ee56",
   "code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
   "analysis_sha256": {
     "src/reviewer1_analysis.py": "695b57ddc7fca17c2abea5cc25438e3648686de15f0e6226adf05ffd3077f32b",
@@ -10,6 +10,9 @@
     "src/generate_tables.py": "37aa850b8ab4a5d3f2470d4fa9fe60c1ce74d8dc7976d2e2026cbd29a4ffc026",
     "src/plotting_q1.py": "d984b00caf1c87e77804fb785056c5ff6c3fe7f7a99cf91e86437839c6121a5f",
     "provenance/generate_corrected_assets.py": "3486a5bf4ad33b03aa7ea98262e50a0c52f8633e4f13daa4ceed75628e0339d4",
+    "provenance/large_dataset_recovery_v1.py": "1b6236db4acd31ef95ddd08286720133d3b24dfceff63dd768734cdf17d68a5b",
+    "provenance/large_dataset_calibration_group_v3.py": "8526b24d393aed6840a973706ef326115b1e73a4badd1b686129c49972c94f1d",
+    "provenance/verify_reviewer1_launch_v2.py": "3628023604f6c3897483d62aee60de5f042e5a816d584870e46e299c798b9521",
     "provenance/reviewer1_condition_crosswalk.md": "940dc149276c6f4a8ce862bb5ea8e673281faa980c5c1da4bbadad78a25bf1ea"
   },
   "dataset_list_sha256": "d86874aabd0b885f5e1041b9a166e6b34135d77bbc1cb1ec6ce16a7819fbcaf4",
@@ -733,7 +736,7 @@
     "auc_eligible_before_condition_specific_skips": 2191000
   },
   "storage": {
-    "free_bytes_at_freeze": 464097939456,
+    "free_bytes_at_freeze": 464327364608,
     "bounded_live_cache_cap_gib_per_run": 8,
     "prior_results_checkpoints_projection_gib_primary": 20.87,
     "scaled_results_checkpoints_projection_gib_all_seven_runs": 27.13,

@@ -74,6 +74,8 @@ checkpoint, cache, and result artifacts. Both four-dataset pilots completed
 at 5,600 valid cells each. This is execution and timing evidence only.
 Corrected performance effects remain **PENDING CORRECTED RUN**.
 
+Launch-gate update: an overlapping four-worker recovery diagnostic and group-aware large calibration caused local memory allocation failures. Both partial attempts were preserved as diagnostic evidence. The row-level calibration completed 120/120; clean group-aware `-003` now runs alone. A separate 600-second-lease forced restart will run alone afterward. The launch verifier rejects another heavy coordinator during this work and requires both clean calibration and recovery evidence before it can return ready. Three focused recovery-contract tests pass; the preceding full `p12` suite passed 106 tests before this new gate code. Full benchmark effects remain **PENDING CORRECTED RUN**.
+
 ## Historical evidence boundary
 
 The historical ledger and manuscript values are preserved as historical evidence. They are not merged into corrected estimates and cannot be used to infer the missing row-level/group-aware comparison.

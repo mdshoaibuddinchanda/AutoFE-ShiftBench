@@ -129,6 +129,8 @@ On this Windows checkout, `setup_and_run.bat` uses `D:\Conda\p12\python.exe` to 
 
 The [versioned seven-run launch scope](provenance/reviewer1_launch_scope_v2.json) records the exact primary and sensitivity task counts, input hashes, command arguments, storage assumptions, and unresolved host gate. The separate [mechanism-history scope](provenance/mechanism_history_scope_v1.json) adds two clean-condition candidate/Jacobian runs; it does not add cells to the primary performance denominator. The [command sheet](provenance/launch_commands_v2.md) gives every run and its monitoring/resume command. The ten-day target has been waived; a representative large-dataset runtime estimate and recovery check are still needed on the intended execution host. Freezing writes a plan and does not launch tasks.
 
+The launch verifier also requires a bounded forced-restart proof on `airlines` under the frozen 600-second scheduler lease. After the clean group calibration completes, `D:\Conda\p12\python.exe -m provenance.large_dataset_recovery_v1 --version 002` deliberately stops and resumes a 20-cell row-level run and a 20-cell group-aware run, checks that committed cells retain their hashes without refitting, and writes `provenance/large_dataset_recovery_v1.json` when both pass. Its local logs and task ledgers stay under `corrected_runs/large_recovery/`. This is diagnostic work only. The earlier `-001` attempt was stopped after overlapping heavy jobs caused memory failures; preserve it and run only one heavy coordinator at a time on this host.
+
 The configured dataset downloader can be run independently in `p12`:
 
 ~~~

@@ -11,11 +11,56 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+import psutil
+
 from src.provenance import code_fingerprint, file_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCOPE = ROOT / "provenance" / "reviewer1_launch_scope_v2.json"
+HEAVY_COORDINATOR_MODULES = {
+    "src.pipeline_runner", "provenance.large_dataset_calibration",
+    "provenance.large_dataset_calibration_group_v3",
+    "provenance.large_dataset_recovery_v1", "provenance.run_mechanism_history",
+}
+
+
+def _active_heavy_coordinators() -> list[dict]:
+    active = []
+    for process in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            args = process.info.get("cmdline") or []
+            for index, value in enumerate(args[:-1]):
+                if value == "-m" and args[index + 1] in HEAVY_COORDINATOR_MODULES:
+                    active.append({"pid": process.pid, "module": args[index + 1]})
+                    break
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            continue
+    return active
+
+
+def _recovery_run_manifest_valid(item: dict, source_fingerprint: str) -> bool:
+    relative = item.get("run_manifest")
+    run_id = item.get("run_id", "")
+    if not relative or not isinstance(relative, str) or not run_id:
+        return False
+    path = (ROOT / relative).resolve()
+    if not path.is_relative_to(ROOT.resolve()) or not path.is_file():
+        return False
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    policy = ("row_level" if run_id.startswith("recovery-airlines-row-") else
+              "group_aware" if run_id.startswith("recovery-airlines-group-") else None)
+    return bool(
+        policy and manifest.get("run_id") == run_id and manifest.get("status") == "complete"
+        and manifest.get("expected_tasks") == 20
+        and manifest.get("counts_by_status", {}).get("success") == 20
+        and manifest.get("code_fingerprint") == source_fingerprint
+        and manifest.get("configuration", {}).get("split_policy") == policy
+        and manifest.get("configuration", {}).get("scheduler_lease_seconds") == 600.0
+    )
 
 
 def verify(run_id: str) -> dict:
@@ -40,6 +85,8 @@ def verify(run_id: str) -> dict:
         os.environ.get(name) == value
         for name, value in scope["required_numerical_thread_environment"].items()
     )
+    active_heavy = _active_heavy_coordinators()
+    checks["one_heavy_coordinator"] = not active_heavy
     host_path = ROOT / scope["host_probe_path"]
     host = json.loads(host_path.read_text(encoding="utf-8"))
     checks["host_probe_hash"] = file_sha256(host_path) == scope["host_probe_sha256"]
@@ -72,7 +119,8 @@ def verify(run_id: str) -> dict:
 
     calibration = {}
     for policy in ("row_level", "group_aware"):
-        path = ROOT / "corrected_runs" / "large_calibration" / f"calibration-{policy}-002" / "manifest.json"
+        calibration_version = "002" if policy == "row_level" else "003"
+        path = ROOT / "corrected_runs" / "large_calibration" / f"calibration-{policy}-{calibration_version}" / "manifest.json"
         if not path.exists():
             calibration[policy] = {"status": "missing"}
             continue
@@ -89,6 +137,32 @@ def verify(run_id: str) -> dict:
         and item.get("success") == 120 and item.get("code_fingerprint_matches")
         and item.get("threads_match")
         for item in calibration.values()
+    )
+    recovery_path = ROOT / "provenance" / "large_dataset_recovery_v1.json"
+    recovery = json.loads(recovery_path.read_text(encoding="utf-8")) if recovery_path.exists() else {}
+    airline = next(item for item in scope["datasets"] if item["name"] == "airlines")
+    recovery_runs = recovery.get("runs", [])
+    checks["large_dataset_forced_restart"] = (
+        recovery.get("artifact_type") == "large_dataset_forced_restart_v1"
+        and recovery.get("status") == "passed"
+        and recovery.get("host", "").casefold() == platform.node().casefold()
+        and Path(recovery.get("python_executable", "")).resolve() == Path(sys.executable).resolve()
+        and recovery.get("code_fingerprint") == scope["code_fingerprint"]
+        and recovery.get("csv_sha256") == airline["csv_sha256"]
+        and recovery.get("sidecar_sha256") == airline["sidecar_sha256"]
+        and recovery.get("numerical_thread_environment") == scope["required_numerical_thread_environment"]
+        and recovery.get("scheduler_lease_seconds") == 600
+        and recovery.get("workers") == 4
+        and len(recovery_runs) == 2
+        and {"row" if item.get("run_id", "").startswith("recovery-airlines-row-") else
+             "group" if item.get("run_id", "").startswith("recovery-airlines-group-") else "invalid"
+             for item in recovery_runs} == {"row", "group"}
+        and all(item.get("status") == "passed"
+                and item.get("committed_successes_before_kill", 0) > 0
+                and item.get("terminal_successes_after_resume") == 20
+                and item.get("pre_crash_successes_retained_without_refit")
+                and _recovery_run_manifest_valid(item, scope["code_fingerprint"])
+                for item in recovery_runs)
     )
     mechanism_path = ROOT / "provenance" / "mechanism_history_scope_v1.json"
     mechanism = json.loads(mechanism_path.read_text(encoding="utf-8")) if mechanism_path.exists() else {}
@@ -122,6 +196,8 @@ def verify(run_id: str) -> dict:
         "minimum_free_gib": round(required_gib, 2),
         "package_mismatches": package_mismatches,
         "large_calibration": calibration,
+        "large_dataset_recovery": recovery.get("status", "missing"),
+        "active_heavy_coordinators": active_heavy,
         "mechanism_history_status": mechanism.get("status", "missing"),
     }
 
