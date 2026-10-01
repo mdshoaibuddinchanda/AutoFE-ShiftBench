@@ -1,0 +1,386 @@
+{
+  "adaptive_report_sha256": "5d79c3fed4e65ec4e8a72fdebced6092eff6a96e6b9917f1c2bf6114faee84ae",
+  "additional_gpu_admission_smoke": {
+    "common_comparison_matrix_bytes": 487201024,
+    "gpu_worker_pid": 32152,
+    "run_dir": "corrected_runs/adaptive_estimate_smoke/adaptive-gpu-airlines-estimate-smoke-v1",
+    "success_cells": 4
+  },
+  "all_seven_ready": true,
+  "artifact_type": "reviewer1_launch_readiness_v4",
+  "bounded_verification": {
+    "compared_cells": 1148,
+    "exact_cpu_cells": 1136,
+    "gpu_feature_only_cells": 12
+  },
+  "checked_utc": "2026-10-01T17:58:51.636651+00:00",
+  "code_commit_at_freeze": "bf64794b976424677323518a6f0d50e91f444fbd",
+  "code_fingerprint": "68d54329e107d42751eaa546a5048c270191e4c89f644ca6e039a2fb20dac4d4",
+  "focused_tests": [
+    {
+      "elapsed_s": 24.22,
+      "passed": 23,
+      "warnings": 14
+    },
+    {
+      "elapsed_s": 24.99,
+      "passed": 22,
+      "warnings": 2
+    }
+  ],
+  "full_campaign_started": false,
+  "full_suite": {
+    "elapsed_s": 109.18,
+    "environment": "existing Conda p12",
+    "passed": 160,
+    "source_commit": "bf64794b976424677323518a6f0d50e91f444fbd",
+    "warnings": 27
+  },
+  "host": "SHOAIB_CHANDA",
+  "limitations": [
+    "Memory budgets are soft admission estimates, not enforced native allocation limits.",
+    "Useful small-data work uses less than 20 GiB; no artificial RAM allocation.",
+    "Sustained external RAM/VRAM pressure can pause admission indefinitely.",
+    "GPU backend numerical equality with CPU and GPU repeatability are not asserted.",
+    "Bounded timings do not provide a validated full-campaign ETA.",
+    "GPU bounded checks cover Raw/AutoFE_Baseline and clean conditions; operator GPU performance effects await the complete matched-backend campaign."
+  ],
+  "mechanism_scope_sha256": "85034e2a8f1ff2f1ccb2a47229cd913b83ee4780d425d3dc56afd92d06dd37f6",
+  "mechanism_smoke_tasks": 4,
+  "permission_scope": "Frozen and verified only; full campaign not launched.",
+  "preexisting_working_tree_change": {
+    "description": "Existing execution-count edit untouched, excluded from source fingerprint and revision commits.",
+    "path": "notebooks/visualization.ipynb"
+  },
+  "python_executable": "D:\\Conda\\p12\\python.exe",
+  "ready_for_full_campaign": true,
+  "reporting_verification": {
+    "artifact_sha256": {
+      "corrected_runs/adaptive_reporting_smoke/assets/asset_manifest.json": "a83e04b49e8f9f4ac4937592b722abc067c62e889c28c9b812d4390b55df3016",
+      "corrected_runs/adaptive_reporting_smoke/assets/baseline_operator_candidate_stages.pdf": "58457b04d93fa84c9769fbe4bd14ec400951a8a01d46566f999b3098b985ec3f",
+      "corrected_runs/adaptive_reporting_smoke/assets/baseline_operator_candidate_stages.png": "3de71f2eb425547c773e471348d0d14f71f1de52c27be29b4668a48c6ce58d0d",
+      "corrected_runs/adaptive_reporting_smoke/assets/operator_selected_candidates.pdf": "854af7ed459759e4e6ab1843926438a978e9796c554020d9a87dc368993aa206",
+      "corrected_runs/adaptive_reporting_smoke/assets/operator_selected_candidates.png": "957abb5a0d42268e99973389d924fdc259e0f449c05bfcdeccab990ae95af2bf",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_auc_ablation.pdf": "ba9e88dba7b7b17665ddad8009b44ff70a6f830b60cb4467325e642c0893c890",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_auc_ablation.png": "24d1eaf05971aa65601cda12e6e61840e9f6856353299d28ff3648060710f56f",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_auc_coverage.pdf": "9ef7b89bb9023a56f9ba355209f8156fe002e66ed22a396be9c8fe3cc4b6cc88",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_auc_coverage.png": "0c1ddada32b50b1b72c32433faeb3c4b1215772d93ee23e561e81a7b73c6a3b3",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_condition_auc_summary.csv": "4b7f9eaae36644e881a68b982171e171e9b6ab09d714a4c1e225ca1fb0d1f5e4",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_dataset_auc_coverage.csv": "34335642e65201fe57fb20ed1fb3799695412215f0351008537b3fc9dbfd663b",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_dataset_condition_auc.csv": "eb6813cf83a8aaa95be36977178ffec3e5a6698b7c94afbc7e311baec3173050",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_dataset_contrasts.csv": "a171cc5aa93284193cde0f457be847a0bbcb38c6fcc0cb899037b4705a9a9451",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_descriptive_contrasts.csv": "0f04861ab5cdc30db898cd10fb2745a54d750e9de692fe6de20594f4208d8ec8",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_f1_contrasts.csv": "9f28aa7a65b2eb6189dc529abf130294d0bd2a34b3cc48db365f2485fea550f0",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_f1_contrasts.pdf": "745d3220fa29603da69c0ed068f98d4d47303b2c95bba4df3d4b5dd74fc14d8b",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_f1_contrasts.png": "a2af6eccd15a39f98dbe823559a08d020fd3579ad320a7f23fb9fc68b878df9e",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_missingness_auc_bounds.csv": "0c430f5eaaf713b98522b54c841ba02d88a9f0fe5bde0309c395ad28192c82c6",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_missingness_auc_bounds.pdf": "165a412ac229293b8b529e631f050222baf61d144beeb1f2fc329e1af411cd26",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_missingness_auc_bounds.png": "db3c718168ff21da6dcf2b7095469510e1862d92e0341c04bb47e1ffe1172424",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_missingness_contrast_bounds.csv": "ee874cf61fbd7d7e5f117b61d4ea8093d0689d44958e0157488d765189cca855",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_missingness_contrast_summary.csv": "ce4eaa14af21971ec84bc83b1c04a64e9faa09e1ab685c62af5e097654b6649e",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_operator_candidate_counts.csv": "2143806d680cdcea2946cc77390875fa1bfe958138fe22af30c0538ff855351b",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_pipeline_auc_summary.csv": "b25f54b432a0d10c0c2d253370f9e8a196084ec9a06b88028292f79e7f045dca",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_resource_budget_and_use.pdf": "4b8a9d13026689b75a347422b4a2a2c9325eaf1e161c03063b05d258c0cbe66c",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_resource_budget_and_use.png": "8c7f0a68635f1a1201b8614297f5215f436ca23e4e4c3d6406ecd1c7daaeba28",
+      "corrected_runs/adaptive_reporting_smoke/assets/primary_resource_policy_and_use.csv": "e20e0eb267945bc30ba945a2aad70f7db2374e60663fe9347c0eb4f9b44b2e1a",
+      "corrected_runs/adaptive_reporting_smoke/assets/row_group_auc_difference.pdf": "a307519a55fb5b139ee622ea964a406fc4453d6e3899eb3197e3a3f95f5913df",
+      "corrected_runs/adaptive_reporting_smoke/assets/row_group_auc_difference.png": "2d074e5899246b0fc280bf172430d5695d2f6a7146cba45135c4e87541245992",
+      "corrected_runs/adaptive_reporting_smoke/assets/row_group_dataset_auc.csv": "1a65d08c6f199c596b821e968ff94e47059320ca24538fd7a15b4fae1d7d9b42",
+      "corrected_runs/adaptive_reporting_smoke/assets/row_group_f1_contrast_comparison.csv": "7779fcff9879a8a1d215d333bd693443eab077b50f33d5c7f2623589c2ced6d1",
+      "corrected_runs/adaptive_reporting_smoke/assets/row_group_pipeline_auc_summary.csv": "badc96f5f0a05bbbd7ddbbe64c0c0b2e21de3e43ea6d019c94e0e281675dd11f",
+      "corrected_runs/adaptive_reporting_smoke/gpu_resource_assets/asset_manifest.json": "c3e6291833834d520e8a37090d79c1a66ed2695312a0f20a110021c42290ffb9",
+      "corrected_runs/adaptive_reporting_smoke/gpu_resource_assets/primary_resource_budget_and_use.pdf": "4ae3fe895cdb6eea4fa51b390b2a9e201639122548990b8d000d7d7a8003ba70",
+      "corrected_runs/adaptive_reporting_smoke/gpu_resource_assets/primary_resource_budget_and_use.png": "f619f9743f88d0aa048675e0d73df3d858a33c44376567c43da8ae8426fadac1",
+      "corrected_runs/adaptive_reporting_smoke/gpu_resource_assets/primary_resource_policy_and_use.csv": "0b3f0167433bdc23484ca5bb1e2d70d29e82f10e4287f613705b7d6f5d46d4d1"
+    },
+    "gpu_resource_cells_per_policy": 4,
+    "primary_csvs": 15,
+    "primary_png_pdf_pairs": 8,
+    "scientific_complete": false,
+    "visual_review": "Resource data labels and diagnostic banner are legible; the diagnostic resource figure has tight banner/title spacing. Full corrected figures do not carry the pilot banner."
+  },
+  "resource_plan": {
+    "backend_by_model": {
+      "catboost": "gpu",
+      "extra_trees": "cpu",
+      "gaussian_nb": "cpu",
+      "knn": "cpu",
+      "lightgbm": "cpu",
+      "linear_svm": "cpu",
+      "logistic_regression": "cpu",
+      "mlp": "cpu",
+      "random_forest": "cpu",
+      "xgboost": "gpu"
+    },
+    "cache_max_bytes": 12802300211,
+    "cache_override": null,
+    "cpu_reserve_satisfied": true,
+    "gpu_backend_comparison_rule": "Common training-schema matrix bound across every configured pipeline for the same dataset/split/seed/fold/condition/model; static oversize uses CPU for the whole comparison in auto mode",
+    "gpu_capacity_matrix_factor": 2,
+    "gpu_probe": {
+      "catboost": {
+        "devices": {
+          "0": {
+            "supported": true
+          }
+        },
+        "supported": true
+      },
+      "xgboost": {
+        "devices": {
+          "0": {
+            "supported": true
+          }
+        },
+        "supported": true
+      }
+    },
+    "gpu_worker_pool": "one persistent process per verified device; all CPU/GPU fits share the total admission ceiling",
+    "hardware": {
+      "allowed_cpu_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "cuda_visible_devices": null,
+      "disk_total_bytes": 512092008448,
+      "gpu_devices": [
+        {
+          "device_index": 0,
+          "driver_version": "616.64",
+          "name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "physical_index": 0,
+          "total_bytes": 4294967296,
+          "uuid": "GPU-c0408868-2c5d-efec-4592-c83aefdb847d"
+        }
+      ],
+      "logical_cpus": 8,
+      "physical_cpus": 4,
+      "ram_total_bytes": 34073251840
+    },
+    "memory_limit_type": "soft estimated admission; native allocation is not forcibly capped",
+    "policy": "adaptive-v3",
+    "ram_budget_bytes": 27258601472,
+    "ram_reserve_bytes": 6814650367,
+    "settings": {
+      "gpu_policy": "auto",
+      "ram_target_fraction": 0.8,
+      "reserve_cpus": 2,
+      "vram_target_fraction": 0.8
+    },
+    "worker_ceiling": 6,
+    "worker_cpu_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "worker_override": null
+  },
+  "runs": [
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-primary-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-primary-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-domain-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-availability-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-availability-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-relabel-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.85,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 87.11,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v4-relabel-group"
+    }
+  ],
+  "scientific_effects": "PENDING CORRECTED RUN",
+  "scope_sha256": "b353d2da3280f8aacaaabdd45bd054752118b953553cceeac38ea696239cdad6",
+  "totals": {
+    "auc_eligible_before_condition_specific_skips": 2191000,
+    "intended_cells": 2275000,
+    "prespecified_group_auc_skips": 84000,
+    "run_count": 7
+  }
+}

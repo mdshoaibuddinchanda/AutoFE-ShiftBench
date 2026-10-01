@@ -1,6 +1,22 @@
 # Reviewer #1 corrected run plan
 
-## Current plan: v3, final verification (2026-10-01)
+## Current plan: v4 adaptive execution (2026-10-01)
+
+The user requested machine-aware CPU/RAM/VRAM use. The fixed-policy v3 freeze and completed evidence remain historical. Current instructions are [launch_commands_v4.md](launch_commands_v4.md), [reviewer1_launch_scope_v4.json](reviewer1_launch_scope_v4.json), [adaptive resource policy](adaptive_resource_design.md), and the fresh v4 readiness artifact. The full campaign has not started. Re-run the verifier before every long command; use existing p12 and one heavy coordinator at a time.
+
+The final dated v4 readiness snapshot has all seven gates green. The immutable scope was written before verification and retains its freeze-time `unresolved_gates` and calibration `PENDING` fields. The completed adaptive/mechanism evidence and dated readiness snapshot close those planning gates; the scope is preserved so its hash still binds the verified resource profile. No validated full-campaign ETA is claimed.
+
+The scientific scope stays seven runs, 14 pipelines and ten classifiers: **2,275,000 intended cells; 84,000 planned group-AUC skips; at most 2,191,000 eligible before condition-specific skips**. Primary group all-seed AUC covers at most 23 datasets. Wine-quality-red/kddcup99 remain visible with reasons. Separate mechanism scope adds 1,250 feature tasks, 50 skips and 1,200 histories.
+
+The adaptive policy detects this host's eight logical CPU slots / four physical cores and resolves six workers, a 25.39 GiB soft RAM budget / 6.35 GiB reserve, and verified XGBoost/CatBoost GPU capability. GPU admission keeps 20% VRAM headroom and one active fit per device. A common matrix capacity bound prevents operator comparisons from mixing CPU/GPU backends. Static oversize uses CPU for the entire comparison in auto mode; live pressure pauses with lease renewal. Actual backend, device, resource measurements and hash-linked resolved classifier parameters are saved. Frozen full commands bind the resource-profile hash and reject changed source/hardware/settings.
+
+The ready disk cache is host-derived, about 11.92 GiB, with another 11.92 GiB staging allowance. Results/checkpoints/catalogs reserve 31.13 GiB (27.13 historical plus 1 GiB timing and 3 GiB adaptive metadata allowances); the doubled-results margin plus both cache allowances and 1 GiB mechanism history requires about **87.11 GiB free**. Recheck actual space. RAM/VRAM limits are soft admission estimates; native allocators are not forcibly capped. Useful small workloads may use less than 20 GiB. CPU/GPU metrics are not promised identical, and CatBoost GPU training is nondeterministic.
+
+Bounded current-source evidence covers all 14 pipelines / ten classifiers / four small datasets under both split policies (560 cells each), Covertype Raw / ten classifiers (ten cells each), and Airlines Raw/AutoFE_Baseline / both supported GPU classifiers with forced restart (four cells each). CPU outputs must match all 24 scientific fields; GPU outputs must match feature/candidate identities and declare backend differences. Current GPU recovery is an additional targeted test; the prior v3 twenty-cell CPU restart proof remains historical. These are code-verification runs, not corrected scientific results.
+
+Authoritative reporting now writes **15 primary CSVs and eight PNG/PDF pairs**, including primary_resource_policy_and_use.csv and primary_resource_budget_and_use.png/.pdf. Parameter catalog hashes and actual resource plans are checked. Mixed-backend operator comparisons are refused. The nine scientific reviewer concerns are implemented, with corrected performance/association/statistical conclusions and manuscript numerical updates **PENDING CORRECTED RUN**. The older 229.69-day projection is historical and highly uncertain; no validated full-campaign ETA is claimed. Longer runtime is acceptable to the user.
+
+## Historical fixed-policy v3 final verification (2026-10-01)
 
 The v2 scope/readiness and preceding measurements are historical after the final cache/dispatch and paper-export fixes. The v3 scope preserves the complete scientific design: **seven performance runs, 14 pipelines, ten classifiers; 2,275,000 intended cells, 84,000 planned group-AUC skips, at most 2,191,000 eligible before condition-specific domain skips**. No full campaign has started. Use existing `D:\Conda\p12`; one heavy coordinator at a time.
 

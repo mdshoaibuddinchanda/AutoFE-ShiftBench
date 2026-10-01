@@ -1,5 +1,7 @@
 # Reviewer #1 seven-run command sheet
 
+**Historical fixed-policy v3 record. The current adaptive source requires [v4 commands](launch_commands_v4.md) and its fresh gate.**
+
 This v3 sheet is the executable plan for the corrected primary and separate sensitivity tracks. The [dated readiness report](reviewer1_launch_readiness_v3.json) records the fresh gate for all seven IDs on this host; **run the verifier again immediately before each run** because disk, dependencies, source identity, and concurrent work can change. The all-seed audit and both scope manifests are already frozen; do not regenerate them just to launch. Use the existing `p12`; no new environment is created. The two primary runs are the paper's corrected benchmark. The five sensitivity runs have their own result identities and are never pooled into the primary estimand. Run one heavy coordinator at a time.
 
 From `D:\DR2\AutoFE_Submission` in PowerShell:

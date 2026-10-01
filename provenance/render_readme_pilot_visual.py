@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "provenance" / "four_dataset_pilot_diagnosis.md"
 DEFAULT_OUTPUT = ROOT / "provenance" / "figures" / "four_dataset_pilot_status.svg"
-READINESS_SOURCE = ROOT / "provenance" / "reviewer1_launch_readiness_v3.json"
+READINESS_SOURCE = ROOT / "provenance" / "reviewer1_launch_readiness_v4.json"
 
 
 def _cells(report: str, label: str) -> list[str]:
@@ -105,12 +105,12 @@ def render(source: Path = SOURCE, output: Path = DEFAULT_OUTPUT) -> Path:
   <text class="note" x="64" y="304">Zero terminal failures in both policies</text>
 
   <rect x="550" y="72" width="510" height="262" rx="14" fill="#fff" stroke="#dce3ec"/>
-  <text class="heading" x="574" y="108">Matched 560-task runtime</text>
+  <text class="heading" x="574" y="108">Historical 560-task runtime</text>
   <text class="note" x="574" y="129">Same four datasets, cells, CPU workers, and outputs</text>
   <text class="label" x="574" y="165">Repaired baseline</text>
   <text class="value" x="1036" y="165" text-anchor="end">{baseline_seconds:.1f} s</text>
   <rect x="574" y="177" width="{baseline_width:.1f}" height="21" rx="10" fill="#778ba6"/>
-  <text class="label" x="574" y="234">Committed implementation</text>
+  <text class="label" x="574" y="234">Historical implementation</text>
   <text class="value" x="1036" y="234" text-anchor="end">{optimized_seconds:.1f} s</text>
   <rect x="574" y="246" width="{optimized_width:.1f}" height="21" rx="10" fill="#286fb0"/>
   <text class="note" x="574" y="304">{speedup:.2f}× faster in this bounded profile; exact output parity</text>

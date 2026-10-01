@@ -56,7 +56,9 @@ Reviewer point: major fixes should be resolved before the expensive corrected ca
 
 Response: The all-five-seed audit fixes the AUC denominator: row-level retains 25datasets; group-aware retains all 25 in intended coverage but explicitly skips wine-quality-red and kddcup99 under the all-seed/all-fold support rule, leaving at most 23 datasets for primary group AUC. Neither receives row-level fallback. The v3 scientific scope retains14 pipelines and ten classifiers. Primary row/group total1,750,000 intended cells with70,000 group skips. Five separate sensitivity runs add525,000 intended cells and 14,000group skips. Total: 2,275,000 intended;84,000 planned group-AUC skips; at most 2,191,000 eligible before domain-condition skips. Transductive partitions have a row-only design; availability and relabeling have both policies. Separate clean mechanism runs add1,250 feature tasks,50 planned skips,1,200 histories and a 1 GiB reserve. Definitions/data/code/analysis are frozen before launch. Corrected numerical results and manuscript revision remain **PENDING CORRECTED RUN**.
 
-## 10. Runtime, cache and recovery verification
+## 10. Runtime, cache and recovery verification (historical fixed-policy stage)
+
+The following records the validated v3 stage. The adaptive follow-up below supersedes its worker/cache/backend limits, output totals and current launch identities.
 
 Engineering follow-up: preserve the complete protocol while improving runtime, bounding storage and verifying recovery.
 
@@ -71,3 +73,12 @@ The user accepts a run longer than ten days. Bounded speed measurements do not e
 ## Historical evidence boundary
 
 The historical ledger and manuscript values are preserved as historical evidence. They are not merged into corrected estimates and cannot be used to infer the missing row-level/group-aware comparison.
+
+
+## Additional adaptive execution follow-up (2026-10-01)
+
+At the author's request, fixed worker/cache limits are replaced by a host-aware policy. The frozen v4 campaign preserves every scientific task, explicit model parameter, feature budget and stopping rule, while using supported GPU backends with recorded actual defaults. CPU admission reserves two logical slots and memory headroom; GPU admission verifies model/device capability, keeps headroom and uses a common capacity decision across operator variants. The frozen resource profile and actual backend/resolved-parameter catalog become part of reproducibility. GPU numerical equivalence with the historical CPU implementation is not asserted.
+
+Current-source tests and bounded CPU/GPU/large-matrix/restart checks are recorded in `adaptive_resource_verification_v1.json` and `reviewer1_launch_readiness_v4.json`. The authoritative exporter includes the new resource budget/observed-use table and figure, validates catalogs, and refuses mixed-backend operator comparisons. Earlier v3 evidence remains historical. No full benchmark has launched and no reviewer scientific effect is inferred from these diagnostic tests. Performance, Jacobian associations, operator effects, statistical conclusions and final manuscript/rebuttal values remain **PENDING CORRECTED RUN**.
+
+Final engineering evidence: 160 passing tests; 1,148 successful bounded adaptive cells (1,136 exact CPU comparisons and 12 GPU feature/candidate comparisons); four mechanism smoke tasks; and seven passing v4 launch gates. Primary exports now total 15 CSVs and eight PNG/PDF pairs. These checks support execution readiness; corrected scientific conclusions and submission values remain **PENDING CORRECTED RUN**.
