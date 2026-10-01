@@ -1,5 +1,7 @@
 from dataclasses import asdict
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -83,20 +85,20 @@ def test_static_gpu_capacity_uses_recorded_cpu_fallback_only_in_auto(monkeypatch
     plan=resource.resolve_plan(resource.ResourceSettings(),hardware(),('xgboost',),gpu_probe={'xgboost':dict(supported=True)})
     controller=resource.ResourceAdmission(plan)
     monkeypatch.setattr(controller,'sample',lambda **kwargs:dict(available_bytes=25*resource.GIB,resident_bytes=resource.GIB))
-    reservation=controller.reservation('xgboost',resource.GIB,[])
+    reservation=controller.reservation('xgboost',resource.GIB,[],comparison_matrix_bytes=2*resource.GIB)
     assert reservation['backend']=='cpu' and reservation['gpu_device'] is None
     assert 'static matrix estimate' in reservation['backend_reason']
     plan['settings']['gpu_policy']='require'
     with pytest.raises(MemoryError,match='VRAM budget'):
-        controller.reservation('xgboost',resource.GIB,[])
+        controller.reservation('xgboost',resource.GIB,[],comparison_matrix_bytes=2*resource.GIB)
 
 
 def test_gpu_capacity_backend_is_shared_across_different_pipeline_widths(monkeypatch):
     plan=resource.resolve_plan(resource.ResourceSettings(),hardware(),('xgboost',),gpu_probe={'xgboost':dict(supported=True)})
     controller=resource.ResourceAdmission(plan)
     monkeypatch.setattr(controller,'sample',lambda **kwargs:dict(available_bytes=25*resource.GIB,resident_bytes=resource.GIB))
-    small=controller.reservation('xgboost',1024,[],comparison_matrix_bytes=resource.GIB)
-    large=controller.reservation('xgboost',resource.GIB//2,[],comparison_matrix_bytes=resource.GIB)
+    small=controller.reservation('xgboost',1024,[],comparison_matrix_bytes=2*resource.GIB)
+    large=controller.reservation('xgboost',resource.GIB//2,[],comparison_matrix_bytes=2*resource.GIB)
     assert small['backend']==large['backend']=='cpu'
     assert small['comparison_matrix_bytes']==large['comparison_matrix_bytes']
 
@@ -118,6 +120,37 @@ def test_cuda_visibility_maps_physical_to_logical_devices(monkeypatch):
     monkeypatch.setenv('CUDA_VISIBLE_DEVICES','1,0')
     devices=resource.gpu_inventory()
     assert [(d['physical_index'],d['device_index']) for d in devices]==[(1,0),(0,1)]
+
+
+def test_gpu_fits_share_one_dedicated_worker_pool(tmp_path,monkeypatch):
+    """Mock routing; real installed GPU fits are checked by the bounded proof."""
+    for name in runner.NUMERICAL_THREAD_ENV:monkeypatch.setenv(name,'1')
+    machine=hardware(cpus=4)
+    monkeypatch.setattr(runner,'detect_hardware',lambda root:machine)
+    monkeypatch.setattr(runner,'probe_gpu_models',lambda devices:{m:dict(supported=True) for m in ('xgboost','catboost')})
+    monkeypatch.setattr(resource,'gpu_inventory',lambda:[{**machine['gpu_devices'][0],'free_bytes':3*resource.GIB}])
+    monkeypatch.setattr(resource.ResourceAdmission,'sample',lambda self,**kwargs:dict(available_bytes=20*resource.GIB,resident_bytes=resource.GIB))
+    pools=[];threads=[]
+    def pool(**options):
+        pools.append(options['max_workers'])
+        return ThreadPoolExecutor(max_workers=options['max_workers'])
+    monkeypatch.setattr(runner,'ProcessPoolExecutor',pool)
+    original=runner._fit_and_score_worker
+    def fake_gpu_fit(payload):
+        threads.append(threading.get_ident())
+        result=original({**payload,'use_gpu':False,'gpu_device':None,'gpu_ram_part':None})
+        result.update(model_backend='gpu',gpu_device=payload['gpu_device'],gpu_ram_part=payload['gpu_ram_part'])
+        return result
+    monkeypatch.setattr(runner,'_fit_and_score_worker',fake_gpu_fit)
+    rng=np.random.default_rng(42);frame=pd.DataFrame(rng.normal(size=(150,4)),columns=list('abcd'))
+    frame['target']=(frame.a>0).astype(int)
+    path=tmp_path/'data.csv';frame.to_csv(path,index=False)
+    manifest=runner.run_experiment({'test':path},run_id='gpu-pool',output_root=tmp_path,
+        seeds=[42],folds=[1],n_splits=3,conditions=(('clean',0.0),),
+        pipelines=('Raw','AutoFE_Baseline'),models=('xgboost','catboost'),
+        resource_policy='adaptive',cache_policy='bounded',durable_scheduler=True)
+    assert manifest['counts_by_status']['success']==4
+    assert pools==[2,1] and len(set(threads))==1 and len(threads)==4
 
 
 def test_adaptive_cpu_has_exact_scientific_parity_and_resumes_same_plan(tmp_path,monkeypatch):

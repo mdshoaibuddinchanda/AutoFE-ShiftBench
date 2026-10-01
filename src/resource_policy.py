@@ -137,14 +137,17 @@ def resolve_plan(settings: ResourceSettings, hardware: dict, models: tuple[str, 
     # another artifact-sized temporary file, budgeted separately at launch.
     cache_bytes = cache_override if cache_override is not None else int(min(
         ram_total*0.4, hardware['disk_total_bytes']*0.025))
-    return dict(policy='adaptive-v2', settings=asdict(settings), hardware=hardware,
+    return dict(policy='adaptive-v3', settings=asdict(settings), hardware=hardware,
                 worker_ceiling=workers, worker_cpu_ids=cpus[:available_slots],
                 cpu_reserve_satisfied=len(cpus)>settings.reserve_cpus,
                 ram_budget_bytes=int(ram_total*settings.ram_target_fraction),
                 ram_reserve_bytes=int(ram_total*(1-settings.ram_target_fraction)),
                 cache_max_bytes=cache_bytes, backend_by_model=backend, gpu_probe=probe,
                 worker_override=worker_override, cache_override=cache_override,
-                gpu_capacity_matrix_factor=4,
+                # Four float32 working matrices per shared float64 host bound,
+                # plus the fixed context/histogram allowance at admission.
+                gpu_capacity_matrix_factor=2,
+                gpu_worker_pool='one persistent process per verified device; all CPU/GPU fits share the total admission ceiling',
                 gpu_backend_comparison_rule='Common training-schema matrix bound across every configured pipeline for the same dataset/split/seed/fold/condition/model; static oversize uses CPU for the whole comparison in auto mode',
                 memory_limit_type='soft estimated admission; native allocation is not forcibly capped')
 

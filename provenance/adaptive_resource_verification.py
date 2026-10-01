@@ -151,11 +151,18 @@ def verify_saved_report(report):
             if stable_digest(record)!=row['model_parameters_fingerprint'] or record['model']!=row['model']:
                 raise ValueError('Resolved model parameter record changed')
         common_backends = {}
+        gpu_worker_pids = {}
         for row in rows(run_dir/'results.jsonl').values():
             key=tuple(row[field] for field in ('dataset','seed','fold','condition','model'))
             signature=(row['model_backend'],row.get('resource_comparison_matrix_bytes'))
             if signature[1] is None or common_backends.setdefault(key,signature)!=signature:
                 raise ValueError('Backend/capacity bound differs within a pipeline comparison')
+            if row['model_backend']=='gpu':
+                gpu_worker_pids.setdefault(row['gpu_device'],set()).add(row['worker_pid'])
+        # A forced restart gets a new process; each uninterrupted segment
+        # still uses one device process. Other runs must use exactly one.
+        if result['kind']!='airlines' and any(len(pids)!=1 for pids in gpu_worker_pids.values()):
+            raise ValueError('GPU tasks did not share a persistent device worker')
         if result['kind']=='airlines':
             before={key:tuple(value) for key,value in result['pre_crash_committed_rows'].items()}
             rechecked_recovery=_check_terminal(run_dir,before,report['code_fingerprint'],expected=4)
@@ -172,7 +179,7 @@ def main():
     parser.add_argument('--worker',action='store_true')
     parser.add_argument('--kind',choices=['small','covertype','airlines'])
     parser.add_argument('--policy',choices=['row_level','group_aware'])
-    parser.add_argument('--run-id');parser.add_argument('--version',default='002')
+    parser.add_argument('--run-id');parser.add_argument('--version',default='003')
     parser.add_argument('--scope',type=Path,default=ROOT/'provenance'/'reviewer1_launch_scope_v4.json')
     parser.add_argument('--verify-report',type=Path)
     args=parser.parse_args()

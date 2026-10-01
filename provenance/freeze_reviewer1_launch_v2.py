@@ -188,7 +188,7 @@ def main() -> None:
     }
     if resource_plan is not None:
         cache_gib = resource_plan['cache_max_bytes']/1024**3
-        payload.update(resource_plan=resource_plan,
+        payload.update(status='FROZEN_SCOPE_USE_DATED_READINESS_SNAPSHOT',resource_plan=resource_plan,
                        adaptive_verification_path='provenance/adaptive_resource_verification_v1.json',
                        optimization_verification_path=None,
                        recovery_evidence_path='provenance/adaptive_resource_verification_v1.json',

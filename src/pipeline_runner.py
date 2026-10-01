@@ -1095,6 +1095,7 @@ def run_experiment(
     # while preserving one authoritative task ledger.
     executor: ProcessPoolExecutor | None = None
     pending_futures: list[tuple[Future, dict[str, Any]]] = []
+    gpu_executors: dict[int, ProcessPoolExecutor] = {}
     deferred_cache_reclaims: dict[str, dict[str, Any]] = {}
     if workers > 1:
         pool_options = dict(max_workers=workers, mp_context=mp.get_context('spawn'),
@@ -1832,8 +1833,20 @@ def run_experiment(
                                                        gpu_device=reservation['gpu_device'],
                                                        gpu_ram_part=reservation['gpu_ram_part'])
                                 if executor is not None:
+                                    task_executor = executor
+                                    if admission is not None and reservation['backend'] == 'gpu':
+                                        device = reservation['gpu_device']
+                                        if device not in gpu_executors:
+                                            gpu_executors[device] = ProcessPoolExecutor(
+                                                max_workers=1, mp_context=mp.get_context('spawn'),
+                                                initializer=initialize_worker,
+                                                initargs=(resource_plan['worker_cpu_ids'],))
+                                        # CUDA contexts and library buffers are reused
+                                        # in one device process instead of accumulating
+                                        # in every CPU worker across a long campaign.
+                                        task_executor = gpu_executors[device]
                                     pending_futures.append((
-                                        executor.submit(_fit_and_score_worker, fit_payload),
+                                        task_executor.submit(_fit_and_score_worker, fit_payload),
                                         phase2_meta,
                                     ))
                                     # Keep serialized matrices bounded in memory.
@@ -1869,6 +1882,8 @@ def run_experiment(
         _drain_one()
     if executor is not None:
         executor.shutdown(wait=True, cancel_futures=False)
+    for gpu_executor in gpu_executors.values():
+        gpu_executor.shutdown(wait=True, cancel_futures=False)
 
     if cache_manager is not None:
         cache_reconciled = cache_manager.reconcile()
