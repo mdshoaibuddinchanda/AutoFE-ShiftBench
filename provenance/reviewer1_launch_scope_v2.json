@@ -2,13 +2,14 @@
   "artifact_type": "reviewer1_launch_scope_v2",
   "status": "FROZEN_SCOPE_HOST_CALIBRATION_PENDING",
   "full_campaign_started": false,
-  "code_commit_at_freeze": "ab171ee423e226ae135a22cdaed4c823b5ac5e07",
+  "code_commit_at_freeze": "2077d731eb4609138d2fd76ca7efffcfb2df314f",
   "code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
   "analysis_sha256": {
     "src/reviewer1_analysis.py": "695b57ddc7fca17c2abea5cc25438e3648686de15f0e6226adf05ffd3077f32b",
     "src/stats_analysis.py": "7dadb9d2413926e51148fcdcb6f32958801d505a153eb9eb66dab66138a3f5a3",
     "src/generate_tables.py": "37aa850b8ab4a5d3f2470d4fa9fe60c1ce74d8dc7976d2e2026cbd29a4ffc026",
     "src/plotting_q1.py": "d984b00caf1c87e77804fb785056c5ff6c3fe7f7a99cf91e86437839c6121a5f",
+    "provenance/generate_corrected_assets.py": "3486a5bf4ad33b03aa7ea98262e50a0c52f8633e4f13daa4ceed75628e0339d4",
     "provenance/reviewer1_condition_crosswalk.md": "940dc149276c6f4a8ce862bb5ea8e673281faa980c5c1da4bbadad78a25bf1ea"
   },
   "dataset_list_sha256": "d86874aabd0b885f5e1041b9a166e6b34135d77bbc1cb1ec6ce16a7819fbcaf4",
@@ -196,6 +197,18 @@
     4,
     5
   ],
+  "primary_conditions": [
+    "clean",
+    "gaussian_noise_0.01",
+    "gaussian_noise_0.05",
+    "gaussian_noise_0.10",
+    "label_noise_0.05",
+    "label_noise_0.10",
+    "label_noise_0.20",
+    "missing_values_0.05",
+    "missing_values_0.10",
+    "missing_values_0.20"
+  ],
   "pipelines": [
     "Raw",
     "AutoFE_Baseline",
@@ -237,6 +250,18 @@
       "split_policy": "row_level",
       "conditions": 10,
       "intended_cells": 875000,
+      "condition_names": [
+        "clean",
+        "gaussian_noise_0.01",
+        "gaussian_noise_0.05",
+        "gaussian_noise_0.10",
+        "label_noise_0.05",
+        "label_noise_0.10",
+        "label_noise_0.20",
+        "missing_values_0.05",
+        "missing_values_0.10",
+        "missing_values_0.20"
+      ],
       "prespecified_group_auc_skips": 0,
       "auc_eligible_before_condition_specific_skips": 875000,
       "required_environment": {
@@ -300,6 +325,18 @@
       "split_policy": "group_aware",
       "conditions": 10,
       "intended_cells": 875000,
+      "condition_names": [
+        "clean",
+        "gaussian_noise_0.01",
+        "gaussian_noise_0.05",
+        "gaussian_noise_0.10",
+        "label_noise_0.05",
+        "label_noise_0.10",
+        "label_noise_0.20",
+        "missing_values_0.05",
+        "missing_values_0.10",
+        "missing_values_0.20"
+      ],
       "prespecified_group_auc_skips": 70000,
       "auc_eligible_before_condition_specific_skips": 805000,
       "required_environment": {
@@ -363,6 +400,10 @@
       "split_policy": "row_level",
       "conditions": 2,
       "intended_cells": 175000,
+      "condition_names": [
+        "covariate_partition",
+        "population_partition"
+      ],
       "prespecified_group_auc_skips": 0,
       "auc_eligible_before_condition_specific_skips": 175000,
       "required_environment": {
@@ -426,6 +467,9 @@
       "split_policy": "row_level",
       "conditions": 1,
       "intended_cells": 87500,
+      "condition_names": [
+        "feature_availability_ablation_0.20"
+      ],
       "prespecified_group_auc_skips": 0,
       "auc_eligible_before_condition_specific_skips": 87500,
       "required_environment": {
@@ -489,6 +533,9 @@
       "split_policy": "group_aware",
       "conditions": 1,
       "intended_cells": 87500,
+      "condition_names": [
+        "feature_availability_ablation_0.20"
+      ],
       "prespecified_group_auc_skips": 7000,
       "auc_eligible_before_condition_specific_skips": 80500,
       "required_environment": {
@@ -552,6 +599,9 @@
       "split_policy": "row_level",
       "conditions": 1,
       "intended_cells": 87500,
+      "condition_names": [
+        "majority_label_relabeling"
+      ],
       "prespecified_group_auc_skips": 0,
       "auc_eligible_before_condition_specific_skips": 87500,
       "required_environment": {
@@ -615,6 +665,9 @@
       "split_policy": "group_aware",
       "conditions": 1,
       "intended_cells": 87500,
+      "condition_names": [
+        "majority_label_relabeling"
+      ],
       "prespecified_group_auc_skips": 7000,
       "auc_eligible_before_condition_specific_skips": 80500,
       "required_environment": {
@@ -680,10 +733,11 @@
     "auc_eligible_before_condition_specific_skips": 2191000
   },
   "storage": {
-    "free_bytes_at_freeze": 466432163840,
+    "free_bytes_at_freeze": 464097939456,
     "bounded_live_cache_cap_gib_per_run": 8,
     "prior_results_checkpoints_projection_gib_primary": 20.87,
     "scaled_results_checkpoints_projection_gib_all_seven_runs": 27.13,
+    "separate_mechanism_history_reservation_gib": 1,
     "prior_candidate_history_projection_gib": 79.66,
     "candidate_history_enabled_in_commands": false,
     "candidate_history_note": "The historical 79.66 GiB estimate used 612,500 assumed history tasks; the full runner does not currently write candidate histories. A separate measured mechanism-history plan is required before using that estimate as a reservation."

@@ -11,8 +11,11 @@ This directory is the versioned audit record for the Reviewer #1 revision. The f
 | Internal independent checks | `*_agent_report.md`, `audit_report.md` | Permanent internal audit trail. These reports are not manuscript tables or performance evidence. |
 | Historical result identity | `original_run.json`, `corrected_smoke_manifest.json` | Keep historical and synthetic results separately labeled. |
 | Pilot visualization | `figures/four_dataset_pilot_status.svg` | Permanent explanatory graphic. It shows task accounting, not ROC-AUC conclusions. |
+| Mechanism scope and bounded evidence | `mechanism_history_scope_v1.json`, `run_mechanism_history.py`, `analyze_mechanism_history.py`; local `../corrected_runs/mechanism-smoke-*/` | Versioned clean-condition candidate/Jacobian protocol and local code-verification evidence. The bounded samples are not corrected performance effects. |
 | Dataset inputs | `../data/raw/*.csv` and matching `*_meta.json` | Local, ignored source snapshots. Keep exact hashes and sidecars for a reproducible run. |
 | Corrected run ledgers | `../corrected_runs/<run-id>/` | Local, ignored **primary research evidence**. Preserve `manifest.json`, `results.jsonl`, SQLite files, scheduler result artifacts, and run IDs after a run. Back them up before any cleanup. |
+| Corrected paper assets | `../corrected_runs/paper_assets/` | Local, ignored publication drafts generated from completed corrected runs; CSV tables, PNG/PDF figures, and a source-hash manifest. Keep and back up with the source ledgers. Synthetic fixture figures in pytest's temporary directory are only code-verification evidence. |
+| Reporting pilot smoke | `../corrected_runs/reporting_pilot_smoke/` | Local, ignored diagnostic generated from both completed four-dataset pilots. Its custom scope and asset manifest state `pilot code verification`; every figure carries a visible pilot diagnostic label. These values must not enter corrected paper conclusions. |
 | Historical outputs | `../reports/tables/`, `../paper/figures/` | Historical, not corrected. Never overwrite with the corrected campaign. |
 
 ## Regenerable and transient files

@@ -10,6 +10,7 @@ from pathlib import Path
 from src.data_loader import load_dataset_names
 from src.pipeline_runner import PIPELINE_CONFIGS
 from src.provenance import code_fingerprint, current_git_commit, file_sha256, stable_digest
+from src.stats_analysis import PRIMARY_CONDITIONS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +38,12 @@ RUNS = (
     ("r1-v2-relabel-row", "majority_label_relabeling", "row_level", 1),
     ("r1-v2-relabel-group", "majority_label_relabeling", "group_aware", 1),
 )
+RUN_CONDITIONS = {
+    "primary": sorted(PRIMARY_CONDITIONS),
+    "transductive_domain_partition": ["covariate_partition", "population_partition"],
+    "feature_availability_ablation": ["feature_availability_ablation_0.20"],
+    "majority_label_relabeling": ["majority_label_relabeling"],
+}
 
 
 def main() -> None:
@@ -77,11 +84,14 @@ def main() -> None:
     ]
     runs = []
     for run_id, scope, policy, condition_count in RUNS:
+        if len(RUN_CONDITIONS[scope]) != condition_count:
+            raise RuntimeError(f"Condition list differs from frozen run count: {run_id}")
         intended = len(names) * len(SEEDS) * 5 * condition_count * len(PIPELINES) * len(MODELS)
         skipped = len(ineligible) * len(SEEDS) * 5 * condition_count * len(PIPELINES) * len(MODELS) if policy == "group_aware" else 0
         runs.append({
             "run_id": run_id, "scope": scope, "split_policy": policy,
             "conditions": condition_count, "intended_cells": intended,
+            "condition_names": RUN_CONDITIONS[scope],
             "prespecified_group_auc_skips": skipped,
             "auc_eligible_before_condition_specific_skips": intended - skipped,
             "required_environment": THREAD_ENV,
@@ -98,7 +108,8 @@ def main() -> None:
         "code_fingerprint": code_fingerprint(ROOT),
         "analysis_sha256": {name: file_sha256(ROOT / name) for name in (
             "src/reviewer1_analysis.py", "src/stats_analysis.py", "src/generate_tables.py",
-            "src/plotting_q1.py", "provenance/reviewer1_condition_crosswalk.md",
+            "src/plotting_q1.py", "provenance/generate_corrected_assets.py",
+            "provenance/reviewer1_condition_crosswalk.md",
         )},
         "dataset_list_sha256": file_sha256(ROOT / "config" / "dataset_list.yaml"),
         "group_seed_audit_sha256": file_sha256(group_audit_path),
@@ -107,6 +118,7 @@ def main() -> None:
         "group_auc_ineligible_datasets": ineligible,
         "all_seed_auc_rule": "A dataset is excluded from group-aware AUC for all configured cells when any configured seed lacks all-fold AUC support; its group folds and skip reasons remain in results.",
         "seeds": list(SEEDS), "folds": [1, 2, 3, 4, 5],
+        "primary_conditions": sorted(PRIMARY_CONDITIONS),
         "pipelines": list(PIPELINES), "models": list(MODELS),
         "required_numerical_thread_environment": THREAD_ENV,
         "runs": runs,
@@ -121,6 +133,7 @@ def main() -> None:
             "bounded_live_cache_cap_gib_per_run": 8,
             "prior_results_checkpoints_projection_gib_primary": 20.87,
             "scaled_results_checkpoints_projection_gib_all_seven_runs": round(20.87 * 2_275_000 / 1_750_000, 2),
+            "separate_mechanism_history_reservation_gib": 1,
             "prior_candidate_history_projection_gib": 79.66,
             "candidate_history_enabled_in_commands": False,
             "candidate_history_note": "The historical 79.66 GiB estimate used 612,500 assumed history tasks; the full runner does not currently write candidate histories. A separate measured mechanism-history plan is required before using that estimate as a reservation.",

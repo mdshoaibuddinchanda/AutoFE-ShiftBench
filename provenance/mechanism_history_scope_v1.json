@@ -1,0 +1,109 @@
+{
+  "artifact_type": "reviewer1_clean_arithmetic_mechanism_scope_v1",
+  "status": "ready",
+  "full_mechanism_runs_started": false,
+  "code_fingerprint": "9d2a562264f20558f76581d25c253c4d5a21d950f91b4f24668b03434257a90f",
+  "dataset_hash_digest": "a4c0bd9d59c477147344be04fdcb0adfce7241441fbcb2bd20867456b80afc34",
+  "mechanism_script_sha256": "dd388ab5ac0b6cc8cfe933c68477e93b123ae5da87d5a6c6c4a7ec6a792e0cf5",
+  "association_analysis_script_sha256": "2581e9038d3ae56e08685edafd69b53feb87af51b45ce4a19a55a4f96c46db3c",
+  "required_numerical_thread_environment": {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  },
+  "datasets": 25,
+  "seeds": 5,
+  "folds": 5,
+  "condition": "clean",
+  "pipeline": "AutoFE_Baseline",
+  "commands": [
+    {
+      "run_id": "r1-v2-mechanism-row",
+      "split_policy": "row_level",
+      "intended_tasks": 625,
+      "prespecified_group_auc_skips": 0,
+      "command_argv": [
+        "D:\\Conda\\p12\\python.exe",
+        "-m",
+        "provenance.run_mechanism_history",
+        "--run-id",
+        "r1-v2-mechanism-row",
+        "--split-policy",
+        "row_level"
+      ]
+    },
+    {
+      "run_id": "r1-v2-mechanism-group",
+      "split_policy": "group_aware",
+      "intended_tasks": 625,
+      "prespecified_group_auc_skips": 50,
+      "command_argv": [
+        "D:\\Conda\\p12\\python.exe",
+        "-m",
+        "provenance.run_mechanism_history",
+        "--run-id",
+        "r1-v2-mechanism-group",
+        "--split-policy",
+        "group_aware"
+      ]
+    }
+  ],
+  "totals": {
+    "intended_tasks": 1250,
+    "prespecified_group_auc_skips": 50,
+    "candidate_history_tasks": 1200
+  },
+  "measurement": {
+    "candidate_selection_score_scope": "train_only",
+    "jacobian_definition": "analytic arithmetic derivative on preprocessed training parents",
+    "input_scale": "population standard deviation of each parent on the training fold; zero/nonfinite scales undefined",
+    "norm": "scaled_l2",
+    "sample_rows_per_fold_max": 256,
+    "sampling": "deterministic without replacement from training rows",
+    "exposure": "dataset mean of fold median selected-candidate finite scaled Jacobian norms",
+    "performance_outcome": "dataset mean paired clean AutoFE_Baseline minus Raw ROC-AUC across 25 seed-folds and ten classifiers",
+    "association": "separate row/group Spearman rho; 10,000 two-sided permutations and 10,000 dataset bootstraps; exploratory, not causal"
+  },
+  "storage": {
+    "sonar_history_plus_jacobian_bytes_per_task": 76096,
+    "sonar_extrapolation_gib_for_1200_tasks": 0.085,
+    "reserved_gib": 1,
+    "note": "Measured compressed Sonar files; actual candidate counts and filesystem overhead vary by dataset. This separate run replaces the unsupported 79.66 GiB full-grid estimate for its limited clean-condition scope."
+  },
+  "bounded_evidence": [
+    {
+      "split_policy": "row_level",
+      "dataset": "haberman",
+      "candidate_count": 15,
+      "matrix_hash_parity_with_runner_pilot": true,
+      "history_sha256": "064e3a390d01e828f2a6d5211b28ed187a549b59b1331ff90fe9802fb3159011",
+      "jacobian_sha256": "ae137532ca851304e01304f088fdda555983ae74bbf178f1552e1783d7c27f54"
+    },
+    {
+      "split_policy": "row_level",
+      "dataset": "sonar",
+      "candidate_count": 950,
+      "matrix_hash_parity_with_runner_pilot": true,
+      "history_sha256": "95665a93fba052e234aae2783ab3b335e72a3dd3b5141e9283dfa6b339b51341",
+      "jacobian_sha256": "3ca047640db795c4847909b2cdd714a0bf4069db4abaafef1cfa62e9f0b65bb1"
+    },
+    {
+      "split_policy": "group_aware",
+      "dataset": "haberman",
+      "candidate_count": 15,
+      "matrix_hash_parity_with_runner_pilot": true,
+      "history_sha256": "f6de7178faf878ea1b22ffff8d2764a5d82c9e866ca60e113e084075ae70b098",
+      "jacobian_sha256": "7536f64cae109221808c6ebbd2728a9aa9b2605909cd06a70b8ac97f527dbb13"
+    },
+    {
+      "split_policy": "group_aware",
+      "dataset": "sonar",
+      "candidate_count": 950,
+      "matrix_hash_parity_with_runner_pilot": true,
+      "history_sha256": "d7d3bb5289a1b413efe68ebfdce35508574e6e602a4820f82ea4d885122e53e0",
+      "jacobian_sha256": "ec311f1b358baf01472182f2b3e24822ac1698b54210e257b17db202a4bf2000"
+    }
+  ],
+  "scientific_limit": "The association samples clean-condition baseline candidate behavior only. It cannot establish a causal mechanism or condition-specific Jacobian effects."
+}
