@@ -95,8 +95,10 @@ The full scientific design is five seeds (`42`, `123`, `456`, `789`, `2025`), fi
 | `--max-datasets`, `--max-seeds`, `--max-folds`, `--max-conditions` | Optional limits for bounded work; omitted means the complete configured dimension. |
 | `--pipelines`, `--models` | Explicit lists; CLI defaults are `Raw AutoFE_Baseline` and `logistic_regression`. These defaults are smaller than the frozen 14-pipeline, ten-model design. |
 | `--split-policy` | `row_level` (default) or `group_aware`; the two tracks need separate run identities. |
+| `--scope` | `primary` (default), `transductive_domain_partition`, `feature_availability_ablation`, or `majority_label_relabeling`. Each scope and split policy needs its own run ID. Transductive domain partitions are row-level only. |
 | `--cache-policy`, `--cache-max-gib` | `retain` (default) or regenerable `bounded` cache; the optional positive GiB cap applies to bounded runs. The pilot used `bounded` with 8 GiB. |
 | `--durable-scheduler`, `--scheduler-lease-seconds`, `--scheduler-max-attempts` | Opt-in durable scheduling; lease default 3,600 seconds and maximum attempts default 3. The completed group-aware pilot used a 600-second lease. |
+| `--manifest-policy` | `detailed` (default) keeps task rows in `manifest.json` for bounded runs. Grids above 10,000 cells require `compact`, which writes task status to `manifest_outcomes.sqlite`; compact mode requires the durable scheduler and disables the verbose cache audit. |
 | `--workers` | Concurrent outer model-fit processes; default 1. The bounded pilot used 4, which is not a host-wide launch recommendation. |
 | `--cache-audit` | Opt-in per-feature build, hit, reader, consumer, and deletion evidence for bounded-cache runs. |
 | `--use-gpu` | Opt-in CUDA routing for XGBoost/CatBoost when the host and backend support it; the completed pilot used CPU. |
@@ -123,7 +125,9 @@ python -m provenance.profile_runner --stage-datasets sonar airlines --mix-datase
 
 The smoke grid includes clean data and one Gaussian-noise condition. It writes its ledger, cache manifests, task checkpoints, and run manifest under corrected_runs/corrected-smoke/. Each corrected run must use a new run ID if its code or configuration changes.
 
-On this Windows checkout, `setup_and_run.bat` uses `D:\Conda\p12\python.exe` to download any missing input for a **four-cell bounded smoke** and then runs the same two-pipeline, one-classifier subset. It does not install packages or start the full campaign. `python main.py` without bounds downloads the 25 configured datasets and plans **12,500 row-level tasks** using the runner's default two pipelines and one classifier; it is not the frozen 14-pipeline, ten-classifier, two-policy study.
+On this Windows checkout, `setup_and_run.bat` uses `D:\Conda\p12\python.exe` to download any missing input for a **four-cell bounded smoke** and then runs the same two-pipeline, one-classifier subset. It does not install packages or start the full campaign. `python main.py` without bounds reaches **12,500 row-level cells** with the runner's default two pipelines and one classifier, so the large-grid guard requires explicit `--manifest-policy compact --durable-scheduler`; it is not the frozen 14-pipeline, ten-classifier, two-policy study.
+
+The [versioned seven-run launch scope](provenance/reviewer1_launch_scope_v2.json) records the exact primary and sensitivity task counts, input hashes, command arguments, storage assumptions, and unresolved host gate. The [command sheet](provenance/launch_commands_v2.md) gives every separate run and its monitoring/resume command. Regenerate the scope with `D:\Conda\p12\python.exe -m provenance.freeze_reviewer1_launch_v2` after the all-seed group audit. The ten-day target has been waived; a representative large-dataset runtime estimate and recovery check are still needed on the intended execution host. Freezing writes a plan and does not launch tasks.
 
 The configured dataset downloader can be run independently in `p12`:
 
@@ -141,14 +145,14 @@ The runner produces evidence, not paper tables or figures automatically. Paths b
 | Output | Location and purpose |
 |---|---|
 | Downloaded datasets | `data/raw/<dataset>.csv` and `<dataset>_meta.json`; 25 CSVs and 25 sidecars are present locally. |
-| One corrected run | `corrected_runs/<run-id>/manifest.json` records configuration, fingerprints, task status, and cache accounting; `results.jsonl` is the result and attempt mirror. |
+| One corrected run | `corrected_runs/<run-id>/manifest.json` records configuration, fingerprints, status totals, and cache accounting; `results.jsonl` is the result and attempt mirror. For compact runs, per-cell current status is in `manifest_outcomes.sqlite`. |
 | Recovery evidence | The same run directory holds `checkpoints.sqlite`, `results_index.sqlite`, and, with durable scheduling, `scheduler.sqlite` plus `scheduler_results/` artifact JSONs. A coordinator lock is placed beside the run directory. |
 | Feature cache | `cache_bounded/` holds regenerable, size-governed artifacts when `--cache-policy bounded` is used; completed consumers permit payload cleanup. The default `retain` policy writes persistent `cache/*.pkl` and manifests, which is unsuitable for the full grid under the current storage gate. |
 | Candidate history | Optional detailed histories are produced only when explicitly enabled by the mechanism-audit API; the full runner does not enable them by default. The bounded preflight writes its sample under `corrected_runs/reviewer1_preflight/`. |
 | README pilot visualization | The versioned [`four_dataset_pilot_status.svg`](provenance/figures/four_dataset_pilot_status.svg) is regenerated from the pilot diagnosis by [`render_readme_pilot_visual.py`](provenance/render_readme_pilot_visual.py). It is an intentional project artifact, not a temporary file. |
 | Standalone workflow drawing | `python -m src.create_workflow_diagram` writes `results/AutoFE_ShiftBench_Workflow.png` and `.pdf` by default; it is a method diagram, not a corrected performance figure. |
 
-The historical ledgers and tables under `reports/tables/`, the historical notebook's `reports/figures/` destination, and the PDFs under `paper/figures/` are separate from corrected run outputs. The current corrected runs contain **no corrected publication tables or figures**. The notebook expects historical `final_results.csv` and `aggregated_results.csv`; it is not a corrected-run report generator.
+The historical ledgers and tables under `reports/tables/`, the historical notebook's `reports/figures/` destination, and the PDFs under `paper/figures/` are separate from corrected run outputs. The current corrected runs contain **no corrected publication tables or figures**. The notebook expects historical `final_results.csv` and `aggregated_results.csv`; it is not a corrected-run report generator. The [diagnostic file policy](provenance/README.md) identifies permanent research records, regenerable caches, and transient execution auxiliaries.
 
 ### Tables and figures after a completed corrected run
 
@@ -163,7 +167,7 @@ python -c "from src.reviewer1_analysis import build_corrected_result_note; build
 python -m src.plotting_q1 --results "$run/results.jsonl" --out-dir "$run/figures"
 ~~~
 
-`generate_tables` writes one Markdown file with ten table sections; `stats_analysis` writes one dataset-level contrast CSV; `reviewer1_analysis` writes a coverage and contrast JSON when given an output path. `plotting_q1` can write Figures 2–10 as PNG/PDF pairs to the explicit figure directory. These tools are separate commands. The table and figure generators remain **draft tooling**: Table 9 currently expects `test_auc` while corrected rows store `roc_auc`, and Figure 10 does not include the individual operator variants. Their scope, dataset-level uncertainty, and memory use on a full ledger need review before any paper use. Corrected ROC-AUC and figure captions remain **PENDING CORRECTED RUN**.
+`generate_tables` writes one Markdown file with ten table sections; `stats_analysis` writes one dataset-level contrast CSV; `reviewer1_analysis` writes a coverage and contrast JSON when given an output path. `plotting_q1` writes Figures 2–10 as PNG/PDF pairs to the explicit figure directory. These tools are separate commands. Table 9 uses the corrected `roc_auc` field and Figure 10 includes the individual operator variants with paired dataset means. The table and figure generators remain **draft tooling** until their scope, uncertainty, and memory use are checked on a completed corrected ledger. Corrected ROC-AUC and figure captions remain **PENDING CORRECTED RUN**.
 
 ## Provenance and historical results
 

@@ -24,16 +24,30 @@ def check_progress(run_dir: str | Path) -> dict[str, Any]:
         * len(configuration.get("pipelines", []))
         * len(configuration.get("models", []))
     )
-    unique_tasks = {
-        (row.get("dataset"), row.get("seed"), row.get("fold"), row.get("condition"),
-         row.get("pipeline"), row.get("model")): row.get("status")
-        for row in manifest.get("tasks", [])
-    }
-    task_counts = {
-        "success": sum(status == "success" for status in unique_tasks.values()),
-        "failed": sum(status == "failed" for status in unique_tasks.values()),
-    }
-    task_counts["remaining"] = max(expected - len(unique_tasks), 0)
+    ledger = manifest.get("task_ledger")
+    if ledger:
+        if ledger.get("format") != "sqlite" or ledger.get("path") != "manifest_outcomes.sqlite":
+            raise ValueError("Unsupported task ledger declared by manifest")
+        with sqlite3.connect(root / ledger["path"]) as connection:
+            status_counts = {
+                str(status): int(count) for status, count in connection.execute(
+                    "SELECT status, COUNT(*) FROM outcomes GROUP BY status"
+                )
+            }
+        recorded = sum(status_counts.values())
+    else:
+        unique_tasks = {
+            (row.get("dataset"), row.get("seed"), row.get("fold"), row.get("condition"),
+             row.get("pipeline"), row.get("model")): row.get("status")
+            for row in manifest.get("tasks", [])
+        }
+        status_counts = {
+            status: sum(value == status for value in unique_tasks.values())
+            for status in ("success", "failed", "skipped", "timed_out")
+        }
+        recorded = len(unique_tasks)
+    task_counts = {name: status_counts.get(name, 0) for name in ("success", "failed", "skipped", "timed_out")}
+    task_counts["remaining"] = max(expected - recorded, 0)
 
     phases: dict[str, dict[str, int]] = {}
     scheduler_states: dict[str, int] = {}
@@ -55,12 +69,22 @@ def check_progress(run_dir: str | Path) -> dict[str, Any]:
 
     results_path = root / "results.jsonl"
     result_rows = 0
-    if results_path.exists():
+    result_index = root / "results_index.sqlite"
+    if result_index.exists():
+        with sqlite3.connect(result_index) as connection:
+            result_rows = int(connection.execute("SELECT COUNT(*) FROM result_keys").fetchone()[0])
+    elif results_path.exists():
         with results_path.open("r", encoding="utf-8") as stream:
             result_rows = sum(bool(line.strip()) for line in stream)
 
+    live_status = manifest.get("status")
+    if ledger and not str(live_status).startswith("blocked_"):
+        if task_counts["remaining"] == 0:
+            live_status = "completed_with_failures" if task_counts["failed"] else "complete"
+        else:
+            live_status = "running_with_failures" if task_counts["failed"] else "running"
     summary = {
-        "run_id": manifest.get("run_id"), "status": manifest.get("status"),
+        "run_id": manifest.get("run_id"), "status": live_status,
         "experiment_scope": manifest.get("experiment_scope"),
         "expected_tasks": expected, "task_counts": task_counts,
         "phase_states": phases, "scheduler_states": scheduler_states,

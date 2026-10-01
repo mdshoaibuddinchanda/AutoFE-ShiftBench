@@ -1,0 +1,98 @@
+{
+  "artifact_type": "host_measurement",
+  "measured_utc": "2026-10-01T00:41:43.818615+00:00",
+  "hostname": "SHOAIB_CHANDA",
+  "computer_name": "SHOAIB_CHANDA",
+  "python": "3.12.14 | packaged by conda-forge | (main, Sep  2 2026, 23:18:20) [MSC v.1944 64 bit (AMD64)]",
+  "python_executable": "D:\\Conda\\p12\\python.exe",
+  "sys_prefix": "D:\\Conda\\p12",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "conda_prefix": null,
+  "conda_default_env": null,
+  "cpu": {
+    "Name": "11th Gen Intel(R) Core(TM) i5-11260H @ 2.60GHz",
+    "NumberOfCores": 4,
+    "NumberOfLogicalProcessors": 8,
+    "MaxClockSpeed": 2611,
+    "SocketDesignation": "U3E1"
+  },
+  "cpu_topology": {
+    "Name": "11th Gen Intel(R) Core(TM) i5-11260H @ 2.60GHz",
+    "NumberOfCores": 4,
+    "NumberOfLogicalProcessors": 8,
+    "ThreadCount": 8,
+    "MaxClockSpeed": 2611,
+    "CurrentClockSpeed": 2611,
+    "SocketDesignation": "U3E1",
+    "Manufacturer": "GenuineIntel"
+  },
+  "power_plan": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+  "gpu": [
+    {
+      "Name": "Intel(R) UHD Graphics",
+      "DriverVersion": "32.0.101.7085",
+      "AdapterRAM": 2147479552,
+      "VideoProcessor": "Intel(R) UHD Graphics Family"
+    },
+    {
+      "Name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+      "DriverVersion": "32.0.16.1664",
+      "AdapterRAM": 4293918720,
+      "VideoProcessor": "NVIDIA GeForce RTX 3050 Laptop GPU"
+    }
+  ],
+  "cuda_visible_devices": null,
+  "memory": {
+    "TotalPhysicalMemory": 34073251840
+  },
+  "physical_disks": [
+    {
+      "FriendlyName": "BC711 NVMe SK hynix 512GB",
+      "MediaType": "SSD",
+      "BusType": "NVMe",
+      "Size": 512110190592,
+      "HealthStatus": "Healthy"
+    },
+    {
+      "FriendlyName": "EVMNV/512GB",
+      "MediaType": "SSD",
+      "BusType": "NVMe",
+      "Size": 512110190592,
+      "HealthStatus": "Healthy"
+    }
+  ],
+  "disk_usage": {
+    "D:\\": {
+      "total_bytes": 512092008448,
+      "used_bytes": 45077364736,
+      "free_bytes": 467014643712,
+      "free_gib": 434.94128036499023
+    }
+  },
+  "disk_io_probe": {
+    "path": "D:\\DR2\\AutoFE_Submission",
+    "bytes": 67108864,
+    "write_seconds": 0.15237329999217764,
+    "read_seconds": 0.09982130001299083,
+    "write_mib_per_s": 420.02109295582335,
+    "read_mib_per_s": 641.1457273314511
+  },
+  "packages": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.5.2",
+    "scipy": "1.13.1",
+    "featuretools": "1.31.0",
+    "woodwork": "0.31.0",
+    "xgboost": "2.0.3",
+    "lightgbm": "4.3.0",
+    "catboost": "1.2.5",
+    "psutil": "5.9.8"
+  },
+  "gpu_backend_probe": {
+    "xgboost_importable": true,
+    "catboost_importable": true,
+    "nvidia_smi": "NVIDIA GeForce RTX 3050 Laptop GPU, 616.64, 4096"
+  },
+  "note": "Run this probe on the intended friend PC; this file is valid only for the host named above. P/E topology is UNKNOWN when Windows does not expose heterogeneous-core fields."
+}

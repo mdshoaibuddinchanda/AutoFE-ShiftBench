@@ -17,11 +17,8 @@ import scikit_posthocs as sp
 import scipy.stats as ss
 
 
-# The primary paper scope is the 22 datasets for which the run produced a
-# complete or near-complete block of results.  The three remaining configured
-# datasets are deliberately excluded from regenerated publication assets:
-# aps_failure was not completed and covertype/kddcup99 were stopped while
-# their long-running final blocks were still in progress.
+# Historical default for the standalone domain-diversity helper. generate_all
+# derives its dataset list from the explicitly supplied corrected ledger.
 PRIMARY_DATASETS = {
     "haberman",
     "sonar",
@@ -386,29 +383,33 @@ def plot_fig9_heatmap(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
 def plot_fig10_ablation(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     if df.empty or "roc_auc" not in df.columns: return
     set_q1_publication_style()
-    
-    ablation_pl = ["Raw", "Raw_MI", "AutoFE_Baseline", "AutoFE_MI", "AutoFE_Random", "AutoFE_NoMultiply"]
+    from src.generate_tables import _dataset_pipeline_scores
+
+    ablation_pl = [
+        "Raw", "Raw_CapMatched", "AutoFE_Baseline", "AutoFE_MI", "AutoFE_Random",
+        "AutoFE_NoMultiply", "AutoFE_Isolate_Add", "AutoFE_Isolate_Subtract",
+        "AutoFE_Isolate_Multiply", "AutoFE_Isolate_Divide", "AutoFE_LeaveOut_Add",
+        "AutoFE_LeaveOut_Subtract", "AutoFE_LeaveOut_Multiply", "AutoFE_LeaveOut_Divide",
+    ]
     adf = df[df["pipeline"].isin(ablation_pl)].copy()
     if adf.empty: return
-    
-    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+    scores = _dataset_pipeline_scores(adf)
+    if scores.empty: return
+    present = [name for name in ablation_pl if name in set(scores["pipeline"])]
+    n_datasets = int(scores["dataset"].nunique())
+
+    fig, ax = plt.subplots(figsize=(11, 9), constrained_layout=True)
     sns.barplot(
-        data=adf, x="pipeline", y="roc_auc",
-        order=ablation_pl, hue="pipeline", palette="viridis", legend=False,
-        errorbar=("ci", 95), ax=ax
+        data=scores, x="roc_auc", y="pipeline",
+        order=present, color="#2C3E50", errorbar=None, ax=ax,
     )
-    ax.set_title("Figure 10: Ablation Study of Feature Generation/Selection", weight="bold", pad=15)
-    ax.set_ylabel("Mean ROC-AUC")
-    ax.set_xlabel("")
-    ax.set_ylim(0.5, 1.0)
-    ax.set_xticks(range(len(ablation_pl)))
-    ax.set_xticklabels([textwrap.fill(str(x), 20) for x in ablation_pl], rotation=25, ha="right")
-    # Seaborn creates one BarContainer per hue level.  Label every container,
-    # not only the first (Raw) bar, so the ablation comparison is numerically
-    # self-contained in the printed figure.
+    ax.set_title(f"Figure 10: Paired Dataset Mean ROC-AUC (N={n_datasets})", weight="bold", pad=15)
+    ax.set_ylabel("")
+    ax.set_xlabel("Mean ROC-AUC across matched datasets")
+    ax.set_xlim(0, 1.05)
     for container in ax.containers:
         if getattr(container, "patches", None):
-            ax.bar_label(container, fmt="%.3f", fontsize=14, padding=5, color="#1f2937")
+            ax.bar_label(container, fmt="%.3f", fontsize=12, padding=5, color="#1f2937")
     _set_print_text(ax, tick=14, label=17, title=21)
     _save_figure(fig, out_dir, "Figure_10_Ablation_Study", dpi)
 
@@ -422,6 +423,8 @@ def generate_all(
     if results_path is None or out_dir is None:
         raise ValueError("Pass a corrected results_path and a new out_dir explicitly; historical figures are not overwritten implicitly")
     df = _load_data(results_path, datasets=datasets)
+    if df.empty or "dataset" not in df:
+        raise ValueError("No successful primary-condition rows were found in the specified corrected ledger")
     selected_datasets = list(datasets) if datasets is not None else sorted(df["dataset"].dropna().unique())
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

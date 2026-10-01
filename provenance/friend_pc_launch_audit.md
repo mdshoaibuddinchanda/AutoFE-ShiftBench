@@ -1,5 +1,7 @@
 # Friend PC launch audit
 
+> **2026-10-01 update:** This file preserves the earlier friend-PC gate as historical evidence. The user has waived the ten-day completion target, so its 7,000 valid-cells/hour threshold is no longer required. The current local `p12` host probe is `launch_host_measurement_v2.json`; a different execution host needs its own probe. Full-grid commands must use `--manifest-policy compact --durable-scheduler --cache-policy bounded` and must omit the verbose `--cache-audit`. See `reviewer1_launch_scope_v2.json` for all seven run commands and current task counts. The representative large-dataset calibration and intended-host decision remain pending.
+
 Date: 2026-09-30 (Asia/Calcutta)  
 Repository: `D:\DR2\AutoFE_Submission`  
 Environment used for bounded verification: existing `p12` (`D:\Conda\p12\python.exe`)  

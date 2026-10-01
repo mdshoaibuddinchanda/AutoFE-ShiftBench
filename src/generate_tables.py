@@ -262,10 +262,10 @@ def generate_table_8_feature_stability(df: pd.DataFrame):
 
 def generate_table_9_overfitting_gap(df: pd.DataFrame):
     """Calculates Train AUC - Test AUC to measure overfitting."""
-    if df.empty or "train_auc" not in df.columns or "test_auc" not in df.columns: return "*(No data)*\n"
+    if df.empty or "train_auc" not in df.columns or "roc_auc" not in df.columns: return "*(No data)*\n"
     out = "## Table 9: Overfitting Analysis (Train AUC - Test AUC)\n\n"
-    
-    df["overfitting_gap"] = df["train_auc"] - df["test_auc"]
+    df = df.copy()
+    df["overfitting_gap"] = pd.to_numeric(df["train_auc"], errors="coerce") - pd.to_numeric(df["roc_auc"], errors="coerce")
     
     grouped = df.groupby("pipeline")["overfitting_gap"].mean().reset_index().sort_values("overfitting_gap")
     

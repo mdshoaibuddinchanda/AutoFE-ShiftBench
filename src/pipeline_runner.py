@@ -12,6 +12,7 @@ import json
 import os
 import pickle
 import platform
+import sqlite3
 import sys
 import time
 import traceback
@@ -567,21 +568,84 @@ def _compact_group_status(status: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
-def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[str, Any]]) -> None:
-    latest: dict[str, dict[str, Any]] = {}
-    for outcome in outcomes:
-        latest[outcome["task_key"]] = outcome
-    outcomes[:] = list(latest.values())
+class CompactOutcomeLedger:
+    """Durable per-cell status without a repeatedly rewritten task array."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(path, timeout=30) as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA synchronous=FULL")
+            connection.execute("CREATE TABLE IF NOT EXISTS outcomes (task_key TEXT PRIMARY KEY, status TEXT NOT NULL, phase TEXT)")
+            rows = connection.execute("SELECT status, COUNT(*) FROM outcomes GROUP BY status").fetchall()
+        self.counts = {str(status): int(count) for status, count in rows}
+        self.changed_since_publish = 0
+        self.last_publish_time = 0.0
+
+    def upsert(self, outcome: dict[str, Any]) -> None:
+        task_key = outcome["task_key"]
+        status = outcome["status"]
+        with sqlite3.connect(self.path, timeout=30) as connection:
+            connection.execute("PRAGMA synchronous=FULL")
+            old = connection.execute("SELECT status FROM outcomes WHERE task_key=?", (task_key,)).fetchone()
+            connection.execute(
+                "INSERT INTO outcomes(task_key,status,phase) VALUES (?,?,?) "
+                "ON CONFLICT(task_key) DO UPDATE SET status=excluded.status,phase=excluded.phase",
+                (task_key, status, outcome.get("phase")),
+            )
+        if old:
+            self.counts[old[0]] -= 1
+        self.counts[status] = self.counts.get(status, 0) + 1
+        self.changed_since_publish += 1
+
+    def should_publish(self) -> bool:
+        return (self.last_publish_time == 0.0 or self.changed_since_publish >= 250
+                or time.monotonic() - self.last_publish_time >= 60.0)
+
+    def published(self) -> None:
+        self.changed_since_publish = 0
+        self.last_publish_time = time.monotonic()
+
+    def __iter__(self):
+        # Only legacy detailed manifests need in-memory per-task lookups.
+        return iter(())
+
+
+def _save_run_manifest(
+    run_dir: Path, base: dict[str, Any],
+    outcomes: list[dict[str, Any]] | CompactOutcomeLedger, *, force: bool = False,
+) -> None:
+    compact = isinstance(outcomes, CompactOutcomeLedger)
+    if compact and not force and not outcomes.should_publish():
+        return
+    if compact:
+        status_counts = outcomes.counts
+        recorded = sum(status_counts.values())
+        phase_counts: dict[str, int] = {}
+    else:
+        latest: dict[str, dict[str, Any]] = {}
+        for outcome in outcomes:
+            latest[outcome["task_key"]] = outcome
+        outcomes[:] = list(latest.values())
+        status_counts = {}
+        phase_counts = {}
+        for outcome in outcomes:
+            status_counts[outcome["status"]] = status_counts.get(outcome["status"], 0) + 1
+            phase = outcome.get("phase")
+            if phase:
+                phase_counts[phase] = phase_counts.get(phase, 0) + 1
+        recorded = len(outcomes)
     # Keep the historical ``counts`` shape stable for existing consumers while
     # publishing a complete status accounting block for corrected campaigns.
     counts: dict[str, int] = {"success": 0, "failed": 0}
     counts_by_status: dict[str, int] = {
         "success": 0, "failed": 0, "skipped": 0, "timed_out": 0, "pending": 0,
     }
-    for outcome in outcomes:
-        counts[outcome["status"]] = counts.get(outcome["status"], 0) + 1
-        if outcome.get("status") in counts_by_status:
-            counts_by_status[outcome["status"]] += 1
+    for outcome_status, count in status_counts.items():
+        counts[outcome_status] = count
+        if outcome_status in counts_by_status:
+            counts_by_status[outcome_status] = count
     configuration = base.get("configuration", {})
     expected = (
         len(configuration.get("datasets", []))
@@ -591,19 +655,14 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
         * len(configuration.get("pipelines", []))
         * len(configuration.get("models", []))
     )
-    counts_by_status["pending"] = max(expected - len(outcomes), 0)
+    counts_by_status["pending"] = max(expected - recorded, 0)
     forced_status = base.get("status") if base.get("status", "").startswith("blocked_") else None
     if forced_status:
         status = forced_status
-    elif len(outcomes) < expected:
+    elif recorded < expected:
         status = "running_with_failures" if counts["failed"] else "running"
     else:
         status = "completed_with_failures" if counts["failed"] else "complete"
-    phase_counts: dict[str, int] = {}
-    for outcome in outcomes:
-        phase = outcome.get("phase")
-        if phase:
-            phase_counts[phase] = phase_counts.get(phase, 0) + 1
     manifest = dict(
         base, status=status, expected_tasks=expected, counts=counts,
         counts_by_status=counts_by_status,
@@ -614,8 +673,13 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
             "counts_by_phase": phase_counts,
             "pending_definition": "expected task keys absent from the current-attempt task list",
         },
-        tasks=outcomes,
+        tasks=[] if compact else outcomes,
     )
+    if compact:
+        manifest["task_ledger"] = {
+            "format": "sqlite", "path": outcomes.path.name,
+            "table": "outcomes", "manifest_counts_max_lag_cells": 249,
+        }
     # Windows antivirus/indexer/read-only observers can briefly hold the
     # destination during ``os.replace``.  Retry the atomic publication instead
     # of converting that transient filesystem condition into a task failure.
@@ -623,6 +687,8 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
     for attempt in range(8):
         try:
             atomic_write_json(manifest_path, manifest)
+            if compact:
+                outcomes.published()
             break
         except PermissionError:
             if attempt == 7:
@@ -630,8 +696,11 @@ def _save_run_manifest(run_dir: Path, base: dict[str, Any], outcomes: list[dict[
             time.sleep(0.05 * (attempt + 1))
 
 
-def _upsert_outcome(outcomes: list[dict[str, Any]], outcome: dict[str, Any]) -> None:
+def _upsert_outcome(outcomes: list[dict[str, Any]] | CompactOutcomeLedger, outcome: dict[str, Any]) -> None:
     """Keep one current manifest entry per task while retaining attempt rows in JSONL."""
+    if isinstance(outcomes, CompactOutcomeLedger):
+        outcomes.upsert(outcome)
+        return
     outcomes[:] = [row for row in outcomes if row.get("task_key") != outcome["task_key"]]
     outcomes.append(outcome)
 
@@ -713,6 +782,7 @@ def run_experiment(
     scheduler_lease_seconds: float = 3600.0,
     scheduler_max_attempts: int = 3,
     cache_audit: bool = False,
+    manifest_policy: str = "detailed",
     use_gpu: bool = False,
     workers: int = 1,
     failure_hook: Callable[[str, dict[str, Any]], None] | None = None,
@@ -730,8 +800,16 @@ def run_experiment(
         raise ValueError("scheduler_max_attempts must be positive")
     if workers < 1:
         raise ValueError("workers must be positive")
+    if manifest_policy not in {"detailed", "compact"}:
+        raise ValueError("manifest_policy must be 'detailed' or 'compact'")
+    if manifest_policy == "compact" and (not durable_scheduler or cache_audit):
+        raise ValueError("compact manifests require a durable scheduler and cache_audit=False")
     seeds = seeds or [42, 123, 456, 789, 2025]
     folds = folds or list(range(1, n_splits + 1))
+    expected_cells = (len(data_paths) * len(seeds) * len(folds) * len(conditions)
+                      * len(pipelines) * len(models))
+    if manifest_policy == "detailed" and expected_cells > 10000:
+        raise ValueError("Grids above 10,000 cells require --manifest-policy compact")
     selected_families = {family for family, _severity in conditions}
     primary_families = {"clean", "gaussian_noise", "missing_values", "label_noise"}
     domain_families = {"covariate_partition", "population_partition"}
@@ -805,6 +883,7 @@ def run_experiment(
         "scheduler_lease_seconds": scheduler_lease_seconds,
         "scheduler_max_attempts": scheduler_max_attempts,
         "cache_audit": bool(cache_audit),
+        "manifest_policy": manifest_policy,
         "use_gpu": bool(use_gpu),
         "workers": int(workers),
         "pipeline_configs": {name: asdict(PIPELINE_CONFIGS[name]) for name in pipelines},
@@ -897,7 +976,11 @@ def run_experiment(
         "partition_uses_held_out_features": False,
         "datasets": list((existing_manifest or {}).get("datasets", [])),
     }
-    outcomes: list[dict[str, Any]] = list((existing_manifest or {}).get("tasks", []))
+    outcomes: list[dict[str, Any]] | CompactOutcomeLedger = (
+        CompactOutcomeLedger(run_dir / "manifest_outcomes.sqlite")
+        if manifest_policy == "compact"
+        else list((existing_manifest or {}).get("tasks", []))
+    )
     if existing_manifest is None:
         _save_run_manifest(run_dir, base_manifest, outcomes)
 
@@ -1090,32 +1173,48 @@ def run_experiment(
         base_manifest["datasets"] = [
             row for row in base_manifest.get("datasets", []) if row.get("dataset") != dataset_name
         ] + [dataset_manifest]
-        for seed in seeds:
-            if split_policy == "group_aware":
-                # Primary classification metrics require all classes in every
-                # train/test fold.  Infeasibility is explicit and never
-                # substituted with row-level folds.
+        group_seed_plans: dict[int, tuple[list[tuple[np.ndarray, np.ndarray]], dict[str, Any]]] = {}
+        group_auc_scope_reason = ""
+        if split_policy == "group_aware":
+            # The primary all-fold comparison requires AUC support for every
+            # configured seed.  Freeze eligibility at the dataset level, so a
+            # lucky seed cannot silently enter a partially covered comparison.
+            for planned_seed in seeds:
                 try:
-                    ordinary_splits, split_status = get_group_stratified_splits(
-                        X, y, n_splits, seed, target_column=target_column,
-                        require_class_support=True, require_auc=True, return_status=True,
+                    planned_splits, planned_status = get_group_stratified_splits(
+                        X, y, n_splits, planned_seed, target_column=target_column,
+                        require_class_support=False, require_auc=False, return_status=True,
                     )
                 except GroupSplitInfeasibleError as exc:
-                    dataset_manifest["group_fold_status_by_seed"][str(seed)] = _compact_group_status(exc.status)
-                    base_manifest["datasets"] = [
-                        row for row in base_manifest.get("datasets", []) if row.get("dataset") != dataset_name
-                    ] + [dataset_manifest]
+                    dataset_manifest["group_fold_status_by_seed"][str(planned_seed)] = _compact_group_status(exc.status)
                     base_manifest["status"] = "blocked_group_split_infeasible"
                     base_manifest["split_policy_blocker"] = {
-                        "dataset": dataset_name, "seed": seed,
+                        "dataset": dataset_name, "seed": planned_seed,
                         "reason": str(exc), "status": _compact_group_status(exc.status),
                     }
-                    _save_run_manifest(run_dir, base_manifest, outcomes)
+                    _save_run_manifest(run_dir, base_manifest, outcomes, force=True)
                     raise
-                assert_group_fold_integrity(ordinary_splits, group_ids)
-                split_status = _compact_group_status(split_status)
-                split_status["split_policy"] = "group_aware"
-                dataset_manifest["group_fold_status_by_seed"][str(seed)] = split_status
+                assert_group_fold_integrity(planned_splits, group_ids)
+                compact_status = _compact_group_status(planned_status)
+                compact_status["split_policy"] = "group_aware"
+                dataset_manifest["group_fold_status_by_seed"][str(planned_seed)] = compact_status
+                group_seed_plans[planned_seed] = (planned_splits, compact_status)
+            unsupported = [
+                str(planned_seed) for planned_seed in seeds
+                if group_seed_plans[planned_seed][1]["auc_status"] != "supported"
+            ]
+            if unsupported:
+                group_auc_scope_reason = (
+                    "dataset_ineligible_for_all_configured_seed_auc; "
+                    "auc_infeasible_seeds=" + ",".join(unsupported)
+                )
+            dataset_manifest["all_configured_seeds_auc_status"] = (
+                "infeasible" if unsupported else "supported"
+            )
+            dataset_manifest["all_configured_seeds_auc_reason"] = group_auc_scope_reason or "all_configured_seeds_supported"
+        for seed in seeds:
+            if split_policy == "group_aware":
+                ordinary_splits, split_status = group_seed_plans[seed]
             else:
                 ordinary_splits = get_stratified_splits(X, y, n_splits, seed, target_column=target_column)
                 assert_fold_integrity(ordinary_splits, len(frame))
@@ -1171,6 +1270,13 @@ def run_experiment(
                             }
                             task_key = stable_digest(dict(task, run_id=run_id))
                             task_split_status = dict(split_status)
+                            if split_policy == "group_aware":
+                                task_split_status["all_configured_seeds_auc_status"] = dataset_manifest[
+                                    "all_configured_seeds_auc_status"
+                                ]
+                                task_split_status["all_configured_seeds_auc_reason"] = dataset_manifest[
+                                    "all_configured_seeds_auc_reason"
+                                ]
                             if family in domain_metadata:
                                 task_split_status["domain_partition"] = domain_metadata[family]
                             task_manifest = {
@@ -1249,8 +1355,12 @@ def run_experiment(
                                 domain_metadata.get(family, {}).get("auc_status")
                                 if family in domain_metadata else None
                             )
-                            if family in domain_metadata and domain_auc_status != "supported":
-                                skip_reason = domain_metadata[family]["auc_reason"]
+                            if ((family in domain_metadata and domain_auc_status != "supported")
+                                    or (split_policy == "group_aware" and bool(group_auc_scope_reason))):
+                                skip_reason = (
+                                    domain_metadata[family]["auc_reason"]
+                                    if family in domain_metadata else group_auc_scope_reason
+                                )
                                 skipped = dict(
                                     task_manifest,
                                     status="skipped",
@@ -1527,7 +1637,7 @@ def run_experiment(
             "high_water": cache_cleanup.get("high_water"),
             "durable_cache_policy": "feature artifacts may be regenerated from frozen identities after all current consumers terminate",
         }
-    _save_run_manifest(run_dir, base_manifest, outcomes)
+    _save_run_manifest(run_dir, base_manifest, outcomes, force=True)
     return json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
 
 
@@ -1540,12 +1650,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--max-seeds", type=int)
     parser.add_argument("--max-folds", type=int)
     parser.add_argument("--max-conditions", type=int)
+    parser.add_argument(
+        "--scope",
+        choices=["primary", "transductive_domain_partition", "feature_availability_ablation",
+                 "majority_label_relabeling"],
+        default="primary",
+        help="Select one prespecified condition track; each track needs its own run ID",
+    )
     parser.add_argument("--pipelines", nargs="+", default=["Raw", "AutoFE_Baseline"])
     parser.add_argument("--models", nargs="+", default=["logistic_regression"])
     parser.add_argument("--split-policy", choices=["row_level", "group_aware"], default="row_level")
     parser.add_argument("--cache-policy", choices=["retain", "bounded"], default="retain")
     parser.add_argument("--cache-max-gib", type=float)
     parser.add_argument("--durable-scheduler", action="store_true")
+    parser.add_argument("--manifest-policy", choices=["detailed", "compact"], default="detailed")
     parser.add_argument("--scheduler-lease-seconds", type=float, default=3600.0)
     parser.add_argument("--scheduler-max-attempts", type=int, default=3)
     parser.add_argument("--workers", type=int, default=1, help="bounded outer worker processes for model fits")
@@ -1563,7 +1681,15 @@ def main(argv: list[str] | None = None) -> None:
     missing = [str(path) for path in data_paths.values() if not path.exists()]
     if missing:
         raise FileNotFoundError(f"Configured dataset CSVs are missing; no partial run started: {missing}")
-    conditions = PRIMARY_CONDITIONS[:args.max_conditions] if args.max_conditions else PRIMARY_CONDITIONS
+    scope_conditions = {
+        "primary": PRIMARY_CONDITIONS,
+        "transductive_domain_partition": DOMAIN_PARTITION_CONDITIONS,
+        "feature_availability_ablation": (SEPARATE_EXPERIMENT_CONDITIONS[0],),
+        "majority_label_relabeling": (SEPARATE_EXPERIMENT_CONDITIONS[1],),
+    }
+    conditions = scope_conditions[args.scope]
+    if args.max_conditions:
+        conditions = conditions[:args.max_conditions]
     manifest = run_experiment(
         data_paths, run_id=args.run_id, output_root=args.output_root,
         seeds=[42, 123, 456, 789, 2025][:args.max_seeds] if args.max_seeds else None,
@@ -1576,6 +1702,7 @@ def main(argv: list[str] | None = None) -> None:
         scheduler_lease_seconds=args.scheduler_lease_seconds,
         scheduler_max_attempts=args.scheduler_max_attempts,
         cache_audit=args.cache_audit,
+        manifest_policy=args.manifest_policy,
         use_gpu=args.use_gpu,
         workers=args.workers,
     )
