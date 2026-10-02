@@ -47,6 +47,14 @@ from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
+from src.seeding import (
+    SEED_SCHEME_VERSION,
+    corruption_seed,
+    distance_sample_seed,
+    estimator_seed,
+    feature_selection_seed,
+    split_seed,
+)
 from src.shift_generator import apply_perturbation
 from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
 from src.shap_explainer import compute_shap_values
@@ -184,6 +192,9 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
     for p_name, cfg in PIPELINE_CONFIGS.items():
         # Set seed on configs that need it
+        selection_random_state = feature_selection_seed(
+            dataset_name, split_policy, seed, fold, condition, p_name,
+        )
         cfg_copy = DFSConfig(
             enable_dfs=cfg.enable_dfs,
             depth=cfg.depth,
@@ -192,7 +203,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             selection_method=cfg.selection_method,
             trans_primitives=list(cfg.trans_primitives),
             monitor_ram=cfg.monitor_ram,
-            random_seed=seed,
+            random_seed=selection_random_state,
         )
 
         train_cache, test_cache, meta_cache = _pipeline_cache_paths(
@@ -227,6 +238,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                 json.dump(meta, f)
 
         res_pipelines[p_name] = (x_train_fe, x_test_fe)
+        meta["selection_seed"] = selection_random_state
         res_meta[p_name] = meta
 
     return res_pipelines, res_meta
@@ -253,7 +265,8 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     if split_cache.exists():
         splits = pd.read_pickle(split_cache)
     else:
-        splits = get_splits(X, y, split_policy, n_splits=5, seed=seed)
+        derived_split_seed = split_seed(dataset_name, split_policy, seed, n_splits=5)
+        splits = get_splits(X, y, split_policy, n_splits=5, seed=derived_split_seed)
         split_cache.parent.mkdir(parents=True, exist_ok=True)
         pd.to_pickle(splits, split_cache)
 
@@ -269,7 +282,9 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     x_test = X.iloc[test_idx].copy()
     y_test = y.iloc[test_idx].copy()
 
-    derived_corruption_seed = hash((seed, fold, condition)) % (2**31)
+    derived_corruption_seed = corruption_seed(
+        dataset_name, split_policy, seed, fold, condition,
+    )
     x_train_cond, y_train_cond, x_test_cond, y_test_cond = apply_training_condition(
         x_train, y_train, shift_family=shift_family,
         x_test=x_test, y_test=y_test, severity=severity,
@@ -310,6 +325,11 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         x_train_prep, x_test_prep, y_train_enc,
         dataset_name, split_policy, seed, fold, condition,
     )
+    for pipeline_name, meta in res_meta.items():
+        meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
+        meta["corruption_seed"] = derived_corruption_seed
+        meta["seed_scheme_version"] = SEED_SCHEME_VERSION
+
     return res_pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean_prep
 
 
@@ -380,7 +400,15 @@ def train_unit(kwargs):
 
         use_gpu = model_type in GPU_MODELS
         t0 = time.time()
-        model = build_model(model_type, random_state=seed, use_gpu=use_gpu)
+        model_seed = estimator_seed(
+            dataset_name,
+            split_policy,
+            seed,
+            fold,
+            condition,
+            model_type,
+        )
+        model = build_model(model_type, random_state=model_seed, use_gpu=use_gpu)
         model.fit(X_tr, y_train_enc)
         train_time = time.time() - t0
 
@@ -401,9 +429,13 @@ def train_unit(kwargs):
         metrics_test = compute_classification_metrics(y_test_enc, y_pred, y_proba, label_enc.classes_)
         metrics_train = compute_classification_metrics(y_train_enc, y_pred_train, y_proba_train, label_enc.classes_)
 
+        distance_seed = distance_sample_seed(
+            dataset_name, split_policy, seed, fold, condition,
+        )
         dist_metrics = compute_distribution_distance(
             x_test_clean,
             pipelines[pipeline_name][1],
+            random_state=distance_seed,
         )
         if condition == "clean":
             dist_metrics["wasserstein"] = 0.0
@@ -411,6 +443,7 @@ def train_unit(kwargs):
 
         res = {
             "evaluation_protocol_version": EVALUATION_PROTOCOL_VERSION,
+            "seed_scheme_version": SEED_SCHEME_VERSION,
             "dataset": dataset_name,
             "split_policy": split_policy,
             "seed": seed,
@@ -425,6 +458,11 @@ def train_unit(kwargs):
             "train_time_s": train_time,
             "infer_time_s": infer_time,
             "autofe_gen_time_s": meta.get("generation_time_s", 0),
+            "split_seed": meta.get("split_seed"),
+            "corruption_seed": meta.get("corruption_seed"),
+            "selection_seed": meta.get("selection_seed"),
+            "model_seed": model_seed,
+            "distance_sample_seed": distance_seed,
             "autofe_cache_hit": meta.get("dfs_cache_hit", False),
             "n_generated": meta.get("num_generated", 0),
             "n_retained": meta.get("num_selected", 0),

@@ -134,10 +134,11 @@ Phase 1 (cache generation) is the longest phase and can take **1-3 days** depend
 ```
 data/cache/
 └── predictor_only_geometry_v2/
-    └── adult/
-        ├── Raw_s42_f1_clean_train.pkl
-        ├── Raw_s42_f1_clean_test.pkl
-        └── Raw_s42_f1_clean_meta.json
+    └── sha256_canonical_json_u32_v1/
+        └── adult/
+            ├── Raw_s42_f1_clean_train.pkl
+            ├── Raw_s42_f1_clean_test.pkl
+            └── Raw_s42_f1_clean_meta.json
 │   ├── AutoFE_MI_s42_f1_gaussian_noise_0.05_train.pkl
 │   ├── ...
 │   └── splits_s42_covariate_shift.pkl
@@ -181,10 +182,10 @@ You can also manually check by counting files:
 
 ```bash
 # Count completed caches for a specific dataset (Windows)
-dir /b data\cache\predictor_only_geometry_v2\adult\*_train.pkl | find /c /v ""
+dir /b data\cache\predictor_only_geometry_v2\sha256_canonical_json_u32_v1\adult\*_train.pkl | find /c /v ""
 
 # Count completed caches for a specific dataset (Linux/Mac)
-ls data/cache/predictor_only_geometry_v2/adult/*_train.pkl | wc -l
+ls data/cache/predictor_only_geometry_v2/sha256_canonical_json_u32_v1/adult/*_train.pkl | wc -l
 ```
 
 ---
@@ -201,13 +202,14 @@ AutoFE-ShiftBench/
 ├── reports/                       # (Git-ignored) Outputs
 │   ├── figures/                   # Generated publication plots (PDF, PNG)
 │   ├── tables/
-│   │   └── results_stream_predictor_only_geometry_v2.jsonl # Versioned result ledger
+│   │   └── results_stream_predictor_only_geometry_v2_sha256_canonical_json_u32_v1.jsonl # Versioned result ledger
 │   ├── worker_logs/               # Error logs for debugging
 │   └── terminal.log               # Running log
 ├── src/
 │   ├── check_progress.py          # Progress tracking utility
 │   ├── checkpoint.py              # SQLite checkpoint DB for resume support
 │   ├── protocol.py                # Versioned evaluation, cache, and ledger identity
+│   ├── seeding.py                 # Stable purpose-specific task seed derivation
 │   ├── data_loader.py             # Downloads OpenML datasets + meta-features
 │   ├── evaluation.py              # 10 classification metrics + distribution distances
 │   ├── feature_engineering.py     # Featuretools DFS wrapper + ablations

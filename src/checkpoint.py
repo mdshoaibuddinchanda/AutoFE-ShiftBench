@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from src.protocol import EVALUATION_PROTOCOL_VERSION
+from src.seeding import SEED_SCHEME_VERSION
 
 DB_PATH = Path("reports/cache.db")
 
@@ -46,7 +47,7 @@ def compute_hash(
     split_policy: str,
 ) -> str:
     return (
-        f"{EVALUATION_PROTOCOL_VERSION}|{dataset}|{split_policy}|"
+        f"{EVALUATION_PROTOCOL_VERSION}|{SEED_SCHEME_VERSION}|{dataset}|{split_policy}|"
         f"{seed}|{fold}|{condition}|{pipeline}|{model}"
     )
 

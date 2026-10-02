@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from src.seeding import stable_seed
+
 
 DEFAULT_TARGET_COLUMN = "target"
 DEFAULT_MAX_ROWS = 100_000
@@ -106,7 +108,12 @@ def _fetch_openml_with_fallbacks(dataset_name: str):
     )
 
 
-def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str, float]:
+def compute_meta_features(
+    features: pd.DataFrame,
+    target: pd.Series,
+    random_state: int = 42,
+    dataset_identity: str = "unspecified",
+) -> dict[str, float]:
     """Compute meta-features for dataset analysis."""
     meta = {}
     
@@ -190,7 +197,15 @@ def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str
         from sklearn.preprocessing import LabelEncoder
         # Sample to speed up
         sample_size = min(n_samples, 2000)
-        sample_idx = np.random.choice(n_samples, sample_size, replace=False)
+        metadata_identity = {
+            "dataset": dataset_identity,
+            "configured_seed": int(random_state),
+            "n_samples": int(n_samples),
+        }
+        sample_seed = stable_seed("dataset_metadata_sample", metadata_identity)
+        sample_idx = np.random.default_rng(sample_seed).choice(
+            n_samples, sample_size, replace=False,
+        )
         f_sample = features.iloc[sample_idx]
         t_sample = target.iloc[sample_idx]
         
@@ -203,7 +218,8 @@ def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str
                 f_numeric[col] = LabelEncoder().fit_transform(f_sample[col].astype(str))
                 
         t_encoded = LabelEncoder().fit_transform(t_sample.astype(str))
-        ami_scores = mutual_info_classif(f_numeric, t_encoded, random_state=42)
+        mi_seed = stable_seed("dataset_metadata_mutual_information", metadata_identity)
+        ami_scores = mutual_info_classif(f_numeric, t_encoded, random_state=mi_seed)
         meta["average_mutual_information"] = float(np.mean(ami_scores))
     except Exception as e:
         print(f"Skipping AMI: {e}")
@@ -216,7 +232,11 @@ def compute_meta_features(features: pd.DataFrame, target: pd.Series) -> dict[str
             from sklearn.preprocessing import StandardScaler
             num_data = features[num_cols].fillna(features[num_cols].median())
             scaled_data = StandardScaler().fit_transform(num_data)
-            pca = PCA(n_components=0.95, random_state=42)
+            pca_seed = stable_seed(
+                "dataset_metadata_pca",
+                {"dataset": dataset_identity, "configured_seed": int(random_state)},
+            )
+            pca = PCA(n_components=0.95, random_state=pca_seed)
             pca.fit(scaled_data)
             meta["intrinsic_dimension"] = float(pca.n_components_)
         else:
@@ -283,7 +303,12 @@ def download_openml_dataset(
     features_sampled = combined.drop(columns=[target_column])
     target_sampled = combined[target_column]
     print(f"Computing meta features for {dataset_name}...")
-    meta_features = compute_meta_features(features_sampled, target_sampled)
+    meta_features = compute_meta_features(
+        features_sampled,
+        target_sampled,
+        random_state=random_state,
+        dataset_identity=dataset_name,
+    )
     print(f"Meta features done for {dataset_name}.")
     
     meta_path = Path(output_dir) / f"{dataset_name}_meta.json"

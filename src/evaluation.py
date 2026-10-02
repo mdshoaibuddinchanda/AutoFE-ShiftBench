@@ -104,15 +104,20 @@ def compute_classification_metrics(
 
 from scipy.stats import wasserstein_distance, ks_2samp
 
-def compute_distribution_distance(x_clean: pd.DataFrame, x_shifted: pd.DataFrame, max_samples: int = 5000) -> dict[str, float]:
+def compute_distribution_distance(
+    x_clean: pd.DataFrame,
+    x_shifted: pd.DataFrame,
+    max_samples: int = 5000,
+    random_state: int = 42,
+) -> dict[str, float]:
     """Compute average Wasserstein and KS distance between clean and shifted test sets."""
     if x_clean.empty or x_shifted.empty:
         return {'wasserstein': np.nan, 'ks_stat': np.nan}
 
     # Sample rows to keep compute feasible
     if len(x_clean) > max_samples:
-        x_clean = x_clean.sample(n=max_samples, random_state=42)
-        x_shifted = x_shifted.sample(n=max_samples, random_state=42)
+        x_clean = x_clean.sample(n=max_samples, random_state=random_state)
+        x_shifted = x_shifted.sample(n=max_samples, random_state=random_state)
 
     # Ensure we only compare common numeric columns
     cols = [c for c in x_clean.columns if c in x_shifted.columns and pd.api.types.is_numeric_dtype(x_clean[c])]
@@ -144,4 +149,3 @@ def compute_jaccard_similarity(list_a: list[str], list_b: list[str]) -> float:
     if not set_a and not set_b:
         return 1.0
     return float(len(set_a.intersection(set_b)) / len(set_a.union(set_b)))
-
