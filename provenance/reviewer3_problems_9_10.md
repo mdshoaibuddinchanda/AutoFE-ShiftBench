@@ -44,3 +44,20 @@ The final P12 test, compile, smoke, interrupted-run/resume, provenance, and
 remote verification results are recorded below as they are completed. The
 checkout currently has no full raw dataset collection or historical full-run
 ledger, so no manuscript-scale empirical conclusion is claimed.
+
+Final record:
+
+- `D:\Conda\P12\python.exe -m pytest -q`: **46 passed**, 13 existing dependency warnings, and 7 subtests passed in 17.54 seconds.
+- `D:\Conda\P12\python.exe -m pytest -q tests/test_production_task_resume.py::ProductionResumeTests::test_worker_execution_and_resume_reconstruct_identical_task_inputs`: **1 passed** in 9.88 seconds. The isolated writer/resume path exited cleanly; the earlier Windows writer access violation was not reproducible in this run.
+- `D:\Conda\P12\python.exe -m compileall -q -f src tests`: completed with no compile errors. The two pre-existing `invalid escape sequence \\D` warnings in `src/analysis/structural_analysis.py` remain unrelated. `git diff --check` passed.
+- Bounded production smoke ran in a disposable source copy with two synthetic configured datasets, two seeds, one fold, clean plus Gaussian noise, `Raw`, `Raw_Capped`, `Raw_Full`, and `AutoFE_Baseline`, logistic regression, one worker, 30-second task timeout, one attempt, and FSVA diagnostics capped at 16 rows. The manifest declared **40 intended tasks** (8 precompute + 32 model); **32 completed** (8 precompute + 24 model rows in the ledger) and **8 model tasks remained pending** after the declared stop limit was reached at a dataset boundary. There were no failures, timeouts, or skips, with **32 attempts**, **32 durable results**, and **24 diagnostic-bearing ledger rows**. The ledger contained all four declared pipelines. The smoke source copy was removed after inspection.
+- The active sensitivity CLI read that smoke snapshot and wrote **60 summary rows** plus coverage, pair, regime, bound, leave-one-dataset-out, cutoff, and exclusion artifacts. The provenance package and read-only verifier returned `overall_status: valid`; protocol and seed-scheme checks were valid, synthetic dataset bytes were hashed, and the remaining configured datasets were explicitly unavailable.
+- The current repository contains no raw benchmark CSVs or full result ledger. No full benchmark, manuscript, or historical claim was generated. The existing `.venv` was not removed; all commands used Conda `P12`.
+
+Commits pushed to `origin/revision/leakage-seed-stability`:
+
+- `4dcb8ef` — Add incomplete-run sensitivity analysis.
+- `b4b7b1a` — Add provenance packaging and verification.
+
+Remote verification matched local `HEAD` at
+`b4b7b1a1e9960583104f99b893ce81ddd0d42941`; the working tree is clean.
