@@ -85,6 +85,23 @@ class TaskManifestTests(unittest.TestCase):
             ExecutionConfig(max_workers=0)
         self.assertEqual(scientific_task_id({"dataset": "d1"})[:5], "task_")
 
+    def test_existing_run_rejects_changed_configuration_and_task_grid(self) -> None:
+        records = build_task_records(["d1"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
+        store = self._store(records)
+        with self.assertRaises(ManifestConflictError):
+            store.create_run("run_test", {"protocol_version": "changed", "seed_scheme_version": "test_seed", "execution": ExecutionConfig(max_workers=1, max_attempts=2).to_dict()}, records)
+        changed_records = build_task_records(["d1", "d2"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
+        with self.assertRaises(ManifestConflictError):
+            store.create_run("run_test", {"protocol_version": "test_protocol", "seed_scheme_version": "test_seed", "execution": ExecutionConfig(max_workers=1, max_attempts=2).to_dict()}, changed_records)
+
+    def test_planned_missing_dataset_is_explicitly_skipped(self) -> None:
+        records = build_task_records(["missing"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], data_paths={"missing": self.directory / "absent.csv"})
+        store = self._store(records)
+        counts = store.state_counts("run_test")
+        self.assertEqual(counts["skipped"], len(records))
+        self.assertEqual(counts["pending"], 0)
+        self.assertTrue(all(record["planned_skip_reason"] == "dataset_unavailable" for record in records))
+
     def test_stale_attempt_recovery_and_result_reconciliation(self) -> None:
         records = build_task_records(["d1"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
         store = self._store(records)

@@ -421,13 +421,19 @@ class ManifestStore:
         cutoff = time.time() - stale_after_seconds
         recovered = 0
         with self._connect() as connection:
+            run_row = connection.execute("SELECT config_json FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            try:
+                max_attempts = int(json.loads(run_row["config_json"]).get("execution", {}).get("max_attempts", 1)) if run_row else 1
+            except (TypeError, ValueError, json.JSONDecodeError):
+                max_attempts = 1
             rows = connection.execute("SELECT attempt_id, scientific_task_id, started_at FROM attempts WHERE run_id = ? AND state = 'running'", (run_id,)).fetchall()
             for row in rows:
                 started = datetime.fromisoformat(row["started_at"]).timestamp()
                 if started <= cutoff:
                     task = connection.execute("SELECT attempt_count FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, row["scientific_task_id"])).fetchone()
                     self._finish_attempt(connection, run_id, row["attempt_id"], "failed", outcome="coordinator_crash")
-                    next_state = "pending" if retry else "failed"
+                    retry_allowed = retry and task is not None and int(task["attempt_count"]) < max_attempts
+                    next_state = "pending" if retry_allowed else "failed"
                     connection.execute("UPDATE tasks SET state = ?, outcome_reason = 'coordinator_crash', active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (next_state, _now(), run_id, row["scientific_task_id"]))
                     recovered += 1
         return recovered
