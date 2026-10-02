@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon, friedmanchisquare
 
+from src.dataset_statistics import AnalysisConfig, run_dataset_level_analysis
 from src.protocol import results_ledger_path
 
 
@@ -32,9 +33,13 @@ def cliffs_delta(x: np.ndarray, y: np.ndarray) -> float:
 
 def run_friedman_nemenyi(data: pd.DataFrame, value_col: str, group_col: str, block_col: str):
     """
-    Run Friedman test and Nemenyi post-hoc on a DataFrame.
+    Legacy pooled-row Friedman/Nemenyi helper.
+
+    Corrected confirmatory analysis uses :func:`run_dataset_level_analysis`;
+    this function remains only for historical exploratory notebooks.
     Returns the p-value of the Friedman test and the Nemenyi p-value matrix.
     """
+    warnings.warn("Pooled-row Friedman/Nemenyi is legacy exploratory output; use dataset-level analysis.", RuntimeWarning)
     try:
         import scikit_posthocs as sp
     except ImportError:
@@ -65,109 +70,22 @@ def run_wilcoxon_analysis(
     output_path: str | Path = "reports/tables/statistical_results.csv",
     alpha: float = 0.05,
 ) -> pd.DataFrame:
-    """Run per-dataset Wilcoxon tests on paired cross-validation outcomes with Effect Sizes."""
-    
+    """Run the active dataset-cluster analysis and persist its summaries.
+
+    The historical row-level Wilcoxon implementation is intentionally no
+    longer used for corrected outputs.  This compatibility entry point keeps
+    the old command name while applying the versioned dataset-level contract.
+    """
     input_path = Path(final_results_path)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Results file not found: {input_path}")
-        
-    if input_path.suffix == ".jsonl":
-        # Aggregate the stream first
-        records = []
-        with open(input_path, "r") as f:
-            import json
-            for line in f:
-                if line.strip():
-                    records.append(json.loads(line))
-        results = pd.DataFrame(records)
-    else:
-        results = pd.read_csv(input_path)
-        
-    # Compare Raw against the active AutoFE baseline.  ``AutoFE`` is retained
-    # as a legacy alias for older ledgers; corrected ledgers use the explicit
-    # ``AutoFE_Baseline`` identity.
-    # The experimental unit is a single Fold outcome for a specific Condition and Seed and Model
-    # So we pair them on [dataset, seed, fold, condition, model]
-    
-    required_cols = {"dataset", "seed", "fold", "condition", "pipeline", "model", "roc_auc"}
-    missing_cols = required_cols.difference(results.columns)
-    if missing_cols:
-        raise KeyError(f"Missing columns: {missing_cols}")
-        
-    results = results.dropna(subset=["roc_auc"]).copy()
-    if results.empty:
-        raise ValueError("No valid rows for stats.")
-        
-    # Pair by all variables except pipeline
-    pair_cols = ["dataset", "seed", "fold", "condition", "model"]
-    
-    pivoted = results.pivot(index=pair_cols, columns="pipeline", values="roc_auc").reset_index()
-    autofe_name = "AutoFE_Baseline" if "AutoFE_Baseline" in pivoted.columns else "AutoFE"
-    if "Raw" not in pivoted.columns or autofe_name not in pivoted.columns:
-        raise ValueError("Both 'Raw' and an AutoFE baseline pipeline must exist to run paired tests.")
-        
-    pivoted = pivoted.dropna(subset=["Raw", autofe_name])
-    
-    dataset_rows = []
-    
-    for dataset, group in pivoted.groupby("dataset"):
-        scores_raw = group["Raw"].to_numpy(dtype=float)
-        scores_autofe = group[autofe_name].to_numpy(dtype=float)
-        
-        if len(scores_raw) >= 2 and not np.allclose(scores_raw, scores_autofe):
-            _stat, p_value = wilcoxon(scores_autofe, scores_raw, alternative="two-sided")
-            p_value_float = float(p_value)
-        else:
-            p_value_float = float("nan")
-            
-        effect_size = cliffs_delta(scores_autofe, scores_raw)
-        
-        mean_raw = float(np.mean(scores_raw))
-        mean_autofe = float(np.mean(scores_autofe))
-        
-        if np.isnan(mean_raw) or np.isnan(mean_autofe):
-            winner = "undetermined"
-        elif mean_autofe > mean_raw:
-            winner = "AutoFE"
-        elif mean_raw > mean_autofe:
-            winner = "Raw"
-        else:
-            winner = "tie"
-            
-        dataset_rows.append({
-            "dataset": dataset,
-            "n_pairs": len(scores_raw),
-            "raw_mean_auc": mean_raw,
-            "autofe_mean_auc": mean_autofe,
-            "mean_diff": mean_autofe - mean_raw,
-            "cliffs_delta": effect_size,
-            "p_value": p_value_float,
-            "winner": winner
-        })
-        
-    stats_df = pd.DataFrame(dataset_rows)
-    stats_df = stats_df.sort_values("dataset")
-    
-    # Apply Benjamini-Hochberg Multiple Comparison Correction
-    try:
-        from statsmodels.stats.multitest import multipletests
-        valid_mask = stats_df["p_value"].notna()
-        stats_df["corrected_p_value"] = np.nan
-        stats_df["significant"] = False
-        if valid_mask.any():
-            _, corrected_p, _, _ = multipletests(stats_df.loc[valid_mask, "p_value"], alpha=alpha, method="fdr_bh")
-            stats_df.loc[valid_mask, "corrected_p_value"] = corrected_p
-            stats_df.loc[valid_mask, "significant"] = corrected_p < alpha
-    except ImportError:
-        warnings.warn("statsmodels not found. Falling back to uncorrected p-values.")
-        stats_df["corrected_p_value"] = stats_df["p_value"]
-        stats_df["significant"] = stats_df["p_value"] < alpha
-    
     out_path = Path(output_path)
+    bundle = run_dataset_level_analysis(
+        input_path,
+        output_dir=out_path.parent / "dataset_level",
+        config=AnalysisConfig(alpha=alpha),
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    stats_df.to_csv(out_path, index=False)
-    
-    return stats_df
+    bundle.summaries.to_csv(out_path, index=False)
+    return bundle.summaries
 
 if __name__ == "__main__":
     run_wilcoxon_analysis()

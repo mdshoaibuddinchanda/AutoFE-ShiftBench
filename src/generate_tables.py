@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as ss
 
+from src.dataset_statistics import AnalysisInputError, AnalysisConfig, run_dataset_level_analysis
 from src.protocol import results_ledger_path
 
 
@@ -253,11 +254,37 @@ def generate_table_10_robustness_score(df: pd.DataFrame):
         
     return out
 
+
+def generate_table_11_dataset_level_inference(summaries: pd.DataFrame):
+    """Render the active dataset-cluster estimates and Holm decisions."""
+    if summaries.empty:
+        return "## Table 11: Dataset-Level Paired Inference\n\n*(No corrected analysis output available)*\n"
+    out = "## Table 11: Dataset-Level Paired Inference\n\n"
+    out += "*Dataset is the independent unit; folds, seeds, conditions and models remain paired within each stratum.*\n\n"
+    out += "| Stratum | Datasets | Paired tasks | Estimate (B-A) | CI lower | CI upper | Raw p | Holm p | Decision |\n"
+    out += "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n"
+    for row in summaries.itertuples():
+        fmt = lambda value: "NA" if pd.isna(value) else f"{float(value):.4f}"
+        decision = "unsupported" if getattr(row, "status", "complete") not in {"complete", "all_zero_effect"} else ("reject" if bool(getattr(row, "rejected_holm", False)) else "retain")
+        out += f"| {row.stratum} | {int(row.n_datasets)} | {int(row.n_paired_tasks)} | {fmt(row.estimate_b_minus_a)} | {fmt(row.ci_lower)} | {fmt(row.ci_upper)} | {fmt(row.p_value)} | {fmt(row.p_value_adjusted_holm)} | {decision} |\n"
+    return out
+
 def generate_all_tables():
     df = _load_data()
     out_dir = Path("reports/tables")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "q1_tables_v2.md"
+    corrected_summaries = pd.DataFrame()
+    if Path(results_ledger_path()).exists():
+        try:
+            corrected_summaries = run_dataset_level_analysis(
+                results_ledger_path(),
+                output_dir=out_dir / "dataset_level",
+                config=AnalysisConfig(),
+            ).summaries
+        except AnalysisInputError as exc:
+            corrected_summaries = pd.DataFrame()
+            print(f"Corrected dataset-level analysis unavailable: {exc}")
     
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("# Q1 Journal Tables (Advanced Statistics)\n\n")
@@ -271,6 +298,7 @@ def generate_all_tables():
         f.write(generate_table_8_feature_stability(df) + "\n\n")
         f.write(generate_table_9_overfitting_gap(df) + "\n\n")
         f.write(generate_table_10_robustness_score(df) + "\n\n")
+        f.write(generate_table_11_dataset_level_inference(corrected_summaries) + "\n\n")
         
     print(f"Generated 10 advanced tables in {out_path.absolute()}")
 

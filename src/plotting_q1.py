@@ -16,6 +16,7 @@ import seaborn as sns
 import scikit_posthocs as sp
 import scipy.stats as ss
 
+from src.dataset_statistics import AnalysisConfig, AnalysisInputError, run_dataset_level_analysis
 from src.protocol import results_ledger_path
 
 
@@ -415,6 +416,19 @@ def generate_all(
     df = _load_data(results_path, datasets=datasets)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Keep publication figures traceable to the corrected dataset-level
+    # contract.  Existing exploratory figures still operate on their declared
+    # plotting rows, while confirmatory summaries are written separately.
+    if Path(results_path).exists():
+        try:
+            run_dataset_level_analysis(
+                results_path,
+                output_dir=out_dir / "dataset_level_analysis",
+                config=AnalysisConfig(),
+            )
+        except AnalysisInputError as exc:
+            (out_dir / "dataset_level_analysis_unavailable.txt").write_text(str(exc), encoding="utf-8")
 
     plot_fig2_dataset_diversity(out_dir, datasets=datasets or PRIMARY_DATASETS, dpi=dpi)
     plot_fig3_pipeline_ranking(df, out_dir, dpi=dpi)
