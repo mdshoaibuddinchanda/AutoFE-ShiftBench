@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from src.protocol import cache_root, results_ledger_path
+from src.task_manifest import ManifestStore
 
 
 def check_progress():
@@ -26,6 +27,20 @@ def check_progress():
     with open(config_path) as f:
         config = yaml.safe_load(f)
     datasets = config.get("datasets", [])
+
+    manifest_dir = Path("reports/manifests")
+    manifest_dbs = sorted(manifest_dir.glob("*.db"), key=lambda path: path.stat().st_mtime, reverse=True) if manifest_dir.exists() else []
+    if manifest_dbs:
+        manifest_db = manifest_dbs[0]
+        store = ManifestStore(manifest_db)
+        with store._connect() as connection:
+            run_row = connection.execute("SELECT run_id, status, updated_at FROM runs ORDER BY updated_at DESC LIMIT 1").fetchone()
+        if run_row is not None:
+            run_id = run_row["run_id"]
+            print(f"  Active manifest: {manifest_db} (run {run_id}, {run_row['status']})")
+            print(f"  Task states: {store.state_counts(run_id)}")
+            print(f"  Attempt states: {store.attempt_counts(run_id)}")
+            print("  Cache and diagnostic artifact counts below are separate from completed model-task counts.")
 
     # Expected counts per dataset
     n_pipelines = 14
