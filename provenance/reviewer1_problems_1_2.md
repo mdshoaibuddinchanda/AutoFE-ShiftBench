@@ -57,7 +57,7 @@ Environment: existing Conda `P12`, Python 3.12.14. The earlier-created `.venv` d
 - `conda run -n P12 python -m compileall -q -f src tests` — exited successfully. It reported two pre-existing invalid-escape `SyntaxWarning`s for `\Delta` strings in `src/analysis/structural_analysis.py`; that unrelated math-label formatting was not changed.
 - `git diff --check` — passed.
 - The separate-process test compared derived seeds, split indices, and corruption output under `PYTHONHASHSEED=1` and `PYTHONHASHSEED=9127` — passed.
-- Production smoke task limits: one synthetic dataset, one configured repetition seed, one of five folds, one Gaussian-noise condition; precompute created all 14 configured pipeline caches for that fold/condition, then one spawned `Raw` + logistic-regression training task wrote one result. A second worker invocation skipped via checkpoint. No full benchmark was run.
+- Production smoke task limits: one synthetic dataset, one configured repetition seed, one of five folds, one clean condition and one Gaussian-noise training condition; precompute created all 14 configured pipeline caches for each condition, then one spawned `Raw` + logistic-regression training task wrote one result. A second worker invocation skipped via checkpoint. No full benchmark was run.
 - The repository had no pre-existing automated test suite or declared linter/type-check configuration; the focused suite added for this work is the verification suite.
 
 ## Historical results and compatibility
@@ -85,7 +85,7 @@ The follow-up audit re-read the active runner, feature-generation and selection 
 
 ### Problem 4 — arithmetic operator ablations
 
-`src/operator_registry.py` is the authoritative executable registry (`arithmetic_operator_registry_v1`). The required sets are:
+`src/operator_registry.py` is the authoritative executable registry (`arithmetic_operator_registry_v1`) with safe arithmetic semantics version `safe_division_1e-12_clip_1e12_v1`. The required sets are:
 
 | Identity | Operators |
 | --- | --- |
@@ -108,11 +108,11 @@ The diagnostics are descriptive and frozen-map measurements. They do not refit p
 
 ## Verification for problems 3–5
 
-- `conda run -n P12 python -m unittest discover -s tests -v` — **23 tests passed in 8.086 seconds** in the final run; no rerun was needed.
+- `conda run -n P12 python -m unittest discover -s tests -v` — **23 tests passed in 14.017 seconds** in the final run; no rerun was needed.
 - `conda run -n P12 python -m compileall -q -f src tests` — successful with the two pre-existing `\Delta` invalid-escape warnings.
 - `git diff --check` — passed after the reader/documentation updates.
 - Baseline/operator fixtures verify full versus cap-matched dimensions, mixed-type handling, training-only selected identities, exact operator membership, forbidden nested operators, safe division, deterministic candidate IDs and tie ordering, analytic derivatives versus finite differences, raw controls, amplification budgets, and selection stability.
-- The production smoke task is synthetic and bounded: one dataset, one seed, one fold, one Gaussian-noise training condition, all configured baseline/operator pipelines precomputed, one spawned `Raw`/logistic-regression worker, candidate histories and FSVA artifacts generated, one JSONL result written, and a resumed task skipped by checkpoint. No full benchmark was run.
-- Production precompute cost was measured in P12 on that same 60-row smoke fixture: 14 pipelines completed in **0.3684 seconds**, producing 14 history JSONL files (100,156 bytes total), 14 FSVA JSON files (51,669 bytes total), and 57 cache/meta files (237,199 bytes total). This is a small-fixture engineering measurement, not a full-benchmark runtime estimate.
+- The production smoke task is synthetic and bounded: one dataset, one seed, one fold, two conditions (clean and Gaussian-noise training corruption), all 14 configured baseline/operator pipelines precomputed for both conditions (28 pipeline-condition units), one spawned `Raw`/logistic-regression worker, candidate histories and FSVA artifacts generated, one JSONL result written, and a resumed task skipped by checkpoint. No full benchmark was run.
+- Production precompute cost was measured in P12 on that same 60-row smoke fixture: 28 pipeline-condition units completed in **0.6215 seconds**, producing 28 history JSONL files (253,393 bytes total), 28 FSVA JSON files (134,606 bytes total), and 113 cache/meta files (507,492 bytes total). This is a small-fixture engineering measurement, not a full-benchmark runtime estimate.
 
 Problems 6–10 remain deferred: dataset-level/hierarchical inference; complete task manifests and failure accounting; broader stopping/recovery; incomplete-run sensitivity analysis; and full dataset/code/environment/cache/analysis provenance. The diagnostic schema and pipeline identities are minimal dependencies for this stage, not a claim that problem 10 is complete.

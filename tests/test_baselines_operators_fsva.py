@@ -12,6 +12,7 @@ from pandas.testing import assert_frame_equal
 from src.feature_engineering import DFSConfig, expand_features_with_dfs
 from src.fsva import compute_empirical_amplification, compute_jacobian_diagnostic, selection_stability, validate_jacobian_finite_difference
 from src.operator_registry import (
+    FINITE_CLIP,
     OPERATOR_SET_REGISTRY,
     SAFE_DIVISION_EPSILON,
     candidate_id,
@@ -130,6 +131,8 @@ class BaselineOperatorFsvaTests(unittest.TestCase):
         matching = [row for row in div_meta["selection_history"] if row["expression_text"] == expression_to_string(div_expr)]
         self.assertEqual(len(matching), 1)
         self.assertEqual(matching[0]["validity"]["protected_count"], 2)
+        self.assertIn("rejection_reason", matching[0])
+        self.assertIn("final_retained", matching[0])
 
     def test_jacobian_and_amplification_match_known_mapping(self) -> None:
         frame = pd.DataFrame({"a": [2.0, 3.0], "b": [4.0, 5.0]})
@@ -140,12 +143,18 @@ class BaselineOperatorFsvaTests(unittest.TestCase):
         self.assertEqual(result["diagnostic_status"], "diagnostic_complete")
         self.assertAlmostEqual(result["per_output"][0]["mean_l2"], np.sqrt(2.0), places=8)
         self.assertGreater(result["selected"]["dimension_adjusted_frobenius"], 0.0)
+        self.assertEqual(result["unsupported_coordinates"], ["categorical_level_changes", "estimator_predictions"])
         validation = validate_jacobian_finite_difference(frame, [add, mul, div], epsilon=1e-6)
         self.assertEqual(validation["status"], "validated")
         self.assertLess(validation["max_absolute_error"], 1e-4)
         amp = compute_empirical_amplification(frame, [mul], raw_control_expressions=[raw_expression("a"), raw_expression("b")], magnitudes=[1e-3, 1e-2], max_rows=8, random_state=3)
         self.assertEqual(len(amp["magnitudes"]), 2)
         self.assertTrue(all(row["status"] == "diagnostic_complete" for row in amp["magnitudes"]))
+
+        clipped = pd.DataFrame({"a": [FINITE_CLIP * 2.0], "b": [1.0]})
+        clipped_add = op_expression("add_numeric", raw_expression("a"), raw_expression("b"))
+        clipped_result = compute_jacobian_diagnostic(clipped, [clipped_add])
+        self.assertGreater(clipped_result["selected"]["status"]["nonsmooth_count"], 0)
 
     def test_selection_stability_handles_empty_and_candidate_availability(self) -> None:
         value = selection_stability([

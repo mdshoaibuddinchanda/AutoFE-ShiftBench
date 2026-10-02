@@ -84,6 +84,9 @@ class ProductionResumeTests(unittest.TestCase):
                         "diagnostic_config",
                     )
                 }
+                clean_precompute_task = dict(precompute_task)
+                clean_precompute_task.update({"condition": "clean", "shift_family": "clean", "severity": 0.0})
+                self.assertEqual(pipeline_runner.precompute_unit(clean_precompute_task), "smoke")
                 self.assertEqual(pipeline_runner.precompute_unit(precompute_task), "smoke")
                 first = pipeline_runner.get_data_splits(
                     data_path,
@@ -96,6 +99,19 @@ class ProductionResumeTests(unittest.TestCase):
                     task["diagnostics_enabled"],
                     task["diagnostic_config"],
                 )
+                clean_inputs = pipeline_runner.get_data_splits(
+                    data_path,
+                    "smoke",
+                    17,
+                    1,
+                    "clean",
+                    "clean",
+                    0.0,
+                    task["diagnostics_enabled"],
+                    task["diagnostic_config"],
+                )
+                for pipeline_name in pipeline_runner.PIPELINE_NAMES:
+                    self.assertEqual(clean_inputs[4][pipeline_name]["diagnostic_status"], "diagnostic_complete")
                 resumed_inputs = pipeline_runner.get_data_splits(
                     data_path,
                     "smoke",
@@ -130,8 +146,20 @@ class ProductionResumeTests(unittest.TestCase):
                     )
                     self.assertEqual(first[4][pipeline_name]["operator_set_id"], resumed_inputs[4][pipeline_name]["operator_set_id"])
                     self.assertEqual(first[4][pipeline_name]["diagnostic_status"], "diagnostic_complete")
-                    self.assertTrue(Path(first[4][pipeline_name]["history_path"]).exists())
-                    self.assertTrue(Path(first[4][pipeline_name]["diagnostic_path"]).exists())
+                    history_path = Path(first[4][pipeline_name]["history_path"])
+                    diagnostic_path = Path(first[4][pipeline_name]["diagnostic_path"])
+                    self.assertTrue(history_path.exists())
+                    self.assertTrue(diagnostic_path.exists())
+                    with history_path.open(encoding="utf-8") as history_file:
+                        history_event = json.loads(next(history_file))
+                    self.assertEqual(history_event["dataset"], "smoke")
+                    self.assertEqual(history_event["pipeline"], pipeline_name)
+                    self.assertIn("requested_cap", history_event)
+                    self.assertIn("rejection_reason", history_event)
+                    with diagnostic_path.open(encoding="utf-8") as diagnostic_file:
+                        diagnostic = json.load(diagnostic_file)
+                    self.assertEqual(diagnostic["diagnostic_status"], "diagnostic_complete")
+                    self.assertEqual(diagnostic["task"]["pipeline"], pipeline_name)
 
                 context = mp.get_context("spawn")
                 result_queue = context.Queue()

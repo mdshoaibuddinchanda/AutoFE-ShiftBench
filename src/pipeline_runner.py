@@ -43,6 +43,7 @@ from src.evaluation import (
     compute_jaccard_similarity,
 )
 from src.feature_engineering import (
+    BASE_FEATURE_POLICY_VERSION,
     CAP_POLICY_VERSION,
     expand_features_with_dfs,
     DFSConfig,
@@ -54,7 +55,7 @@ from src.fsva import (
     compute_jacobian_diagnostic,
     validate_jacobian_finite_difference,
 )
-from src.operator_registry import OPERATOR_REGISTRY_VERSION, raw_expression
+from src.operator_registry import OPERATOR_REGISTRY_VERSION, OPERATOR_SEMANTICS_VERSION, raw_expression
 from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
@@ -222,8 +223,11 @@ def pipeline_identity_token(pipeline_name: str) -> str:
         [
             pipeline_name,
             OPERATOR_REGISTRY_VERSION,
+            OPERATOR_SEMANTICS_VERSION,
             cfg.operator_set_id,
             cfg.baseline_kind or "autofe",
+            CAP_POLICY_VERSION,
+            BASE_FEATURE_POLICY_VERSION,
             f"cap{cfg.max_features if cfg.max_features is not None else 'all'}",
             f"base{cfg.max_base_features if cfg.max_base_features is not None else 'all'}",
             f"sel{cfg.selection_method}",
@@ -316,6 +320,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
         meta["pipeline_identity"] = pipeline_identity_token(p_name)
         meta["operator_registry_version"] = OPERATOR_REGISTRY_VERSION
+        meta["operator_semantics_version"] = OPERATOR_SEMANTICS_VERSION
         meta["operator_set_id"] = cfg.operator_set_id
         meta["operator_set"] = list(cfg.trans_primitives)
         meta["cap_policy_version"] = meta.get("cap_policy_version", CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1")
@@ -338,6 +343,10 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                 "pipeline_identity": pipeline_identity_token(p_name),
                 "operator_set_id": cfg.operator_set_id,
                 "cap_policy_version": meta.get("cap_policy_version"),
+                "requested_cap": meta.get("requested_cap"),
+                "requested_base_cap": meta.get("requested_base_cap"),
+                "candidate_count": meta.get("candidate_count"),
+                "selection_stage": meta.get("selector_identity"),
             }
             with history_path.open("w", encoding="utf-8") as history_file:
                 for event in history:
@@ -350,32 +359,55 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             from src.fsva import expression_from_dict
             selected_exprs = [expression_from_dict(item) for item in selected_expressions]
             raw_exprs = [raw_expression(column) for column in x_train.columns]
-            jac = compute_jacobian_diagnostic(
-                x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                max_rows=max_rows, random_state=diag_seed,
-            )
-            amp = compute_empirical_amplification(
-                x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                magnitudes=diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES),
-                max_rows=max_rows, random_state=diag_seed,
-            )
-            derivative_validation = validate_jacobian_finite_difference(
-                x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
-            )
-            diagnostics = {
-                "schema_version": FSVA_SCHEMA_VERSION,
-                "diagnostic_status": "diagnostic_complete",
-                "task": task_context,
-                "settings": {"max_rows": max_rows, "random_state": diag_seed, "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES))},
-                "jacobian": jac,
-                "empirical_amplification": amp,
-                "derivative_validation": derivative_validation,
+            settings = {
+                "max_rows": max_rows,
+                "random_state": diag_seed,
+                "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES)),
             }
+            try:
+                jac = compute_jacobian_diagnostic(
+                    x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                    max_rows=max_rows, random_state=diag_seed,
+                )
+                amp = compute_empirical_amplification(
+                    x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                    magnitudes=settings["magnitudes"],
+                    max_rows=max_rows, random_state=diag_seed,
+                )
+                derivative_validation = validate_jacobian_finite_difference(
+                    x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
+                )
+                diagnostic_status = "diagnostic_complete"
+                diagnostics = {
+                    "schema_version": FSVA_SCHEMA_VERSION,
+                    "diagnostic_status": diagnostic_status,
+                    "task": task_context,
+                    "settings": settings,
+                    "jacobian": jac,
+                    "empirical_amplification": amp,
+                    "derivative_validation": derivative_validation,
+                }
+            except Exception as diagnostic_error:
+                # Feature caches and benchmark results remain usable, but the
+                # artifact is explicitly marked incomplete and cannot be
+                # mistaken for diagnostic-complete evidence.
+                diagnostic_status = "diagnostic_failed"
+                diagnostics = {
+                    "schema_version": FSVA_SCHEMA_VERSION,
+                    "diagnostic_status": diagnostic_status,
+                    "task": task_context,
+                    "settings": settings,
+                    "error_type": type(diagnostic_error).__name__,
+                    "error_message": str(diagnostic_error),
+                }
             fsva_path.write_text(json.dumps(diagnostics, sort_keys=True), encoding="utf-8")
             meta["diagnostic_schema_version"] = FSVA_SCHEMA_VERSION
-            meta["diagnostic_status"] = "diagnostic_complete"
+            meta["diagnostic_status"] = diagnostic_status
             meta["diagnostic_path"] = str(fsva_path)
             meta["history_path"] = str(history_path)
+        else:
+            meta["diagnostic_schema_version"] = None
+            meta["diagnostic_status"] = "diagnostic_disabled"
 
         res_pipelines[p_name] = (x_train_fe, x_test_fe)
         res_meta[p_name] = meta
@@ -610,6 +642,7 @@ def train_unit(kwargs):
             "model_seed": model_seed,
             "distance_sample_seed": distance_seed,
             "operator_registry_version": meta.get("operator_registry_version"),
+            "operator_semantics_version": meta.get("operator_semantics_version"),
             "operator_set_id": meta.get("operator_set_id"),
             "operator_set": meta.get("operator_set", []),
             "operator_set_manifest": meta.get("operator_set_manifest"),
@@ -619,8 +652,11 @@ def train_unit(kwargs):
             "requested_base_cap": meta.get("requested_base_cap"),
             "eligible_base_feature_count": meta.get("eligible_base_feature_count"),
             "candidate_count": meta.get("candidate_count"),
+            "generated_candidate_count": meta.get("num_generated"),
+            "raw_candidate_count": meta.get("num_original"),
             "retained_raw_count": meta.get("retained_raw_count"),
             "retained_generated_count": meta.get("retained_generated_count"),
+            "retained_feature_count": meta.get("num_selected"),
             "actual_estimator_input_dimension": meta.get("actual_estimator_input_dimension"),
             "selector_identity": meta.get("selector_identity"),
             "selected_feature_identities": meta.get("selected_feature_identities", []),

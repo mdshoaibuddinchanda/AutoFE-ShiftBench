@@ -16,6 +16,7 @@ import numpy as np
 
 
 OPERATOR_REGISTRY_VERSION = "arithmetic_operator_registry_v1"
+OPERATOR_SEMANTICS_VERSION = "safe_division_1e-12_clip_1e12_v1"
 SAFE_DIVISION_EPSILON = 1e-12
 FINITE_CLIP = 1e12
 
@@ -53,6 +54,7 @@ def operator_set_manifest() -> dict[str, dict[str, Any]]:
         set_id: {
             "operator_set_id": set_id,
             "registry_version": OPERATOR_REGISTRY_VERSION,
+            "semantics_version": OPERATOR_SEMANTICS_VERSION,
             "operators": list(operators),
         }
         for set_id, operators in OPERATOR_SET_REGISTRY.items()
@@ -129,6 +131,7 @@ def expression_from_dict(value: dict[str, Any]) -> Expression:
 def candidate_id(expression: Expression) -> str:
     payload = {
         "registry_version": OPERATOR_REGISTRY_VERSION,
+        "semantics_version": OPERATOR_SEMANTICS_VERSION,
         "expression": expression_to_dict(expression),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

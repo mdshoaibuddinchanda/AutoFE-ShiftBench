@@ -12,6 +12,7 @@ from sklearn.feature_selection import mutual_info_classif
 from src.operator_registry import (
     OPERATOR_REGISTRY,
     OPERATOR_REGISTRY_VERSION,
+    OPERATOR_SEMANTICS_VERSION,
     OPERATOR_SET_REGISTRY,
     Expression,
     candidate_id,
@@ -201,6 +202,7 @@ def expand_features_with_dfs(
     selected = list(selected)
     selected_set = set(selected)
 
+    rank_by_id = {fid: rank for rank, fid in enumerate(ranked, start=1)}
     history: list[dict[str, Any]] = []
     for fid in train_matrix.columns:
         expr = expression_by_id[fid]
@@ -218,7 +220,11 @@ def expand_features_with_dfs(
             "eligible": True,
             "evaluated": True,
             "selected": selected_flag,
+            "final_retained": selected_flag,
+            "candidate_rank": rank_by_id[fid],
             "decision": "selected" if selected_flag else "not_selected_by_cap",
+            "rejection_reason": None if selected_flag else "post_candidate_cap",
+            "pruned": not selected_flag,
             "validity": validity[fid],
         })
     for column in excluded_base:
@@ -235,7 +241,11 @@ def expand_features_with_dfs(
             "eligible": False,
             "evaluated": False,
             "selected": False,
+            "final_retained": False,
+            "candidate_rank": None,
             "decision": "not_generated_by_base_cap",
+            "rejection_reason": "base_feature_cap",
+            "pruned": True,
             "validity": {},
         })
     history.sort(key=lambda row: row["candidate_id"])
@@ -247,6 +257,7 @@ def expand_features_with_dfs(
     raw_selected = len(selected) - generated_selected
     metadata: dict[str, Any] = {
         "operator_registry_version": OPERATOR_REGISTRY_VERSION,
+        "operator_semantics_version": OPERATOR_SEMANTICS_VERSION,
         "operator_set_id": cfg.operator_set_id,
         "operator_set": list(validate_operator_set(cfg.operator_set_id)),
         "operator_set_manifest": operator_set_manifest()[cfg.operator_set_id],

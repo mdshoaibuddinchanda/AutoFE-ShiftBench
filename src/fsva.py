@@ -51,29 +51,32 @@ def _derivative(expression: Expression, frame: pd.DataFrame) -> tuple[np.ndarray
         "nonfinite_count": left_status.get("nonfinite_count", 0) + right_status.get("nonfinite_count", 0),
     }
     if operator == "add_numeric":
-        values = left_value + right_value
+        raw_values = left_value + right_value
         jac = left_jac + right_jac
     elif operator == "subtract_numeric":
-        values = left_value - right_value
+        raw_values = left_value - right_value
         jac = left_jac - right_jac
     elif operator == "multiply_numeric":
-        values = left_value * right_value
+        raw_values = left_value * right_value
         jac = left_jac * right_value[:, None] + right_jac * left_value[:, None]
     elif operator == "divide_numeric":
         safe = np.abs(right_value) >= SAFE_DIVISION_EPSILON
-        raw = np.zeros_like(left_value, dtype=float)
-        np.divide(left_value, right_value, out=raw, where=safe)
-        values = np.clip(np.where(np.isfinite(raw), raw, 0.0), -FINITE_CLIP, FINITE_CLIP)
+        raw_values = np.zeros_like(left_value, dtype=float)
+        np.divide(left_value, right_value, out=raw_values, where=safe)
         jac = np.zeros_like(left_jac)
-        valid = safe & np.isfinite(raw) & (np.abs(raw) <= FINITE_CLIP)
+        valid = safe & np.isfinite(raw_values) & (np.abs(raw_values) <= FINITE_CLIP)
         jac[valid] = (left_jac[valid] * right_value[valid, None] - right_jac[valid] * left_value[valid, None]) / (right_value[valid, None] ** 2)
         status["protected_count"] += int(np.count_nonzero(~safe))
         status["nonsmooth_count"] += int(np.count_nonzero(~valid))
     else:
         raise ValueError(f"Unsupported operator in expression: {operator}")
-    finite = np.isfinite(values) & np.all(np.isfinite(jac), axis=1)
+    finite = np.isfinite(raw_values) & np.all(np.isfinite(jac), axis=1)
+    clipped = finite & (np.abs(raw_values) > FINITE_CLIP)
+    valid = finite & ~clipped
     status["nonfinite_count"] += int(np.count_nonzero(~finite))
-    values = np.nan_to_num(values, nan=0.0, posinf=FINITE_CLIP, neginf=-FINITE_CLIP)
+    status["nonsmooth_count"] += int(np.count_nonzero(clipped))
+    values = np.clip(np.where(np.isfinite(raw_values), raw_values, 0.0), -FINITE_CLIP, FINITE_CLIP)
+    jac[~valid] = 0.0
     jac = np.nan_to_num(jac, nan=0.0, posinf=0.0, neginf=0.0)
     return values, jac, status
 
@@ -87,6 +90,7 @@ def _summary(jacobian: np.ndarray, *, status: dict[str, Any], method: str = "exa
     return {
         "matrix_norm": "frobenius",
         "norm_method": method,
+        "measurement_scope": "exact_on_sampled_rows",
         "frobenius_norm": fro,
         "dimension_adjusted_frobenius": float(fro / np.sqrt(max(n_outputs, 1))),
         "mean_output_l2": float(np.mean(per_output)) if per_output.size else 0.0,
@@ -122,6 +126,10 @@ def compute_jacobian_diagnostic(
         "input_coordinates": list(base_inputs.columns),
         "input_definition": "preprocessed_corrupted_training_rows; frozen during diagnostic",
         "output_definition": "selected_executed_arithmetic_features",
+        "unsupported_coordinates": [
+            "categorical_level_changes",
+            "estimator_predictions",
+        ],
         "sample_identity": {"random_state": int(random_state), "max_rows": int(max_rows)},
         "selected": _summary(jacobian, status=dict(statuses)),
         "per_output": [
@@ -146,12 +154,17 @@ def compute_jacobian_diagnostic(
     return result
 
 
-def _evaluate_mapping(expressions: list[Expression], frame: pd.DataFrame) -> np.ndarray:
+def _evaluate_mapping(
+    expressions: list[Expression], frame: pd.DataFrame, *, return_status: bool = False,
+) -> np.ndarray | tuple[np.ndarray, dict[str, int]]:
     outputs: list[np.ndarray] = []
+    status = Counter()
     for expression in expressions:
-        values, _jac, _status = _derivative(expression, frame)
+        values, _jac, expression_status = _derivative(expression, frame)
         outputs.append(values)
-    return np.stack(outputs, axis=1) if outputs else np.zeros((len(frame), 0))
+        status.update(expression_status)
+    values = np.stack(outputs, axis=1) if outputs else np.zeros((len(frame), 0))
+    return (values, dict(status)) if return_status else values
 
 
 def compute_empirical_amplification(
@@ -171,13 +184,17 @@ def compute_empirical_amplification(
     directions = rng.normal(size=sampled.shape)
     norms = np.linalg.norm(directions, axis=1, keepdims=True)
     directions = directions / np.where(norms == 0.0, 1.0, norms)
-    baseline = _evaluate_mapping(expressions, sampled)
-    raw_baseline = _evaluate_mapping(raw_expressions, sampled) if raw_expressions else None
+    baseline, baseline_status = _evaluate_mapping(expressions, sampled, return_status=True)
+    if raw_expressions:
+        raw_baseline, raw_status = _evaluate_mapping(raw_expressions, sampled, return_status=True)
+    else:
+        raw_baseline, raw_status = None, {}
     rows: list[dict[str, Any]] = []
     for magnitude in magnitudes:
         magnitude = float(magnitude)
         perturbed = sampled + magnitude * directions
-        changed = _evaluate_mapping(expressions, perturbed) - baseline
+        perturbed_values, perturbed_status = _evaluate_mapping(expressions, perturbed, return_status=True)
+        changed = perturbed_values - baseline
         input_norm = np.linalg.norm(magnitude * directions, axis=1)
         output_norm = np.linalg.norm(changed, axis=1)
         valid = input_norm > 0.0
@@ -189,13 +206,18 @@ def compute_empirical_amplification(
             "amplification_ratio_mean": float(np.mean(ratios)) if len(ratios) else None,
             "amplification_ratio_max": float(np.max(ratios)) if len(ratios) else None,
             "valid_rows": int(np.count_nonzero(valid)),
+            "baseline_validity": baseline_status,
+            "perturbed_validity": perturbed_status,
             "status": "diagnostic_complete" if len(ratios) else "zero_input_norm",
         }
         if raw_baseline is not None:
-            raw_changed = _evaluate_mapping(raw_expressions, perturbed) - raw_baseline
+            raw_perturbed, raw_perturbed_status = _evaluate_mapping(raw_expressions, perturbed, return_status=True)
+            raw_changed = raw_perturbed - raw_baseline
             raw_output_norm = np.linalg.norm(raw_changed, axis=1)
             raw_ratios = raw_output_norm[valid] / input_norm[valid] if np.any(valid) else np.array([], dtype=float)
             row["raw_control_amplification_ratio_mean"] = float(np.mean(raw_ratios)) if len(raw_ratios) else None
+            row["raw_control_baseline_validity"] = raw_status
+            row["raw_control_perturbed_validity"] = raw_perturbed_status
             row["dimension_adjusted_ratio"] = (
                 float(np.mean(ratios) / max(np.sqrt(len(expressions)), 1.0)) if len(ratios) else None
             )
