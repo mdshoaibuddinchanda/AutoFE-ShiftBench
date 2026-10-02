@@ -47,7 +47,14 @@ def generate_table_2_robustness(df: pd.DataFrame):
     out = "## Table 2: Robustness Under Distribution Shift\n\n"
     
     shifts = ["clean", "missing_0.1", "missing_0.3", "gaussian_0.1", "gaussian_0.3"]
-    pipelines = ["Raw", "AutoFE_Baseline", "AutoFE_NoMultiply"]
+    preferred = [
+        "Raw", "Raw_Full", "Raw_Capped", "AutoFE_Baseline",
+        "AutoFE_AddSub", "AutoFE_AddSubDiv", "AutoFE_NoDivision",
+        "AutoFE_NoMultiply", "AutoFE_MI", "AutoFE_Random",
+    ]
+    pipelines = [p for p in preferred if p in set(df["pipeline"].dropna())]
+    if not pipelines:
+        pipelines = ["Raw", "AutoFE", "AutoFE_NoMultiply"]
     
     out += "| Shift Condition | " + " | ".join(pipelines) + " |\n"
     out += "| :--- | " + " | ".join([":---:"] * len(pipelines)) + " |\n"
@@ -110,7 +117,12 @@ def generate_table_5_statistical_tests(df: pd.DataFrame):
     out += "| Comparison | N Pairs | p-value | Cohen's d | Meaning |\n"
     out += "| :--- | :---: | :---: | :---: | :--- |\n"
     
-    comparisons = [("Raw", "AutoFE_Baseline"), ("Raw", "AutoFE_NoMultiply"), ("AutoFE_Baseline", "AutoFE_NoMultiply")]
+    available = set(df["pipeline"].dropna())
+    baseline = "AutoFE_Baseline" if "AutoFE_Baseline" in available else "AutoFE"
+    comparisons = [("Raw", baseline)]
+    for candidate in ("Raw_Full", "Raw_Capped", "AutoFE_AddSub", "AutoFE_AddSubDiv", "AutoFE_NoDivision", "AutoFE_NoMultiply"):
+        if candidate in available:
+            comparisons.append(("Raw", candidate))
     
     for p1, p2 in comparisons:
         df1 = df[df["pipeline"] == p1].groupby(["dataset", "seed", "fold", "condition", "model"])["roc_auc"].mean()
@@ -160,7 +172,11 @@ def generate_table_7_win_tie_loss(df: pd.DataFrame):
     out += "| Comparison | Wins | Ties | Losses |\n"
     out += "| :--- | :---: | :---: | :---: |\n"
     
-    comparisons = [("Raw", "AutoFE_Baseline"), ("Raw", "AutoFE_NoMultiply")]
+    available = set(df["pipeline"].dropna())
+    baseline = "AutoFE_Baseline" if "AutoFE_Baseline" in available else "AutoFE"
+    comparisons = [("Raw", baseline)]
+    if "AutoFE_NoMultiply" in available:
+        comparisons.append(("Raw", "AutoFE_NoMultiply"))
     threshold = 0.001
     
     for p1, p2 in comparisons:

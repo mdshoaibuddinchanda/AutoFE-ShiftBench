@@ -83,7 +83,9 @@ def run_wilcoxon_analysis(
     else:
         results = pd.read_csv(input_path)
         
-    # We want to compare Pipeline A (Raw) vs B (AutoFE)
+    # Compare Raw against the active AutoFE baseline.  ``AutoFE`` is retained
+    # as a legacy alias for older ledgers; corrected ledgers use the explicit
+    # ``AutoFE_Baseline`` identity.
     # The experimental unit is a single Fold outcome for a specific Condition and Seed and Model
     # So we pair them on [dataset, seed, fold, condition, model]
     
@@ -100,16 +102,17 @@ def run_wilcoxon_analysis(
     pair_cols = ["dataset", "seed", "fold", "condition", "model"]
     
     pivoted = results.pivot(index=pair_cols, columns="pipeline", values="roc_auc").reset_index()
-    if "Raw" not in pivoted.columns or "AutoFE" not in pivoted.columns:
-        raise ValueError("Both 'Raw' and 'AutoFE' pipelines must exist to run paired tests.")
+    autofe_name = "AutoFE_Baseline" if "AutoFE_Baseline" in pivoted.columns else "AutoFE"
+    if "Raw" not in pivoted.columns or autofe_name not in pivoted.columns:
+        raise ValueError("Both 'Raw' and an AutoFE baseline pipeline must exist to run paired tests.")
         
-    pivoted = pivoted.dropna(subset=["Raw", "AutoFE"])
+    pivoted = pivoted.dropna(subset=["Raw", autofe_name])
     
     dataset_rows = []
     
     for dataset, group in pivoted.groupby("dataset"):
         scores_raw = group["Raw"].to_numpy(dtype=float)
-        scores_autofe = group["AutoFE"].to_numpy(dtype=float)
+        scores_autofe = group[autofe_name].to_numpy(dtype=float)
         
         if len(scores_raw) >= 2 and not np.allclose(scores_raw, scores_autofe):
             _stat, p_value = wilcoxon(scores_autofe, scores_raw, alternative="two-sided")

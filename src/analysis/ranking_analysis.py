@@ -66,19 +66,30 @@ def main():
     print("--- ROBUSTNESS INDEX ---")
     ri = df.groupby(["dataset", "model", "pipeline"])["f1_macro"].mean().reset_index()
     ri_wide = ri.pivot_table(index=["dataset", "model"], columns="pipeline", values="f1_macro")
-    ri_wide["Delta"] = ri_wide["AutoFE"] - ri_wide["Raw"]
+    autofe_name = "AutoFE_Baseline" if "AutoFE_Baseline" in ri_wide.columns else "AutoFE"
+    if "Raw" not in ri_wide.columns or autofe_name not in ri_wide.columns:
+        print("Missing Raw or AutoFE baseline pipeline data.")
+        return
+    ri_wide["Delta"] = ri_wide[autofe_name] - ri_wide["Raw"]
     print(ri_wide.groupby("model")["Delta"].mean().sort_values(ascending=False))
     
     # 2. Win/Tie/Loss Matrix
     print("\n--- WIN / TIE / LOSS (AutoFE vs Raw) ---")
     # Compare per dataset, fold, condition, model
-    pairs = df.pivot_table(index=["dataset", "seed", "fold", "condition", "model"], 
+    pairs = df.pivot_table(index=["dataset", "seed", "fold", "condition", "model"],
                            columns="pipeline", values="f1_macro").dropna()
+    if "Raw" not in pairs.columns:
+        print("Missing Raw pipeline data.")
+        return
+    autofe_name = "AutoFE_Baseline" if "AutoFE_Baseline" in pairs.columns else "AutoFE"
+    if autofe_name not in pairs.columns:
+        print("Missing AutoFE baseline pipeline data.")
+        return
     
     threshold = 0.001
-    wins = (pairs["AutoFE"] > pairs["Raw"] + threshold).sum()
-    ties = (np.abs(pairs["AutoFE"] - pairs["Raw"]) <= threshold).sum()
-    losses = (pairs["AutoFE"] < pairs["Raw"] - threshold).sum()
+    wins = (pairs[autofe_name] > pairs["Raw"] + threshold).sum()
+    ties = (np.abs(pairs[autofe_name] - pairs["Raw"]) <= threshold).sum()
+    losses = (pairs[autofe_name] < pairs["Raw"] - threshold).sum()
     print(f"Wins: {wins}, Ties: {ties}, Losses: {losses}")
     
     # 3. Average Rank & Friedman Test

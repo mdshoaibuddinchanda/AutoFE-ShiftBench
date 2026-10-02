@@ -44,7 +44,7 @@ def load_data():
                     except:
                         pass
     df_results = pd.DataFrame(records)
-    
+
     # Load Meta-features
     meta_records = []
     for meta_file in Path("data/raw").glob("*_meta.json"):
@@ -117,11 +117,12 @@ def main():
     
     # Compute average performance per dataset and pipeline
     perf = df_results.groupby(["dataset", "pipeline"])["f1_macro"].mean().unstack()
-    if "AutoFE" not in perf.columns or "Raw" not in perf.columns:
+    autofe_name = "AutoFE_Baseline" if "AutoFE_Baseline" in perf.columns else "AutoFE"
+    if autofe_name not in perf.columns or "Raw" not in perf.columns:
         print("Missing pipeline data.")
         return
-        
-    perf["delta_f1"] = perf["AutoFE"] - perf["Raw"]
+
+    perf["delta_f1"] = perf[autofe_name] - perf["Raw"]
     perf = perf.reset_index()
     
     # Join with meta features

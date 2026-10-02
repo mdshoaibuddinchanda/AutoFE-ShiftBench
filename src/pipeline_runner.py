@@ -498,7 +498,7 @@ def apply_training_condition(
 # ---------------------------------------------------------------------------
 
 def precompute_unit(kwargs):
-    """Phase 1 worker: generate splits + all 7 pipeline caches for one unit."""
+    """Phase 1 worker: generate splits and every configured pipeline cache."""
     try:
         kwargs_copy = kwargs.copy()
         kwargs_copy.pop("size", None)

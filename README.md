@@ -137,7 +137,7 @@ Phase 1 (cache generation) is the longest phase and can take **1-3 days** depend
 
 ```
 data/cache/
-└── predictor_only_geometry_v2/
+└── predictor_only_geometry_v2_baselines_operators_fsva_v1/
     └── sha256_canonical_json_u32_v1/
         └── adult/
             ├── Raw_s42_f1_clean_train.pkl
@@ -173,12 +173,12 @@ This shows a per-dataset progress bar:
 ----------------------------------------------------------------------
   Dataset                             Cached   Expected   Progress
 ----------------------------------------------------------------------
-  haberman                              2450 / 2450     ████████████████████ ✓ DONE
-  sonar                                 1200 / 2450     █████████░░░░░░░░░░░  49.0%
-  adult                                    0 / 2450     ░░░░░░░░░░░░░░░░░░░░   0.0%
+  haberman                              4900 / 4900     ████████████████████ ✓ DONE
+  sonar                                 1200 / 4900     █████░░░░░░░░░░░░░░░░░  24.5%
+  adult                                    0 / 4900     ░░░░░░░░░░░░░░░░░░░░   0.0%
   ...
 ----------------------------------------------------------------------
-  TOTAL                                 3650 / 61250                         6.0%
+  TOTAL                                 6100 / 122500                        5.0%
 ======================================================================
 ```
 
@@ -186,10 +186,10 @@ You can also manually check by counting files:
 
 ```bash
 # Count completed caches for a specific dataset (Windows)
-dir /b data\cache\predictor_only_geometry_v2\sha256_canonical_json_u32_v1\adult\*_train.pkl | find /c /v ""
+dir /b data\cache\predictor_only_geometry_v2_baselines_operators_fsva_v1\sha256_canonical_json_u32_v1\adult\*_train.pkl | find /c /v ""
 
 # Count completed caches for a specific dataset (Linux/Mac)
-ls data/cache/predictor_only_geometry_v2/sha256_canonical_json_u32_v1/adult/*_train.pkl | wc -l
+ls data/cache/predictor_only_geometry_v2_baselines_operators_fsva_v1/sha256_canonical_json_u32_v1/adult/*_train.pkl | wc -l
 ```
 
 ---
@@ -206,7 +206,7 @@ AutoFE-ShiftBench/
 ├── reports/                       # (Git-ignored) Outputs
 │   ├── figures/                   # Generated publication plots (PDF, PNG)
 │   ├── tables/
-│   │   └── results_stream_predictor_only_geometry_v2_sha256_canonical_json_u32_v1.jsonl # Versioned result ledger
+│   │   └── results_stream_predictor_only_geometry_v2_baselines_operators_fsva_v1_sha256_canonical_json_u32_v1.jsonl # Versioned result ledger
 │   ├── worker_logs/               # Error logs for debugging
 │   └── terminal.log               # Running log
 ├── src/

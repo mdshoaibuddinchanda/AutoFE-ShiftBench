@@ -49,6 +49,15 @@ PRIMARY_DATASETS = {
     "airlines",
 }
 
+# Regenerated readers keep the historical figures available while exposing all
+# new fair-baseline and operator-ablation identities when those rows exist.
+ABLATION_PIPELINES = [
+    "Raw", "Raw_Full", "Raw_Capped", "Raw_Variance", "Raw_MI",
+    "AutoFE_Baseline", "AutoFE_NoMultiply", "AutoFE_AddSub",
+    "AutoFE_AddSubDiv", "AutoFE_NoDivision", "AutoFE_MultiplyOnly",
+    "AutoFE_DivideOnly", "AutoFE_MI", "AutoFE_Random",
+]
+
 DOMAIN_BY_DATASET = {
     "haberman": "Healthcare",
     "heart-disease": "Healthcare",
@@ -371,7 +380,7 @@ def plot_fig10_ablation(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     if df.empty or "roc_auc" not in df.columns: return
     set_q1_publication_style()
     
-    ablation_pl = ["Raw", "Raw_MI", "AutoFE_Baseline", "AutoFE_MI", "AutoFE_Random", "AutoFE_NoMultiply"]
+    ablation_pl = [p for p in ABLATION_PIPELINES if p in df["pipeline"].unique()]
     adf = df[df["pipeline"].isin(ablation_pl)].copy()
     if adf.empty: return
     
