@@ -302,7 +302,7 @@ def generate_all_tables():
         f.write(generate_table_10_robustness_score(df) + "\n\n")
         f.write(generate_table_11_dataset_level_inference(corrected_summaries) + "\n\n")
         
-    print(f"Generated 10 advanced tables in {out_path.absolute()}")
+    print(f"Generated 11 tables (including the corrected dataset-level Table 11) in {out_path.absolute()}")
 
 if __name__ == "__main__":
     generate_all_tables()
