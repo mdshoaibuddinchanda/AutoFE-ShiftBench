@@ -161,6 +161,35 @@ Run the built-in progress tracker:
 python -m src.check_progress
 ```
 
+The runner creates a versioned SQLite task manifest before dispatch. To validate
+a bounded grid without downloading data, generating features, or fitting
+models, use for example:
+
+```bash
+python -m src.pipeline_runner --dry-run-manifest --max-datasets 2 --max-seeds 1 --max-folds 1 --max-conditions 2 --max-workers 1
+```
+
+For a bounded execution verification, `--pipelines` and `--models` may select
+an explicit subset while retaining the same manifest and resume contract.
+
+Manifest task states and attempt counts are authoritative for progress. Cache,
+candidate-history, and FSVA artifact counts are reported separately.
+
+### Corrected dataset-level analysis
+
+After a result ledger exists, run the active paired dataset analysis:
+
+```bash
+python -m src.stats_analysis
+```
+
+It keeps split policies, conditions, and estimators as separate strata,
+aggregates task differences within dataset, uses equal dataset weighting,
+bootstraps whole datasets, applies a dataset-level sign-flip test, and writes
+Holm-adjusted summaries plus task-pair and exclusion tables under
+`reports/analysis/dataset_level/`. The current checkout has no corrected
+result ledger, so no empirical analysis is claimed.
+
 This shows a per-dataset progress bar:
 
 ```
@@ -204,6 +233,7 @@ AutoFE-ShiftBench/
 │   ├── raw/                       # Downloaded CSV datasets + JSON meta-features
 │   └── cache/                     # Human-readable pipeline caches (per dataset)
 ├── reports/                       # (Git-ignored) Outputs
+│   ├── manifests/                 # Run manifests, task states, and attempts
 │   ├── figures/                   # Generated publication plots (PDF, PNG)
 │   ├── tables/
 │   │   └── results_stream_predictor_only_geometry_v2_baselines_operators_fsva_v1_sha256_canonical_json_u32_v1.jsonl # Versioned result ledger

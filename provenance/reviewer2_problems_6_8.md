@@ -48,3 +48,19 @@ The prior pooled Wilcoxon/Friedman helpers remain available only as legacy explo
 ## Verification
 
 Final command results, bounded smoke counts, injected failures/timeouts, and artifact sizes will be appended after the final P12 run. Problems 9–10 remain deferred; this stage records only the minimum run identity, coverage, compatibility, and analysis traceability dependencies needed for problems 6–8.
+
+## Final verification record
+
+All implementation and verification commands used `D:\\Conda\\P12\\python.exe`; the repository `.venv` was retained untouched.
+
+- `python -m unittest discover -s tests -v`: **39 tests passed** in 8.5 seconds. This includes the prior problems 1–5 regression coverage, dataset-level numerical fixtures, manifest state/failure fixtures, stale-worker fencing, timeout containment, malformed-ledger reconciliation, changed-run rejection, and planned-skip accounting.
+- `python -m compileall -q -f src tests`: completed with no compile errors. The two existing `invalid escape sequence \\D` warnings in `src/analysis/structural_analysis.py` remain unrelated to this stage. `git diff --check` passed.
+- Manifest-only dry run with two configured (unavailable) datasets, one seed, one fold, and two conditions produced **564 intended tasks**, all explicitly `skipped: dataset_unavailable`, with no precompute, model, or dispatch work.
+- Bounded production-path smoke (`smoke68verify`) used two synthetic datasets, two seeds, one fold, clean plus `gaussian_noise_0.01`, `Raw` and `AutoFE_Baseline`, and `logistic_regression`, with one worker, 30-second task timeout, one attempt, and a 16-model dispatch limit. It built **24 intended tasks** (8 precompute + 16 model), completed **24 tasks** (8 precompute + 16 model), recorded **24 attempts** and **24 durable results**, and wrote **16 authoritative model rows**. There were no failures, timeouts, skips, or pending tasks. The ledger contained both pipelines, both conditions, and both synthetic datasets. Re-running the same run ID added zero result rows and zero attempts.
+- Feeding that authoritative ledger to the active corrected reader with 100 bootstrap and 100 sign-flip resamples produced two separate strata (clean and Gaussian), eight paired task records, two contributing datasets per stratum, and zero exclusions. No empirical manuscript conclusion is claimed.
+- Earlier stop-limit smoke used two datasets and two conditions with the default full pipeline grid: **564 intended**, **6 completed** (2 precompute + 4 model), **6 attempts**, **6 durable results**, **4 model rows**, and **558 pending** after the declared stop limit. This confirms pending work is retained separately from completed estimator tasks.
+- Controlled fault fixtures demonstrated: dependency failure propagates to explicit downstream skips; failed attempts retry without creating a second scientific observation; timeout termination returns before the child finishes; stale attempts cannot commit after takeover; duplicate delivery is idempotent; conflicting payloads raise an integrity error; truncated JSONL lines are counted and valid rows reconciled; and incompatible run configuration/task grids are rejected.
+
+## Scope boundary
+
+The implementation adds only the coverage, identity, compatibility, and analysis traceability dependencies required by problems 6–8. Problems 9 (formal incomplete-run sensitivity analysis) and 10 (full dataset/code/environment/cache/analysis provenance package) remain open. The checkout has no full dataset collection or historical result ledger, so the manuscript’s historical findings require a future corrected benchmark recomputation.

@@ -16,6 +16,7 @@ import json
 import logging
 import multiprocessing
 import os
+import signal
 import sys
 import time
 import traceback
@@ -72,6 +73,14 @@ from src.seeding import (
 from src.shift_generator import apply_perturbation
 from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
 from src.shap_explainer import compute_shap_values
+from src.task_manifest import (
+    ExecutionConfig,
+    ManifestError,
+    ManifestConflictError,
+    ManifestStore,
+    build_task_records,
+    run_id_for,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -139,6 +148,21 @@ SHIFT_FAMILIES = [
 ]
 
 _writer_queue = None
+_stop_requested = False
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert NumPy scalars and nonfinite floats to strict JSON values."""
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        numeric = float(value)
+        return numeric if np.isfinite(numeric) else None
+    return value
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -529,15 +553,76 @@ def apply_training_condition(
 # Worker functions
 # ---------------------------------------------------------------------------
 
+def _manifest_for_task(task: dict[str, Any]) -> ManifestStore | None:
+    path = task.get("manifest_db")
+    return ManifestStore(path) if path else None
+
+
+def _claim_manifest_task(task: dict[str, Any], *, worker_id: str) -> str | None:
+    store = _manifest_for_task(task)
+    if store is None or not task.get("scientific_task_id") or not task.get("run_id"):
+        return None
+    attempt_id = task.get("attempt_id")
+    if attempt_id:
+        return str(attempt_id)
+    return store.claim_task(
+        str(task["run_id"]),
+        str(task["scientific_task_id"]),
+        worker_id=worker_id,
+        timeout_seconds=task.get("task_timeout_seconds"),
+    )
+
+
+def _record_manifest_failure(task: dict[str, Any], attempt_id: str | None, *, failure_class: str, exception: BaseException | None = None, retry: bool = False) -> None:
+    store = _manifest_for_task(task)
+    if store is None or not attempt_id or not task.get("scientific_task_id") or not task.get("run_id"):
+        return
+    try:
+        store.record_failure(
+            str(task["run_id"]), str(task["scientific_task_id"]), str(attempt_id),
+            failure_class=failure_class, exception=exception,
+            timeout_seconds=task.get("task_timeout_seconds"), retry=retry,
+        )
+        if failure_class == "precompute_failure":
+            store.propagate_dependency_failure(str(task["run_id"]), str(task["scientific_task_id"]))
+    except ManifestConflictError:
+        # A newer retry may already own the task.  Preserve that authoritative
+        # state instead of allowing a stale worker to overwrite it.
+        return
+
+
+def _manifest_result_fields(task: dict[str, Any], attempt_id: str | None) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    if task.get("run_id"):
+        fields["run_id"] = task["run_id"]
+    if task.get("scientific_task_id"):
+        fields["scientific_task_id"] = task["scientific_task_id"]
+    if attempt_id:
+        fields["attempt_id"] = attempt_id
+    return fields
+
+
 def precompute_unit(kwargs):
     """Phase 1 worker: generate splits and every configured pipeline cache."""
+    attempt_id = _claim_manifest_task(kwargs, worker_id=f"precompute:{os.getpid()}")
+    if kwargs.get("manifest_db") and kwargs.get("scientific_task_id") and attempt_id is None:
+        return kwargs.get("dataset_name")
     try:
         kwargs_copy = kwargs.copy()
-        kwargs_copy.pop("size", None)
+        for key in ("size", "run_id", "manifest_db", "manifest_path", "scientific_task_id", "task_timeout_seconds", "retry", "attempt_id"):
+            kwargs_copy.pop(key, None)
         get_data_splits(**kwargs_copy)
+        store = _manifest_for_task(kwargs)
+        if store is not None and attempt_id:
+            store.commit_result(
+                str(kwargs["run_id"]), str(kwargs["scientific_task_id"]), str(attempt_id),
+                {**_manifest_result_fields(kwargs, attempt_id), "stage": "precompute", "status": "completed"},
+                result_ref=str(cache_root() / kwargs["dataset_name"]),
+            )
         gc.collect()
         return kwargs_copy["dataset_name"]
-    except Exception:
+    except Exception as exc:
+        _record_manifest_failure(kwargs, attempt_id, failure_class="precompute_failure", exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase1_error.log", "a") as f:
             f.write(f"Precompute error on {kwargs}: {traceback.format_exc()}\n")
         return None
@@ -545,6 +630,9 @@ def precompute_unit(kwargs):
 
 def train_unit(kwargs):
     """Phase 2 worker: train one (pipeline, model) combo and write results."""
+    attempt_id = _claim_manifest_task(kwargs, worker_id=f"train:{os.getpid()}")
+    if kwargs.get("manifest_db") and kwargs.get("scientific_task_id") and attempt_id is None:
+        return
     try:
         dataset_name = kwargs["dataset_name"]
         seed = kwargs["seed"]
@@ -555,7 +643,7 @@ def train_unit(kwargs):
         split_policy = split_policy_for_condition(kwargs["shift_family"])
         pipeline_identity = pipeline_identity_token(pipeline_name)
 
-        if has_run(
+        if not kwargs.get("manifest_db") and has_run(
             dataset_name, seed, fold, condition, pipeline_name, model_type, split_policy,
             pipeline_identity,
         ):
@@ -630,6 +718,7 @@ def train_unit(kwargs):
             "pipeline_identity": pipeline_identity,
             "model": model_type,
             "status": "success",
+            **_manifest_result_fields(kwargs, attempt_id),
             "n_train": len(X_tr),
             "n_test": len(X_te),
             "n_original": x_test_clean.shape[1],
@@ -680,7 +769,8 @@ def train_unit(kwargs):
         del model, X_tr, X_te, pipelines, x_test_clean
         gc.collect()
 
-    except Exception:
+    except Exception as exc:
+        _record_manifest_failure(kwargs, attempt_id, failure_class="worker_exception", exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase2_error.log", "a") as f:
             f.write(f"Train error {kwargs}: {traceback.format_exc()}\n")
 
@@ -689,16 +779,122 @@ def train_unit(kwargs):
 # Writer process (sequential disk I/O)
 # ---------------------------------------------------------------------------
 
-def writer_process(queue, results_path):
-    """Dedicated process that writes results to JSONL and logs to checkpoint DB."""
+def _train_process_entry(task: dict[str, Any], result_queue) -> None:
+    global _writer_queue
+    _writer_queue = result_queue
+    train_unit(task)
+
+
+def run_bounded_train_task(task: dict[str, Any], result_queue, *, timeout_seconds: float) -> str:
+    """Run one training worker in a killable process for explicit timeouts."""
+    store = _manifest_for_task(task)
+    if store is not None and task.get("run_id") and task.get("scientific_task_id") and not task.get("attempt_id"):
+        task["attempt_id"] = store.claim_task(
+            str(task["run_id"]), str(task["scientific_task_id"]),
+            worker_id=f"bounded-parent:{os.getpid()}", timeout_seconds=timeout_seconds,
+        )
+    if task.get("manifest_db") and not task.get("attempt_id"):
+        return "skipped"
+    context = multiprocessing.get_context("spawn")
+    process = context.Process(target=_train_process_entry, args=(task, result_queue))
+    process.start()
+    process.join(timeout_seconds)
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        if process.is_alive():
+            process.kill()
+            process.join(5)
+        _record_manifest_failure(task, task.get("attempt_id"), failure_class="timeout", retry=task.get("retry", False))
+        return "timeout"
+    if process.exitcode != 0:
+        _record_manifest_failure(task, task.get("attempt_id"), failure_class="worker_exception", retry=task.get("retry", False))
+        return "failed"
+    return "completed"
+
+
+def dispatch_training_tasks(cpu_tasks: list[dict[str, Any]], gpu_tasks: list[dict[str, Any]], queue, execution_config: ExecutionConfig) -> None:
+    """Dispatch one bounded attempt batch under the declared execution policy."""
+    if not (cpu_tasks or gpu_tasks):
+        return
+    if execution_config.task_timeout_seconds is not None:
+        for bounded_task in cpu_tasks + gpu_tasks:
+            if _stop_requested:
+                break
+            run_bounded_train_task(
+                bounded_task, queue,
+                timeout_seconds=execution_config.task_timeout_seconds,
+            )
+        return
+    cpu_pool = multiprocessing.Pool(
+        execution_config.max_workers, initializer=init_worker, initargs=(queue,),
+        maxtasksperchild=MAX_TASKS_PER_CHILD,
+    )
+    gpu_pool = multiprocessing.Pool(
+        N_GPU_WORKERS, initializer=init_worker, initargs=(queue,),
+        maxtasksperchild=MAX_TASKS_PER_CHILD,
+    )
+    try:
+        cpu_res = cpu_pool.map_async(train_unit, cpu_tasks)
+        gpu_res = gpu_pool.map_async(train_unit, gpu_tasks)
+        cpu_res.wait()
+        gpu_res.wait()
+    finally:
+        cpu_pool.close()
+        cpu_pool.join()
+        gpu_pool.close()
+        gpu_pool.join()
+
+
+def _wait_for_manifest_tasks(
+    store: ManifestStore,
+    run_id: str,
+    task_ids: list[str],
+    *,
+    timeout_seconds: float = 120.0,
+) -> None:
+    """Wait for the writer to fence/commit an attempt batch before retrying."""
+    if not task_ids:
+        return
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        states = [store.get_task(run_id, task_id) for task_id in task_ids]
+        if not any(task is not None and task.get("state") == "running" for task in states):
+            return
+        if time.monotonic() >= deadline:
+            # Leave still-running attempts visible for coordinator recovery;
+            # never dispatch a second attempt while ownership is unresolved.
+            return
+        time.sleep(0.05)
+
+def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None):
+    """Write durable result records, then commit their manifest completion."""
     init_db()
-    with open(results_path, "a") as f:
+    store = ManifestStore(manifest_db) if manifest_db and run_id else None
+    with open(results_path, "a", encoding="utf-8", newline="\n") as f:
         while True:
             res = queue.get()
             if res == "DONE":
                 break
-            f.write(json.dumps(res) + "\n")
+            res = _json_safe(res)
+            if store is not None and res.get("run_id") and res.get("scientific_task_id") and res.get("attempt_id"):
+                task = store.get_task(str(run_id), str(res["scientific_task_id"]))
+                if task is None:
+                    raise ManifestError(f"result references unknown manifest task {res['scientific_task_id']}")
+                if task["state"] == "completed":
+                    # Idempotent duplicate delivery: the authoritative result
+                    # is already durable, so do not append a second analysis row.
+                    continue
+                if task["state"] != "running" or task["active_attempt_id"] != res["attempt_id"]:
+                    raise ManifestConflictError("result writer received a stale task attempt")
+            f.write(json.dumps(res, allow_nan=False) + "\n")
             f.flush()
+            os.fsync(f.fileno())
+            if store is not None:
+                store.commit_result(
+                    str(run_id), str(res["scientific_task_id"]), str(res["attempt_id"]),
+                    res, result_ref=str(results_path),
+                )
             log_run(
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
@@ -756,21 +952,43 @@ def detect_hardware():
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    global _stop_requested
     parser = argparse.ArgumentParser(description="AutoFE-ShiftBench runner")
     parser.add_argument("--max-datasets", type=int, default=None)
     parser.add_argument("--max-seeds", type=int, default=None)
     parser.add_argument("--max-folds", type=int, default=None)
     parser.add_argument("--max-conditions", type=int, default=None)
+    parser.add_argument("--condition-start", type=int, default=0)
+    parser.add_argument("--pipelines", type=str, default=None, help="Optional comma-separated pipeline subset for a bounded run")
+    parser.add_argument("--models", type=str, default=None, help="Optional comma-separated estimator subset for a bounded run")
     parser.add_argument("--enable-fsva-diagnostics", action="store_true")
     parser.add_argument("--fsva-max-rows", type=int, default=128)
+    parser.add_argument("--dry-run-manifest", action="store_true", help="Create and validate the complete manifest without dispatching work")
+    parser.add_argument("--manifest-db", type=Path, default=None)
+    parser.add_argument("--manifest-path", type=Path, default=None)
+    parser.add_argument("--run-id", type=str, default=None)
+    parser.add_argument("--max-workers", type=int, default=None)
+    parser.add_argument("--task-timeout-seconds", type=float, default=None)
+    parser.add_argument("--run-wall-time-seconds", type=float, default=None)
+    parser.add_argument("--max-attempts", type=int, default=1)
+    parser.add_argument("--stop-after-tasks", type=int, default=None)
     args = parser.parse_args()
+
+    def _request_stop(_signal_number, _frame):
+        global _stop_requested
+        _stop_requested = True
+
+    signal.signal(signal.SIGINT, _request_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _request_stop)
 
     # Ensure directories exist
     Path("reports/tables").mkdir(parents=True, exist_ok=True)
     Path("reports/worker_logs").mkdir(parents=True, exist_ok=True)
 
     init_db()
-    detect_hardware()
+    if not args.dry_run_manifest:
+        detect_hardware()
     logger = setup_logger("reports/terminal.log")
     results_path = results_ledger_path()
 
@@ -788,8 +1006,24 @@ def main() -> None:
         folds = folds[:args.max_folds]
 
     families = list(SHIFT_FAMILIES)
+    if args.condition_start < 0:
+        raise ValueError("condition-start must be non-negative")
+    families = families[args.condition_start:]
     if args.max_conditions:
         families = families[:args.max_conditions]
+
+    requested_pipelines = PIPELINE_NAMES if args.pipelines is None else [value.strip() for value in args.pipelines.split(",") if value.strip()]
+    unknown_pipelines = sorted(set(requested_pipelines) - set(PIPELINE_NAMES))
+    if unknown_pipelines or not requested_pipelines:
+        raise ValueError(f"Unknown or empty pipeline subset: {unknown_pipelines or args.pipelines}")
+    selected_pipelines = [name for name in PIPELINE_NAMES if name in set(requested_pipelines)]
+    requested_models = (CPU_MODELS + GPU_MODELS) if args.models is None else [value.strip() for value in args.models.split(",") if value.strip()]
+    unknown_models = sorted(set(requested_models) - set(CPU_MODELS + GPU_MODELS))
+    if unknown_models or not requested_models:
+        raise ValueError(f"Unknown or empty estimator subset: {unknown_models or args.models}")
+    selected_cpu_models = [name for name in CPU_MODELS if name in set(requested_models)]
+    selected_gpu_models = [name for name in GPU_MODELS if name in set(requested_models)]
+    selected_models = selected_cpu_models + selected_gpu_models
 
     # ---- Build precompute task list ----
     precompute_tasks = []
@@ -818,6 +1052,66 @@ def main() -> None:
                         "size": size,
                     })
 
+    # Construct the complete scientific task manifest before any expensive
+    # precompute or model dispatch.  Missing datasets remain explicit skipped
+    # tasks so intended and executable counts cannot be conflated.
+    execution_config = ExecutionConfig(
+        max_workers=args.max_workers or min(N_CPU_WORKERS, 4),
+        task_timeout_seconds=args.task_timeout_seconds,
+        run_wall_time_seconds=args.run_wall_time_seconds,
+        max_attempts=args.max_attempts,
+        stop_after_tasks=args.stop_after_tasks,
+    )
+    data_paths = {dataset: Path(f"data/raw/{dataset}.csv") for dataset in datasets}
+    manifest_config = {
+        "protocol_version": EVALUATION_PROTOCOL_VERSION,
+        "seed_scheme_version": SEED_SCHEME_VERSION,
+        "datasets": datasets,
+        "seeds": seeds,
+        "folds": folds,
+        "conditions": [{"shift_family": fam, "severity": sev} for fam, sev in families],
+        "pipelines": selected_pipelines,
+        "models": selected_models,
+        "diagnostics_enabled": args.enable_fsva_diagnostics,
+        "diagnostic_max_rows": args.fsva_max_rows,
+        "execution": execution_config.to_dict(),
+    }
+    run_id = args.run_id or run_id_for(manifest_config)
+    manifest_db = args.manifest_db or Path("reports/manifests/task_manifest.db")
+    manifest_path = args.manifest_path or Path("reports/manifests") / f"{run_id}.jsonl"
+    manifest_records = build_task_records(
+        datasets, seeds, folds, families, selected_pipelines, selected_models,
+        pipeline_identity=pipeline_identity_token,
+        pipeline_metadata=lambda name: {
+            "operator_set_id": PIPELINE_CONFIGS[name].operator_set_id,
+            "cap_policy_version": CAP_POLICY_VERSION if PIPELINE_CONFIGS[name].max_features is not None else "none_v1",
+        },
+        data_paths=data_paths,
+    )
+    manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
+    expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)
+    precompute_ids = {
+        (record["dataset"], record["seed"], record["fold"], record["condition"]): record["scientific_task_id"]
+        for record in manifest_records if record["task_kind"] == "precompute"
+    }
+    model_ids = {
+        (record["dataset"], record["seed"], record["fold"], record["condition"], record["pipeline"], record["model"]): record["scientific_task_id"]
+        for record in manifest_records if record["task_kind"] == "model"
+    }
+    for task in precompute_tasks:
+        task.update({
+            "run_id": run_id,
+            "manifest_db": str(manifest_db),
+            "manifest_path": str(manifest_path),
+            "scientific_task_id": precompute_ids[(task["dataset_name"], task["seed"], task["fold"], task["condition"])],
+            "task_timeout_seconds": args.task_timeout_seconds,
+            "retry": args.max_attempts > 1,
+        })
+    logger.info(f"Manifest {run_id}: {expected_manifest_count} intended tasks ({manifest_store.state_counts(run_id)})")
+    if args.dry_run_manifest:
+        print(json.dumps({"run_id": run_id, "manifest_db": str(manifest_db), "manifest_path": str(manifest_path), "state_counts": manifest_store.state_counts(run_id)}, sort_keys=True))
+        return
+
     # Sort datasets so we still process the smallest ones first for fast feedback
     # Calculate dataset sizes
     dataset_sizes = {}
@@ -829,13 +1123,18 @@ def main() -> None:
     # ---- Setup Writer ----
     manager = multiprocessing.Manager()
     queue = manager.Queue()
-    writer = multiprocessing.Process(target=writer_process, args=(queue, results_path))
+    writer = multiprocessing.Process(target=writer_process, args=(queue, results_path, str(manifest_db), run_id))
     writer.start()
 
-    phase1_workers = min(N_CPU_WORKERS, 4)  # Capped at 4 to prevent OOM
+    phase1_workers = min(args.max_workers or N_CPU_WORKERS, 4)  # Capped at 4 to prevent OOM
     
     # Process each dataset completely to allow cache cleanup
+    run_started = time.monotonic()
+    dispatched_model_tasks = 0
     for d in sorted_datasets:
+        if _stop_requested or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks) or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
+            manifest_store.request_stop(run_id, reason="run_wall_time_or_signal")
+            break
         logger.info(f"--- Processing dataset: {d} ---")
         dataset_tasks = [t for t in precompute_tasks if t["dataset_name"] == d]
         
@@ -844,63 +1143,91 @@ def main() -> None:
             
         # ---- Phase 1: Precompute splits + AutoFE caches for this dataset ----
         logger.info(f"Phase 1 [{d}]: {len(dataset_tasks)} units using {phase1_workers} workers...")
-        completed = 0
         total = len(dataset_tasks)
-        with multiprocessing.Pool(phase1_workers, maxtasksperchild=1) as pool:
-            for result in pool.imap_unordered(precompute_unit, dataset_tasks):
-                completed += 1
-                if completed % 50 == 0 or completed == total:
-                    ram_pct = psutil.virtual_memory().percent
-                    logger.info(f"Phase 1 [{d}]: {completed}/{total} ({100*completed/total:.1f}%) | RAM: {ram_pct:.0f}%")
-        
-        # ---- Phase 2: Train models for this dataset ----
-        cpu_tasks = []
-        gpu_tasks = []
-        for pt in dataset_tasks:
-            for p in PIPELINE_NAMES:
-                for m in CPU_MODELS:
-                    if not has_run(
-                        pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
-                        split_policy_for_condition(pt["shift_family"]),
-                        pipeline_identity_token(p),
-                    ):
+        for precompute_round in range(execution_config.max_attempts):
+            pending_precompute: list[dict[str, Any]] = []
+            for task in dataset_tasks:
+                task_id = str(task["scientific_task_id"])
+                manifest_task = manifest_store.get_task(run_id, task_id)
+                if manifest_task is None or manifest_task["state"] != "pending":
+                    continue
+                task["retry"] = precompute_round + 1 < execution_config.max_attempts
+                pending_precompute.append(task)
+            if not pending_precompute:
+                break
+            completed = total - len(pending_precompute)
+            logger.info(f"Phase 1 [{d}] attempt {precompute_round + 1}/{execution_config.max_attempts}: {len(pending_precompute)} pending units")
+            with multiprocessing.Pool(phase1_workers, maxtasksperchild=1) as pool:
+                for _result in pool.imap_unordered(precompute_unit, pending_precompute):
+                    completed += 1
+                    if completed % 50 == 0 or completed == total:
+                        ram_pct = psutil.virtual_memory().percent
+                        logger.info(f"Phase 1 [{d}]: {completed}/{total} ({100*completed/total:.1f}%) | RAM: {ram_pct:.0f}%")
+            if _stop_requested or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
+                break
+
+        if not all(
+            (manifest_store.get_task(run_id, str(task["scientific_task_id"])) or {}).get("state") == "completed"
+            for task in dataset_tasks
+        ):
+            # Model tasks remain pending/skipped until every precompute
+            # dependency is authoritative; a cache or a running lease alone
+            # is never treated as estimator completion.
+            continue
+
+        # ---- Phase 2: Train models for this dataset with bounded retries ----
+        for attempt_round in range(execution_config.max_attempts):
+            if _stop_requested:
+                break
+            if execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds:
+                break
+            cpu_tasks: list[dict[str, Any]] = []
+            gpu_tasks: list[dict[str, Any]] = []
+            for pt in dataset_tasks:
+                for p in selected_pipelines:
+                    for m in selected_cpu_models:
+                        model_task_id = model_ids[(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m)]
+                        manifest_task = manifest_store.get_task(run_id, model_task_id)
+                        if manifest_task is None or manifest_task["state"] != "pending":
+                            continue
                         t = pt.copy()
                         t["pipeline"] = p
                         t["model"] = m
+                        t["model_task_id"] = model_task_id
+                        t["scientific_task_id"] = model_task_id
+                        t["task_timeout_seconds"] = args.task_timeout_seconds
+                        t["retry"] = attempt_round + 1 < execution_config.max_attempts
                         cpu_tasks.append(t)
-                for m in GPU_MODELS:
-                    if not has_run(
-                        pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
-                        split_policy_for_condition(pt["shift_family"]),
-                        pipeline_identity_token(p),
-                    ):
+                    for m in selected_gpu_models:
+                        model_task_id = model_ids[(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m)]
+                        manifest_task = manifest_store.get_task(run_id, model_task_id)
+                        if manifest_task is None or manifest_task["state"] != "pending":
+                            continue
                         t = pt.copy()
                         t["pipeline"] = p
                         t["model"] = m
+                        t["model_task_id"] = model_task_id
+                        t["scientific_task_id"] = model_task_id
+                        t["task_timeout_seconds"] = args.task_timeout_seconds
+                        t["retry"] = attempt_round + 1 < execution_config.max_attempts
                         gpu_tasks.append(t)
-                        
-        logger.info(f"Phase 2 [{d}]: Evaluating {len(cpu_tasks)} CPU and {len(gpu_tasks)} GPU tasks...")
-        
-        if cpu_tasks or gpu_tasks:
-            cpu_pool = multiprocessing.Pool(
-                N_CPU_WORKERS, initializer=init_worker, initargs=(queue,),
-                maxtasksperchild=MAX_TASKS_PER_CHILD,
+
+            logger.info(f"Phase 2 [{d}] attempt {attempt_round + 1}/{execution_config.max_attempts}: evaluating {len(cpu_tasks)} CPU and {len(gpu_tasks)} GPU tasks...")
+            if execution_config.stop_after_tasks is not None:
+                remaining = max(0, execution_config.stop_after_tasks - dispatched_model_tasks)
+                cpu_tasks = cpu_tasks[:remaining]
+                remaining = max(0, execution_config.stop_after_tasks - dispatched_model_tasks - len(cpu_tasks))
+                gpu_tasks = gpu_tasks[:remaining]
+            dispatched_model_tasks += len(cpu_tasks) + len(gpu_tasks)
+            dispatch_training_tasks(cpu_tasks, gpu_tasks, queue, execution_config)
+            _wait_for_manifest_tasks(
+                manifest_store,
+                run_id,
+                [str(task["scientific_task_id"]) for task in cpu_tasks + gpu_tasks],
+                timeout_seconds=max(30.0, (args.task_timeout_seconds or 0.0) * 2.0),
             )
-            gpu_pool = multiprocessing.Pool(
-                N_GPU_WORKERS, initializer=init_worker, initargs=(queue,),
-                maxtasksperchild=MAX_TASKS_PER_CHILD,
-            )
-
-            cpu_res = cpu_pool.map_async(train_unit, cpu_tasks)
-            gpu_res = gpu_pool.map_async(train_unit, gpu_tasks)
-
-            cpu_res.wait()
-            gpu_res.wait()
-
-            cpu_pool.close()
-            cpu_pool.join()
-            gpu_pool.close()
-            gpu_pool.join()
+            if not (cpu_tasks or gpu_tasks) or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks):
+                break
 
         # ---- Phase 3: Cleanup cache to prevent 600GB disk usage ----
         import shutil
@@ -911,7 +1238,15 @@ def main() -> None:
             
     queue.put("DONE")
     writer.join()
-    logger.info("Benchmark finished! All caches cleaned up.")
+    if writer.exitcode != 0:
+        manifest_store.set_run_status(run_id, "failed")
+        logger.error(f"Result writer exited with code {writer.exitcode}; reconciliation is required")
+    elif _stop_requested or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks) or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
+        manifest_store.request_stop(run_id, reason="declared_stop_limit")
+        manifest_store.set_run_status(run_id, "stopped")
+    else:
+        manifest_store.set_run_status(run_id, "completed")
+    logger.info(f"Benchmark finished. Manifest counts: {manifest_store.state_counts(run_id)}")
 
 
 if __name__ == "__main__":
