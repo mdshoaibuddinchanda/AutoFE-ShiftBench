@@ -41,7 +41,7 @@ The prior pooled Wilcoxon/Friedman helpers remain available only as legacy explo
 
 ## Problem 8 — stopping, checkpointing, and recovery
 
-`src/pipeline_runner.py` now persists execution controls (`max_workers`, task timeout, run wall time, maximum attempts, retryable failure classes, stop-after-task limit), handles signal/declarative stopping, and supports a killable per-task timeout path. Workers claim attempts transactionally; stale workers cannot commit after a newer attempt owns the task. Result writing fsyncs JSONL before committing the manifest result and checkpoint; duplicate deliveries are idempotent and conflicting payloads raise an integrity error.
+`src/pipeline_runner.py` now persists execution controls (`max_workers`, task timeout, run wall time, maximum attempts, retryable failure classes, stop-after-task limit, and stale-attempt recovery threshold), handles signal/declarative stopping, and supports a killable per-task timeout path. Resume invokes stale-attempt recovery before dispatch. Workers claim attempts transactionally; stale workers cannot commit after a newer attempt owns the task. Result writing fsyncs JSONL before committing the manifest result and checkpoint; duplicate deliveries are idempotent and conflicting payloads raise an integrity error.
 
 `ManifestStore.reconcile_result_ledger` handles durable-result/completion-marker crash windows, malformed/truncated JSONL records, conflicts, and completed tasks lacking durable payloads. Stale running attempts can be recovered to pending or terminal failure while preserving attempt history.
 

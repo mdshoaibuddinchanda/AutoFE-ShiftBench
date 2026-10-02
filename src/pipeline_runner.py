@@ -972,6 +972,7 @@ def main() -> None:
     parser.add_argument("--run-wall-time-seconds", type=float, default=None)
     parser.add_argument("--max-attempts", type=int, default=1)
     parser.add_argument("--stop-after-tasks", type=int, default=None)
+    parser.add_argument("--stale-after-seconds", type=float, default=3600.0, help="Recover running attempts older than this on resume")
     args = parser.parse_args()
 
     def _request_stop(_signal_number, _frame):
@@ -1061,6 +1062,7 @@ def main() -> None:
         run_wall_time_seconds=args.run_wall_time_seconds,
         max_attempts=args.max_attempts,
         stop_after_tasks=args.stop_after_tasks,
+        stale_after_seconds=args.stale_after_seconds,
     )
     data_paths = {dataset: Path(f"data/raw/{dataset}.csv") for dataset in datasets}
     manifest_config = {
@@ -1090,6 +1092,13 @@ def main() -> None:
     )
     manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
     expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)
+    recovered_attempts = manifest_store.recover_stale_attempts(
+        run_id,
+        stale_after_seconds=execution_config.stale_after_seconds,
+        retry=True,
+    )
+    if recovered_attempts:
+        logger.warning(f"Recovered {recovered_attempts} stale running attempts for run {run_id}")
     precompute_ids = {
         (record["dataset"], record["seed"], record["fold"], record["condition"]): record["scientific_task_id"]
         for record in manifest_records if record["task_kind"] == "precompute"
