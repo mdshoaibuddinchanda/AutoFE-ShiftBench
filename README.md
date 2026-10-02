@@ -21,6 +21,8 @@ Most AutoML and Feature Engineering evaluations optimize only for clean-test acc
 | **Metrics** | ROC-AUC, PR-AUC, F1 (Macro), MCC, Balanced Accuracy, Accuracy, Log Loss, Brier Score, Precision, Recall |
 | **Effect Sizes** | Cliff's Delta, Wilcoxon Signed-Rank, Friedman, Nemenyi |
 
+The active runner keeps the historical `Raw` control, and adds `Raw_Full` (all eligible preprocessed base features) plus `Raw_Capped` (the same post-candidate top-k cap stage used by AutoFE). Arithmetic variants are driven by the versioned operator registry: full `{add, sub, mul, div}`, `{add, sub}`, `{add, sub, div}`, `{add, sub, mul}`, `{mul}`, and `{div}`. `AutoFE_NoMultiply` remains an explicit compatibility alias for the historical `{add, sub}` variant.
+
 ---
 
 ## Hardware Requirements
@@ -123,6 +125,8 @@ The benchmark automatically detects your CPU cores and GPU, then parallelizes ac
 python -m src.pipeline_runner --max-datasets 1 --max-seeds 1 --max-folds 1 --max-conditions 1
 ```
 
+To collect bounded FSVA Jacobian, perturbation-amplification, and candidate-history artifacts on the same production task path, add `--enable-fsva-diagnostics` (optionally `--fsva-max-rows 128`). Diagnostics are descriptive and do not change fitted features, selection, predictions, or metrics.
+
 ---
 
 ## Tracking Progress
@@ -147,7 +151,7 @@ data/cache/
 └── ...
 ```
 
-Each dataset produces **2,450 cache sets** (7 pipelines × 5 seeds × 5 folds × 14 conditions).
+Each dataset produces **4,900 cache sets** (14 configured pipelines × 5 seeds × 5 folds × 14 conditions). The configured controls include historical `Raw`, full-dimensional `Raw_Full`, cap-matched `Raw_Capped`, and the explicit arithmetic operator variants.
 
 ### Check Progress
 
@@ -163,7 +167,7 @@ This shows a per-dataset progress bar:
 ======================================================================
   AutoFE-ShiftBench — Progress Report
 ======================================================================
-  Expected caches per dataset: 2,450
+  Expected caches per dataset: 4,900
   Total datasets: 25
   Total expected: 61,250
 ----------------------------------------------------------------------

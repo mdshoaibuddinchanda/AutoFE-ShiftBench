@@ -1,38 +1,63 @@
-"""Feature engineering helpers, including Featuretools DFS expansion and ablations."""
+"""Deterministic arithmetic candidate generation and baseline controls."""
 
 from __future__ import annotations
 
-import argparse
-import itertools
-import pickle
-import random
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
 
+from src.operator_registry import (
+    OPERATOR_REGISTRY,
+    OPERATOR_REGISTRY_VERSION,
+    OPERATOR_SET_REGISTRY,
+    Expression,
+    candidate_id,
+    evaluate_operator,
+    expression_columns,
+    expression_depth,
+    expression_operators,
+    expression_to_dict,
+    expression_to_string,
+    op_expression,
+    raw_expression,
+    validate_operator_set,
+)
+
+
+CAP_POLICY_VERSION = "post_candidate_topk_v1"
+BASE_FEATURE_POLICY_VERSION = "training_variance_topk_v1"
+
 
 @dataclass(slots=True)
 class DFSConfig:
-    """Configuration for DFS feature generation and ablations."""
+    """Configuration for raw controls and arithmetic feature generation."""
+
     enable_dfs: bool = True
     depth: int = 1
     max_features: int | None = 100
     max_base_features: int | None = 20
-    selection_method: str = "variance"  # "variance", "mi", "random", "none"
-    trans_primitives: list[str] = field(
-        default_factory=lambda: [
-            "add_numeric",
-            "subtract_numeric",
-            "multiply_numeric",
-            "divide_numeric",
-        ]
-    )
+    selection_method: str = "variance"
+    trans_primitives: list[str] | None = None
     monitor_ram: bool = True
     random_seed: int = 42
+    operator_set_id: str = "full_arithmetic_v1"
+    baseline_kind: str | None = None
+    display_identity: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.trans_primitives is None:
+            self.trans_primitives = list(OPERATOR_SET_REGISTRY[self.operator_set_id])
+        else:
+            primitive_tuple = tuple(self.trans_primitives)
+            if primitive_tuple != tuple(OPERATOR_SET_REGISTRY[self.operator_set_id]):
+                matches = [key for key, value in OPERATOR_SET_REGISTRY.items() if value == primitive_tuple]
+                if not matches:
+                    raise ValueError(f"Primitive list is not a registered operator set: {primitive_tuple}")
+                self.operator_set_id = matches[0]
+
 
 def _get_process_ram_mb() -> float | None:
     try:
@@ -41,66 +66,96 @@ def _get_process_ram_mb() -> float | None:
         return None
     return float(psutil.Process().memory_info().rss / (1024 * 1024))
 
-def _build_entityset(df: pd.DataFrame, entityset_id: str):
-    try:
-        import featuretools as ft
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError("featuretools is required.") from exc
 
-    working_df = df.reset_index(drop=True).copy()
-    working_df.insert(0, "__row_id", range(len(working_df)))
-    entityset = ft.EntitySet(id=entityset_id)
-    return entityset.add_dataframe(
-        dataframe_name="samples",
-        dataframe=working_df,
-        index="__row_id",
-    )
+def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    numeric = frame.select_dtypes(include=["number", "bool"]).copy()
+    if numeric.empty:
+        raise ValueError("No numeric columns available.")
+    numeric = numeric.astype(float).replace([np.inf, -np.inf], np.nan)
+    return numeric.fillna(0.0)
 
-def _limit_features(
-    train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
-    y_train: np.ndarray | None,
-    cfg: DFSConfig,
-) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
-    if cfg.selection_method == "none" or cfg.max_features is None or train_df.shape[1] <= cfg.max_features:
-        return train_df, test_df, list(train_df.columns)
 
-    cleaned = train_df.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    
-    if cfg.selection_method == "variance":
-        variance = cleaned.var(axis=0, numeric_only=True).fillna(0.0)
-        ranked = variance.sort_values(ascending=False).index.tolist()
-        
-    elif cfg.selection_method == "mi":
+def _base_columns(x_train: pd.DataFrame, cfg: DFSConfig) -> tuple[pd.DataFrame, list[str], list[str]]:
+    numeric = _numeric_frame(x_train)
+    eligible = list(numeric.columns)
+    if cfg.max_base_features is None or len(eligible) <= cfg.max_base_features:
+        return numeric, eligible, []
+    variances = numeric.var(axis=0).fillna(0.0)
+    ranked = sorted(eligible, key=lambda col: (-float(variances[col]), str(col)))
+    retained = ranked[: cfg.max_base_features]
+    excluded = [col for col in eligible if col not in set(retained)]
+    return numeric[retained], retained, excluded
+
+
+def _generate_expressions(columns: list[str], operator_set_id: str, depth: int) -> list[Expression]:
+    operators = validate_operator_set(operator_set_id)
+    if depth < 0:
+        raise ValueError("depth must be non-negative")
+    expressions: list[Expression] = [raw_expression(col) for col in columns]
+    if not operators or depth == 0:
+        return expressions
+
+    by_depth: dict[int, list[Expression]] = {0: list(expressions)}
+    for current_depth in range(1, depth + 1):
+        left_pool = [expr for d in range(current_depth) for expr in by_depth.get(d, [])]
+        right_pool = by_depth[0]
+        generated: list[Expression] = []
+        for operator in operators:
+            spec = OPERATOR_REGISTRY[operator]
+            if spec.commutative:
+                for left in left_pool:
+                    for right in right_pool:
+                        if expression_to_string(left) <= expression_to_string(right):
+                            generated.append(op_expression(operator, left, right))
+            else:
+                for left in left_pool:
+                    for right in right_pool:
+                        generated.append(op_expression(operator, left, right))
+        generated.sort(key=candidate_id)
+        by_depth[current_depth] = generated
+        expressions.extend(generated)
+    return expressions
+
+
+def _evaluate_expression(expression: Expression, frame: pd.DataFrame) -> tuple[np.ndarray, dict[str, int]]:
+    if expression[0] == "raw":
+        return frame[str(expression[1])].to_numpy(dtype=float), {"nonfinite_count": 0, "clipped_count": 0, "protected_count": 0}
+    left, left_status = _evaluate_expression(expression[2], frame)
+    right, right_status = _evaluate_expression(expression[3], frame)
+    values, status = evaluate_operator(str(expression[1]), left, right)
+    merged = {key: left_status.get(key, 0) + right_status.get(key, 0) + status.get(key, 0) for key in ("nonfinite_count", "clipped_count", "protected_count")}
+    return values, merged
+
+
+def _score_candidates(matrix: pd.DataFrame, y_train: np.ndarray | None, cfg: DFSConfig) -> dict[str, float | None]:
+    method = cfg.selection_method
+    if method == "none":
+        return {column: None for column in matrix.columns}
+    cleaned = matrix.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    if method == "variance":
+        return {column: float(cleaned[column].var(ddof=1)) for column in matrix.columns}
+    if method == "mi":
         if y_train is None:
             raise ValueError("y_train is required for MI selection.")
-        # Ensure y_train matches cleaned length
-        if len(y_train) != len(cleaned):
-            y_train = y_train[:len(cleaned)]
-        mi_scores = mutual_info_classif(cleaned, y_train, random_state=cfg.random_seed)
-        mi_series = pd.Series(mi_scores, index=cleaned.columns)
-        ranked = mi_series.sort_values(ascending=False).index.tolist()
-        
-    elif cfg.selection_method == "random":
-        # Average random ranking over 10 draws
+        scores = mutual_info_classif(cleaned, y_train, random_state=cfg.random_seed)
+        return {column: float(score) for column, score in zip(matrix.columns, scores)}
+    if method == "random":
         rng = np.random.default_rng(cfg.random_seed)
-        cols = list(cleaned.columns)
-        draws = []
-        for _ in range(10):
-            d = cols.copy()
-            rng.shuffle(d)
-            draws.append(d)
-        
-        rank_scores = {c: 0 for c in cols}
-        for d in draws:
-            for i, c in enumerate(d):
-                rank_scores[c] += i
-        ranked = sorted(cols, key=lambda c: rank_scores[c])
-    else:
-        raise ValueError(f"Unknown selection method {cfg.selection_method}")
+        return {column: float(rng.random()) for column in matrix.columns}
+    raise ValueError(f"Unknown selection method {method!r}")
 
-    selected_cols = ranked[:cfg.max_features]
-    return train_df[selected_cols], test_df[selected_cols], selected_cols
+
+def _metadata_for_expression(expression: Expression, feature_id: str, status: dict[str, int]) -> dict[str, Any]:
+    return {
+        "feature_id": feature_id,
+        "name": expression_to_string(expression),
+        "expression": expression_to_dict(expression),
+        "parents": list(expression_columns(expression)),
+        "operators": list(expression_operators(expression)),
+        "depth": expression_depth(expression),
+        "validity": status,
+    }
+
 
 def expand_features_with_dfs(
     x_train: pd.DataFrame,
@@ -108,82 +163,112 @@ def expand_features_with_dfs(
     y_train: np.ndarray | None = None,
     config: DFSConfig | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    """Fit candidate construction and selection on training rows only."""
     cfg = config or DFSConfig()
-    
+    if cfg.operator_set_id not in OPERATOR_SET_REGISTRY:
+        raise ValueError(f"Unknown operator set: {cfg.operator_set_id}")
+    if tuple(cfg.trans_primitives) != tuple(validate_operator_set(cfg.operator_set_id)):
+        raise ValueError("trans_primitives must exactly match the declared operator set")
+
     ram_before = _get_process_ram_mb() if cfg.monitor_ram else None
+    train_base, base_columns, excluded_base = _base_columns(x_train, cfg)
+    test_numeric = _numeric_frame(x_test)
+    missing = [col for col in base_columns if col not in test_numeric.columns]
+    if missing:
+        raise ValueError(f"Held-out predictors are missing training columns: {missing}")
+    test_base = test_numeric[base_columns]
 
-    numeric_train = x_train.select_dtypes(include=["number", "bool"]).copy()
-    numeric_test = x_test.select_dtypes(include=["number", "bool"]).copy()
+    expressions = _generate_expressions(base_columns, cfg.operator_set_id if cfg.enable_dfs else "none_v1", cfg.depth if cfg.enable_dfs else 0)
+    train_values: dict[str, np.ndarray] = {}
+    test_values: dict[str, np.ndarray] = {}
+    validity: dict[str, dict[str, int]] = {}
+    expression_by_id: dict[str, Expression] = {}
+    for expression in expressions:
+        fid = candidate_id(expression)
+        train_value, train_status = _evaluate_expression(expression, train_base)
+        test_value, _test_status = _evaluate_expression(expression, test_base)
+        train_values[fid] = train_value
+        test_values[fid] = test_value
+        validity[fid] = train_status
+        expression_by_id[fid] = expression
 
-    if numeric_train.empty:
-        raise ValueError("No numeric columns available.")
+    train_matrix = pd.DataFrame(train_values, index=train_base.index)
+    test_matrix = pd.DataFrame(test_values, index=test_base.index)
+    scores = _score_candidates(train_matrix, y_train, cfg)
+    ranked = sorted(train_matrix.columns, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))
+    selected = ranked if cfg.max_features is None else ranked[: cfg.max_features]
+    selected = list(selected)
+    selected_set = set(selected)
 
-    # Base feature selection if needed
-    if cfg.max_base_features and numeric_train.shape[1] > cfg.max_base_features:
-        # We always use variance for base selection to prevent DFS explosion unless otherwise specified
-        variance = numeric_train.var(axis=0, numeric_only=True).fillna(0.0)
-        base_columns = variance.sort_values(ascending=False).index.tolist()[:cfg.max_base_features]
-    else:
-        base_columns = list(numeric_train.columns)
+    history: list[dict[str, Any]] = []
+    for fid in train_matrix.columns:
+        expr = expression_by_id[fid]
+        selected_flag = fid in selected_set
+        score = scores[fid]
+        history.append({
+            "candidate_id": fid,
+            "expression": expression_to_dict(expr),
+            "expression_text": expression_to_string(expr),
+            "parents": list(expression_columns(expr)),
+            "operators": list(expression_operators(expr)),
+            "depth": expression_depth(expr),
+            "selection_stage": cfg.selection_method,
+            "score": score,
+            "eligible": True,
+            "evaluated": True,
+            "selected": selected_flag,
+            "decision": "selected" if selected_flag else "not_selected_by_cap",
+            "validity": validity[fid],
+        })
+    for column in excluded_base:
+        expression = raw_expression(column)
+        history.append({
+            "candidate_id": candidate_id(expression),
+            "expression": expression_to_dict(expression),
+            "expression_text": expression_to_string(expression),
+            "parents": [column],
+            "operators": [],
+            "depth": 0,
+            "selection_stage": "base_feature_cap",
+            "score": None,
+            "eligible": False,
+            "evaluated": False,
+            "selected": False,
+            "decision": "not_generated_by_base_cap",
+            "validity": {},
+        })
+    history.sort(key=lambda row: row["candidate_id"])
 
-    train_base = numeric_train[base_columns].copy()
-    test_base = numeric_test[base_columns].copy()
-
-    if not cfg.enable_dfs:
-        # Just selection control
-        train_out, test_out, selected = _limit_features(train_base, test_base, y_train, cfg)
-        metadata = {
-            "n_generated": 0,
-            "n_retained": len(selected),
-            "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
-            "feature_metadata": [{"name": c, "primitive": "raw", "parents": [], "depth": 0} for c in selected]
-        }
-        return train_out, test_out, metadata
-
-    import featuretools as ft
-
-    train_entityset = _build_entityset(train_base, entityset_id="train_es")
-    
-    train_feature_matrix, feature_defs = ft.dfs(
-        entityset=train_entityset,
-        target_dataframe_name="samples",
-        trans_primitives=cfg.trans_primitives,
-        max_depth=cfg.depth,
-        verbose=False,
-    )
-    
-    train_feature_matrix = train_feature_matrix.drop(columns=["__row_id"], errors="ignore").reset_index(drop=True).fillna(0.0)
-
-    test_entityset = _build_entityset(test_base, entityset_id="test_es")
-    test_feature_matrix = ft.calculate_feature_matrix(
-        features=feature_defs,
-        entityset=test_entityset,
-        verbose=False,
-    )
-    test_feature_matrix = test_feature_matrix.drop(columns=["__row_id"], errors="ignore").reset_index(drop=True).fillna(0.0)
-
-    # Feature Metadata
-    generated_features = []
-    for f in feature_defs:
-        try:
-            prim = f.primitive.name if hasattr(f, 'primitive') and f.primitive else "raw"
-            parents = [p.get_name() for p in f.base_features] if hasattr(f, 'base_features') else []
-            depth = f.get_depth()
-        except:
-            prim = "unknown"
-            parents = []
-            depth = 1
-        generated_features.append({"name": f.get_name(), "primitive": prim, "parents": parents, "depth": depth})
-
-    train_out, test_out, selected_cols = _limit_features(train_feature_matrix, test_feature_matrix, y_train, cfg)
-    
-    retained_meta = [g for g in generated_features if g["name"] in selected_cols]
-
-    metadata = {
-        "n_generated": len(feature_defs),
-        "n_retained": len(selected_cols),
+    selected_train = train_matrix[selected].copy()
+    selected_test = test_matrix[selected].copy()
+    selected_meta = [_metadata_for_expression(expression_by_id[fid], fid, validity[fid]) for fid in selected]
+    generated_selected = sum(bool(expression_operators(expression_by_id[fid])) for fid in selected)
+    raw_selected = len(selected) - generated_selected
+    metadata: dict[str, Any] = {
+        "operator_registry_version": OPERATOR_REGISTRY_VERSION,
+        "operator_set_id": cfg.operator_set_id,
+        "operator_set": list(validate_operator_set(cfg.operator_set_id)),
+        "baseline_kind": cfg.baseline_kind or ("autofe" if cfg.enable_dfs else "raw"),
+        "display_identity": cfg.display_identity,
+        "cap_policy_version": CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1",
+        "base_feature_policy_version": BASE_FEATURE_POLICY_VERSION if cfg.max_base_features is not None else "none_v1",
+        "requested_cap": cfg.max_features,
+        "requested_base_cap": cfg.max_base_features,
+        "eligible_base_feature_count": len(base_columns) + len(excluded_base),
+        "base_feature_count": len(base_columns),
+        "candidate_count": len(train_matrix.columns),
+        "num_original": len(base_columns),
+        "num_generated": sum(bool(expression_operators(expression_by_id[fid])) for fid in train_matrix.columns),
+        "num_selected": len(selected),
+        "retained_raw_count": raw_selected,
+        "retained_generated_count": generated_selected,
+        "actual_estimator_input_dimension": len(selected),
+        "selector_identity": cfg.selection_method,
+        "selected_feature_identities": selected,
+        "selected_feature_expressions": selected_meta,
+        "selection_history": history,
+        "generation_time_s": 0.0,
         "ram_used_mb": (_get_process_ram_mb() - ram_before) if ram_before else 0,
-        "feature_metadata": retained_meta
+        "feature_metadata": selected_meta,
     }
-
-    return train_out, test_out, metadata
+    return selected_train, selected_test, metadata

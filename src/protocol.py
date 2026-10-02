@@ -8,7 +8,7 @@ from src.seeding import SEED_SCHEME_VERSION
 # Geometry-based folds now use predictors only. Keep their artifacts in a new
 # namespace so that historical splits, representations, and task checkpoints
 # cannot be mistaken for outputs from this corrected evaluation protocol.
-EVALUATION_PROTOCOL_VERSION = "predictor_only_geometry_v2"
+EVALUATION_PROTOCOL_VERSION = "predictor_only_geometry_v2_baselines_operators_fsva_v1"
 
 
 def cache_root() -> Path:

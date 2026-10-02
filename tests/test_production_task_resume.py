@@ -66,6 +66,8 @@ class ProductionResumeTests(unittest.TestCase):
                     "severity": 0.05,
                     "pipeline": "Raw",
                     "model": "logistic_regression",
+                    "diagnostics_enabled": True,
+                    "diagnostic_config": {"max_rows": 24, "random_state": 909, "magnitudes": [1e-3, 1e-2]},
                 }
 
                 precompute_task = {
@@ -78,6 +80,8 @@ class ProductionResumeTests(unittest.TestCase):
                         "condition",
                         "shift_family",
                         "severity",
+                        "diagnostics_enabled",
+                        "diagnostic_config",
                     )
                 }
                 self.assertEqual(pipeline_runner.precompute_unit(precompute_task), "smoke")
@@ -89,6 +93,8 @@ class ProductionResumeTests(unittest.TestCase):
                     task["condition"],
                     task["shift_family"],
                     task["severity"],
+                    task["diagnostics_enabled"],
+                    task["diagnostic_config"],
                 )
                 resumed_inputs = pipeline_runner.get_data_splits(
                     data_path,
@@ -98,6 +104,8 @@ class ProductionResumeTests(unittest.TestCase):
                     task["condition"],
                     task["shift_family"],
                     task["severity"],
+                    task["diagnostics_enabled"],
+                    task["diagnostic_config"],
                 )
                 for pipeline_name in pipeline_runner.PIPELINE_NAMES:
                     assert_frame_equal(
@@ -120,6 +128,10 @@ class ProductionResumeTests(unittest.TestCase):
                         first[4][pipeline_name]["selection_seed"],
                         resumed_inputs[4][pipeline_name]["selection_seed"],
                     )
+                    self.assertEqual(first[4][pipeline_name]["operator_set_id"], resumed_inputs[4][pipeline_name]["operator_set_id"])
+                    self.assertEqual(first[4][pipeline_name]["diagnostic_status"], "diagnostic_complete")
+                    self.assertTrue(Path(first[4][pipeline_name]["history_path"]).exists())
+                    self.assertTrue(Path(first[4][pipeline_name]["diagnostic_path"]).exists())
 
                 context = mp.get_context("spawn")
                 result_queue = context.Queue()
@@ -144,10 +156,11 @@ class ProductionResumeTests(unittest.TestCase):
                     records = [json.loads(line) for line in result_file if line.strip()]
                 self.assertEqual(len(records), 1)
                 self.assertEqual(records[0]["seed_scheme_version"], pipeline_runner.SEED_SCHEME_VERSION)
+                self.assertEqual(records[0]["diagnostic_status"], "diagnostic_complete")
                 self.assertTrue(
                     has_run(
                         "smoke", 17, 1, task["condition"], "Raw", "logistic_regression",
-                        "stratified",
+                        "stratified", pipeline_runner.pipeline_identity_token("Raw"),
                     )
                 )
 

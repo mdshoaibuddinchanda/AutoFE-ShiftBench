@@ -6,7 +6,7 @@ Usage:
 Cache layout:
     data/cache/{protocol}/{seed_scheme}/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_train.pkl
 
-Each dataset has 7 pipelines × 5 seeds × 5 folds × 14 conditions = 2,450 train caches.
+Each dataset has 14 configured pipelines × 5 seeds × 5 folds × 14 conditions = 4,900 train caches.
 """
 
 from pathlib import Path
@@ -28,11 +28,11 @@ def check_progress():
     datasets = config.get("datasets", [])
 
     # Expected counts per dataset
-    n_pipelines = 7
+    n_pipelines = 14
     n_seeds = 5
     n_folds = 5
     n_conditions = 14
-    expected_per_dataset = n_pipelines * n_seeds * n_folds * n_conditions  # 2,450
+    expected_per_dataset = n_pipelines * n_seeds * n_folds * n_conditions  # 4,900 with current 14-pipeline configuration
 
     print("=" * 70)
     print("  AutoFE-ShiftBench — Progress Report")

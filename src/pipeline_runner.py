@@ -42,7 +42,19 @@ from src.evaluation import (
     compute_distribution_distance,
     compute_jaccard_similarity,
 )
-from src.feature_engineering import expand_features_with_dfs, DFSConfig
+from src.feature_engineering import (
+    CAP_POLICY_VERSION,
+    expand_features_with_dfs,
+    DFSConfig,
+)
+from src.fsva import (
+    DEFAULT_PERTURBATION_MAGNITUDES,
+    FSVA_SCHEMA_VERSION,
+    compute_empirical_amplification,
+    compute_jacobian_diagnostic,
+    validate_jacobian_finite_difference,
+)
+from src.operator_registry import OPERATOR_REGISTRY_VERSION, raw_expression
 from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
@@ -54,6 +66,7 @@ from src.seeding import (
     estimator_seed,
     feature_selection_seed,
     split_seed,
+    stable_seed,
 )
 from src.shift_generator import apply_perturbation
 from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
@@ -68,16 +81,41 @@ RAM_LIMIT_PERCENT = 85  # Pause spawning if RAM exceeds this %
 MAX_TASKS_PER_CHILD = 50  # Reduce process respawn overhead
 
 PIPELINE_CONFIGS = {
-    "Raw": DFSConfig(enable_dfs=False, selection_method="none"),
-    "Raw_Variance": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100),
-    "Raw_MI": DFSConfig(enable_dfs=False, selection_method="mi", max_features=100),
-    "AutoFE_Baseline": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1),
-    "AutoFE_MI": DFSConfig(enable_dfs=True, selection_method="mi", max_features=100, depth=1),
-    "AutoFE_Random": DFSConfig(enable_dfs=True, selection_method="random", max_features=100, depth=1),
-    "AutoFE_NoMultiply": DFSConfig(
-        enable_dfs=True, selection_method="variance", max_features=100, depth=1,
-        trans_primitives=["add_numeric", "subtract_numeric"],
-    ),
+    # Historical Raw retained its old 20-column training variance pre-cap.
+    "Raw": DFSConfig(enable_dfs=False, selection_method="none", max_features=None,
+                     max_base_features=20, operator_set_id="none_v1",
+                     baseline_kind="historical_raw", display_identity="Raw (historical 20-column control)"),
+    "Raw_Full": DFSConfig(enable_dfs=False, selection_method="none", max_features=None,
+                           max_base_features=None, operator_set_id="none_v1",
+                           baseline_kind="full_dimensional_raw", display_identity="Raw_Full (all eligible base features)"),
+    "Raw_Capped": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100,
+                             max_base_features=None, operator_set_id="none_v1",
+                             baseline_kind="cap_matched_raw", display_identity="Raw_Capped (post-candidate cap matched)"),
+    "Raw_Variance": DFSConfig(enable_dfs=False, selection_method="variance", max_features=100,
+                               max_base_features=20, operator_set_id="none_v1",
+                               baseline_kind="historical_raw_variant", display_identity="Raw_Variance"),
+    "Raw_MI": DFSConfig(enable_dfs=False, selection_method="mi", max_features=100,
+                         max_base_features=20, operator_set_id="none_v1",
+                         baseline_kind="historical_raw_variant", display_identity="Raw_MI"),
+    "AutoFE_Baseline": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                  operator_set_id="full_arithmetic_v1", display_identity="AutoFE_Baseline (full arithmetic)"),
+    "AutoFE_MI": DFSConfig(enable_dfs=True, selection_method="mi", max_features=100, depth=1,
+                            operator_set_id="full_arithmetic_v1", display_identity="AutoFE_MI (full arithmetic)"),
+    "AutoFE_Random": DFSConfig(enable_dfs=True, selection_method="random", max_features=100, depth=1,
+                                operator_set_id="full_arithmetic_v1", display_identity="AutoFE_Random (full arithmetic)"),
+    # Historical name retained as an explicit compatibility alias for {add, sub}.
+    "AutoFE_NoMultiply": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                    operator_set_id="add_sub_v1", display_identity="AutoFE_NoMultiply (legacy add_sub alias)"),
+    "AutoFE_AddSub": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                operator_set_id="add_sub_v1", display_identity="AutoFE_AddSub ({add, sub})"),
+    "AutoFE_AddSubDiv": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                   operator_set_id="add_sub_div_v1", display_identity="AutoFE_AddSubDiv ({add, sub, div})"),
+    "AutoFE_NoDivision": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                    operator_set_id="add_sub_mul_v1", display_identity="AutoFE_NoDivision ({add, sub, mul})"),
+    "AutoFE_MultiplyOnly": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                      operator_set_id="multiply_only_v1", display_identity="AutoFE_MultiplyOnly ({mul})"),
+    "AutoFE_DivideOnly": DFSConfig(enable_dfs=True, selection_method="variance", max_features=100, depth=1,
+                                    operator_set_id="divide_only_v1", display_identity="AutoFE_DivideOnly ({div})"),
 }
 
 PIPELINE_NAMES = list(PIPELINE_CONFIGS.keys())
@@ -167,7 +205,9 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
         data/cache/{protocol}/{seed_scheme}/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_meta.json
     """
     d = _cache_dir_for_dataset(dataset_name)
-    base = f"{pipeline_name}_s{seed}_f{fold}_{condition}"
+    cfg = PIPELINE_CONFIGS[pipeline_name]
+    token = pipeline_identity_token(pipeline_name)
+    base = f"{token}_s{seed}_f{fold}_{condition}"
     return (
         d / f"{base}_train.pkl",
         d / f"{base}_test.pkl",
@@ -175,13 +215,40 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
     )
 
 
+def pipeline_identity_token(pipeline_name: str) -> str:
+    """Return a collision-resistant cache/checkpoint identity for a pipeline spec."""
+    cfg = PIPELINE_CONFIGS[pipeline_name]
+    return "__".join(
+        [
+            pipeline_name,
+            OPERATOR_REGISTRY_VERSION,
+            cfg.operator_set_id,
+            cfg.baseline_kind or "autofe",
+            f"cap{cfg.max_features if cfg.max_features is not None else 'all'}",
+            f"base{cfg.max_base_features if cfg.max_base_features is not None else 'all'}",
+            f"sel{cfg.selection_method}",
+            f"depth{cfg.depth}",
+        ]
+    ).replace(" ", "_")
+
+
+def _diagnostic_paths(dataset_name: str, pipeline_name: str, seed: int, fold: int, condition: str):
+    train_cache, test_cache, meta_cache = _pipeline_cache_paths(
+        dataset_name, pipeline_name, seed, fold, condition,
+    )
+    stem = meta_cache.with_suffix("")
+    return train_cache, test_cache, meta_cache, stem.with_name(stem.name + "_history.jsonl"), stem.with_name(stem.name + "_fsva.json")
+
+
 # ---------------------------------------------------------------------------
 # Pipeline generation (Phase 1 core)
 # ---------------------------------------------------------------------------
 
 def _run_pipeline_generation(x_train, x_test, y_train,
-                             dataset_name, split_policy, seed, fold, condition):
-    """Generate all 7 pipeline variants for one experimental unit.
+                             dataset_name, split_policy, seed, fold, condition,
+                             diagnostics_enabled: bool = False,
+                             diagnostic_config: dict[str, Any] | None = None):
+    """Generate all configured raw controls and arithmetic variants for one unit.
 
     Returns:
         res_pipelines: dict[str, (DataFrame, DataFrame)]
@@ -204,17 +271,26 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             trans_primitives=list(cfg.trans_primitives),
             monitor_ram=cfg.monitor_ram,
             random_seed=selection_random_state,
+            operator_set_id=cfg.operator_set_id,
+            baseline_kind=cfg.baseline_kind,
+            display_identity=cfg.display_identity,
         )
 
-        train_cache, test_cache, meta_cache = _pipeline_cache_paths(
+        train_cache, test_cache, meta_cache, history_path, fsva_path = _diagnostic_paths(
             dataset_name, p_name, seed, fold, condition
         )
 
-        if train_cache.exists() and test_cache.exists() and meta_cache.exists():
+        cache_compatible = train_cache.exists() and test_cache.exists() and meta_cache.exists()
+        if diagnostics_enabled:
+            cache_compatible = cache_compatible and history_path.exists() and fsva_path.exists()
+        if cache_compatible:
             x_train_fe = pd.read_pickle(train_cache)
             x_test_fe = pd.read_pickle(test_cache)
             with open(meta_cache) as f:
                 meta = json.load(f)
+            if diagnostics_enabled:
+                with history_path.open(encoding="utf-8") as history_file:
+                    meta["selection_history"] = [json.loads(line) for line in history_file if line.strip()]
             meta["dfs_cache_hit"] = True
         else:
             t0 = time.time()
@@ -224,6 +300,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             gen_time = time.time() - t0
 
             meta = {
+                **dfs_meta,
                 "num_original": x_train.shape[1],
                 "num_generated": dfs_meta.get("n_generated", 0),
                 "num_selected": dfs_meta.get("n_retained", x_train_fe.shape[1]),
@@ -235,10 +312,72 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             x_train_fe.to_pickle(train_cache)
             x_test_fe.to_pickle(test_cache)
             with open(meta_cache, "w") as f:
-                json.dump(meta, f)
+                json.dump({key: value for key, value in meta.items() if key != "selection_history"}, f)
+
+        meta["pipeline_identity"] = pipeline_identity_token(p_name)
+        meta["operator_registry_version"] = OPERATOR_REGISTRY_VERSION
+        meta["operator_set_id"] = cfg.operator_set_id
+        meta["operator_set"] = list(cfg.trans_primitives)
+        meta["cap_policy_version"] = meta.get("cap_policy_version", CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1")
+        meta["selection_seed"] = selection_random_state
+
+        history = meta.get("selection_history", [])
+        if diagnostics_enabled and not history:
+            # Reconstruct candidate metadata from the frozen selected matrices only
+            # is intentionally disallowed; a diagnostic-enabled cache must have
+            # been generated with real candidate events.
+            raise RuntimeError("Diagnostic history is missing from the generated candidate event stream")
+        if diagnostics_enabled:
+            task_context = {
+                "dataset": dataset_name,
+                "split_policy": split_policy,
+                "seed": seed,
+                "fold": fold,
+                "condition": condition,
+                "pipeline": p_name,
+                "pipeline_identity": pipeline_identity_token(p_name),
+                "operator_set_id": cfg.operator_set_id,
+                "cap_policy_version": meta.get("cap_policy_version"),
+            }
+            with history_path.open("w", encoding="utf-8") as history_file:
+                for event in history:
+                    history_file.write(json.dumps({**task_context, **event}, sort_keys=True) + "\n")
+            diagnostic_cfg = diagnostic_config or {}
+            max_rows = int(diagnostic_cfg.get("max_rows", 128))
+            diag_seed = int(diagnostic_cfg.get("random_state", seed))
+            selected_expressions = [item["expression"] for item in meta.get("selected_feature_expressions", [])]
+            # Expression dictionaries are converted by the helper below.
+            from src.fsva import expression_from_dict
+            selected_exprs = [expression_from_dict(item) for item in selected_expressions]
+            raw_exprs = [raw_expression(column) for column in x_train.columns]
+            jac = compute_jacobian_diagnostic(
+                x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                max_rows=max_rows, random_state=diag_seed,
+            )
+            amp = compute_empirical_amplification(
+                x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                magnitudes=diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES),
+                max_rows=max_rows, random_state=diag_seed,
+            )
+            derivative_validation = validate_jacobian_finite_difference(
+                x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
+            )
+            diagnostics = {
+                "schema_version": FSVA_SCHEMA_VERSION,
+                "diagnostic_status": "diagnostic_complete",
+                "task": task_context,
+                "settings": {"max_rows": max_rows, "random_state": diag_seed, "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES))},
+                "jacobian": jac,
+                "empirical_amplification": amp,
+                "derivative_validation": derivative_validation,
+            }
+            fsva_path.write_text(json.dumps(diagnostics, sort_keys=True), encoding="utf-8")
+            meta["diagnostic_schema_version"] = FSVA_SCHEMA_VERSION
+            meta["diagnostic_status"] = "diagnostic_complete"
+            meta["diagnostic_path"] = str(fsva_path)
+            meta["history_path"] = str(history_path)
 
         res_pipelines[p_name] = (x_train_fe, x_test_fe)
-        meta["selection_seed"] = selection_random_state
         res_meta[p_name] = meta
 
     return res_pipelines, res_meta
@@ -249,7 +388,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 # ---------------------------------------------------------------------------
 
 def get_data_splits(data_path, dataset_name, seed, fold, condition,
-                    shift_family, severity):
+                    shift_family, severity, diagnostics_enabled: bool = False,
+                    diagnostic_config: dict[str, Any] | None = None):
     """Load data and keep labels out of feature-based split geometry.
 
     Covariate/population fold definitions intentionally use all predictor rows
@@ -324,6 +464,8 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     res_pipelines, res_meta = _run_pipeline_generation(
         x_train_prep, x_test_prep, y_train_enc,
         dataset_name, split_policy, seed, fold, condition,
+        diagnostics_enabled=diagnostics_enabled,
+        diagnostic_config=diagnostic_config,
     )
     for pipeline_name, meta in res_meta.items():
         meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
@@ -379,9 +521,11 @@ def train_unit(kwargs):
         pipeline_name = kwargs["pipeline"]
         model_type = kwargs["model"]
         split_policy = split_policy_for_condition(kwargs["shift_family"])
+        pipeline_identity = pipeline_identity_token(pipeline_name)
 
         if has_run(
             dataset_name, seed, fold, condition, pipeline_name, model_type, split_policy,
+            pipeline_identity,
         ):
             return
 
@@ -389,6 +533,7 @@ def train_unit(kwargs):
             get_data_splits(
                 kwargs["data_path"], dataset_name, seed, fold, condition,
                 kwargs["shift_family"], kwargs["severity"],
+                kwargs.get("diagnostics_enabled", False), kwargs.get("diagnostic_config"),
             )
         )
 
@@ -450,6 +595,7 @@ def train_unit(kwargs):
             "fold": fold,
             "condition": condition,
             "pipeline": pipeline_name,
+            "pipeline_identity": pipeline_identity,
             "model": model_type,
             "status": "success",
             "n_train": len(X_tr),
@@ -463,6 +609,24 @@ def train_unit(kwargs):
             "selection_seed": meta.get("selection_seed"),
             "model_seed": model_seed,
             "distance_sample_seed": distance_seed,
+            "operator_registry_version": meta.get("operator_registry_version"),
+            "operator_set_id": meta.get("operator_set_id"),
+            "operator_set": meta.get("operator_set", []),
+            "baseline_kind": meta.get("baseline_kind"),
+            "cap_policy_version": meta.get("cap_policy_version"),
+            "requested_cap": meta.get("requested_cap"),
+            "requested_base_cap": meta.get("requested_base_cap"),
+            "eligible_base_feature_count": meta.get("eligible_base_feature_count"),
+            "candidate_count": meta.get("candidate_count"),
+            "retained_raw_count": meta.get("retained_raw_count"),
+            "retained_generated_count": meta.get("retained_generated_count"),
+            "actual_estimator_input_dimension": meta.get("actual_estimator_input_dimension"),
+            "selector_identity": meta.get("selector_identity"),
+            "selected_feature_identities": meta.get("selected_feature_identities", []),
+            "diagnostic_schema_version": meta.get("diagnostic_schema_version"),
+            "diagnostic_status": meta.get("diagnostic_status", "diagnostic_disabled"),
+            "diagnostic_path": meta.get("diagnostic_path"),
+            "history_path": meta.get("history_path"),
             "autofe_cache_hit": meta.get("dfs_cache_hit", False),
             "n_generated": meta.get("num_generated", 0),
             "n_retained": meta.get("num_selected", 0),
@@ -502,6 +666,7 @@ def writer_process(queue, results_path):
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
                 res["split_policy"],
+                res.get("pipeline_identity", ""),
             )
 
 
@@ -559,6 +724,8 @@ def main() -> None:
     parser.add_argument("--max-seeds", type=int, default=None)
     parser.add_argument("--max-folds", type=int, default=None)
     parser.add_argument("--max-conditions", type=int, default=None)
+    parser.add_argument("--enable-fsva-diagnostics", action="store_true")
+    parser.add_argument("--fsva-max-rows", type=int, default=128)
     args = parser.parse_args()
 
     # Ensure directories exist
@@ -602,6 +769,15 @@ def main() -> None:
                     precompute_tasks.append({
                         "dataset_name": d, "data_path": dp, "seed": s, "fold": f,
                         "shift_family": fam, "severity": sev, "condition": cond_name,
+                        "diagnostics_enabled": args.enable_fsva_diagnostics,
+                        "diagnostic_config": {
+                            "max_rows": args.fsva_max_rows,
+                            "random_state": stable_seed("fsva_diagnostic", {
+                                "dataset": d, "split_policy": split_policy_for_condition(fam),
+                                "seed": s, "fold": f, "condition": cond_name,
+                            }),
+                            "magnitudes": list(DEFAULT_PERTURBATION_MAGNITUDES),
+                        },
                         "size": size,
                     })
 
@@ -649,6 +825,7 @@ def main() -> None:
                     if not has_run(
                         pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
                         split_policy_for_condition(pt["shift_family"]),
+                        pipeline_identity_token(p),
                     ):
                         t = pt.copy()
                         t["pipeline"] = p
@@ -658,6 +835,7 @@ def main() -> None:
                     if not has_run(
                         pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
                         split_policy_for_condition(pt["shift_family"]),
+                        pipeline_identity_token(p),
                     ):
                         t = pt.copy()
                         t["pipeline"] = p

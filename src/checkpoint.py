@@ -45,10 +45,11 @@ def compute_hash(
     pipeline: str,
     model: str,
     split_policy: str,
+    pipeline_identity: str = "",
 ) -> str:
     return (
         f"{EVALUATION_PROTOCOL_VERSION}|{SEED_SCHEME_VERSION}|{dataset}|{split_policy}|"
-        f"{seed}|{fold}|{condition}|{pipeline}|{model}"
+        f"{seed}|{fold}|{condition}|{pipeline}|{pipeline_identity}|{model}"
     )
 
 def has_run(
@@ -59,8 +60,9 @@ def has_run(
     pipeline: str,
     model: str,
     split_policy: str,
+    pipeline_identity: str = "",
 ) -> bool:
-    h = compute_hash(dataset, seed, fold, condition, pipeline, model, split_policy)
+    h = compute_hash(dataset, seed, fold, condition, pipeline, model, split_policy, pipeline_identity)
     try:
         with _connection() as conn:
             cur = conn.execute("SELECT 1 FROM completed_tasks WHERE task_hash = ?", (h,))
@@ -76,8 +78,9 @@ def log_run(
     pipeline: str,
     model: str,
     split_policy: str,
+    pipeline_identity: str = "",
 ) -> None:
-    h = compute_hash(dataset, seed, fold, condition, pipeline, model, split_policy)
+    h = compute_hash(dataset, seed, fold, condition, pipeline, model, split_policy, pipeline_identity)
     with _connection() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO completed_tasks VALUES (?, ?, ?, ?, ?, ?, ?)",
