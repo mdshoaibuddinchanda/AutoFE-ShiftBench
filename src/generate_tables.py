@@ -114,7 +114,8 @@ def generate_table_4_memory_and_features(df: pd.DataFrame):
 def generate_table_5_statistical_tests(df: pd.DataFrame):
     if df.empty or "roc_auc" not in df.columns: return "*(No data)*\n"
     
-    out = "## Table 5: Statistical Significance (Wilcoxon Test & Effect Size)\n\n"
+    out = "## Table 5: Legacy Exploratory Pooled-Row Statistics (Wilcoxon & Effect Size)\n\n"
+    out += "*Not suitable for corrected confirmatory claims; use Table 11 dataset-level paired inference.*\n\n"
     out += "| Comparison | N Pairs | p-value | Cohen's d | Meaning |\n"
     out += "| :--- | :---: | :---: | :---: | :--- |\n"
     
@@ -150,7 +151,8 @@ def generate_table_5_statistical_tests(df: pd.DataFrame):
 
 def generate_table_6_friedman_test(df: pd.DataFrame):
     if df.empty or "roc_auc" not in df.columns: return ""
-    out = "## Table 6: Friedman Omnibus Test\n\n"
+    out = "## Table 6: Legacy Exploratory Pooled-Row Friedman Test\n\n"
+    out += "*Not suitable for corrected confirmatory claims; use Table 11 dataset-level paired inference.*\n\n"
     
     pivot = df.groupby(["dataset", "seed", "fold", "condition", "pipeline"])["roc_auc"].mean().reset_index()
     pivot = pivot.pivot(index=["dataset", "seed", "fold", "condition"], columns="pipeline", values="roc_auc").dropna()
