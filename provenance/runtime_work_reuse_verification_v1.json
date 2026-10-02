@@ -1,0 +1,91 @@
+{
+  "adaptive_report_sha256": "ee2a48fe6558b00ce7a78c8cd66ece1ff796eeac99d079f085d776e848cb6b8f",
+  "additional_mapped_vs_pickle_cpu_comparisons": 4,
+  "artifact_type": "runtime_work_reuse_verification_v1",
+  "bounded_success_cells": 1156,
+  "code_commit": "2fcce1d591e531a6a19723e7b5e60793343a1a5e",
+  "code_fingerprint": "4089328151551ee14c455e2cc5f5c6300c65f3a14d8c5cde9052606c4cbbf365",
+  "covertype_knn_worker_timings": [
+    {
+      "current_train_infer_time_s": 51.95908280008007,
+      "current_worker_elapsed_s": 88.36454070010222,
+      "prior_worker_elapsed_s": 108.01989410002716,
+      "split_policy": "row_level"
+    },
+    {
+      "current_train_infer_time_s": 47.294233400025405,
+      "current_worker_elapsed_s": 83.61679329990875,
+      "prior_worker_elapsed_s": 110.07776299997931,
+      "split_policy": "group_aware"
+    }
+  ],
+  "exact_historical_cpu_cells": 1144,
+  "full_campaign_started": false,
+  "full_suite": {
+    "elapsed_s": 139.06,
+    "environment": "existing Conda p12",
+    "passed": 179,
+    "warnings": 26
+  },
+  "gpu_feature_only_cells": 12,
+  "prior_timing_report_sha256": "5d79c3fed4e65ec4e8a72fdebced6092eff6a96e6b9917f1c2bf6114faee84ae",
+  "scientific_status": "PENDING CORRECTED RUN",
+  "scope_sha256": "3e29210511894867df33fd1fe352583e0c09503ccf23572d7854721a0398c183",
+  "shared_preprocessing_timings": [
+    {
+      "current_sum_unique_feature_preprocessing_s": 0.04261560004670173,
+      "prior_sum_unique_feature_preprocessing_s": 0.5090208000037819,
+      "split_policy": "row_level"
+    },
+    {
+      "current_sum_unique_feature_preprocessing_s": 0.045067499740980566,
+      "prior_sum_unique_feature_preprocessing_s": 0.5040946998051368,
+      "split_policy": "group_aware"
+    }
+  ],
+  "timing_limit": "Sequential bounded observations on the same host, without randomized repetitions or control of host load/thermal state. Small-run wall time increased despite lower preprocessing work; no universal speedup or campaign ETA is asserted. GPU observations include forced restart and transport-policy changes.",
+  "timings": [
+    {
+      "current_elapsed_s": 156.53100000007544,
+      "includes_forced_restart": false,
+      "kind": "small",
+      "prior_elapsed_s": 126.60899999999674,
+      "split_policy": "row_level"
+    },
+    {
+      "current_elapsed_s": 169.59299999999348,
+      "includes_forced_restart": false,
+      "kind": "small",
+      "prior_elapsed_s": 144.5779999999795,
+      "split_policy": "group_aware"
+    },
+    {
+      "current_elapsed_s": 145.23499999998603,
+      "includes_forced_restart": false,
+      "kind": "covertype",
+      "prior_elapsed_s": 157.7029999999795,
+      "split_policy": "row_level"
+    },
+    {
+      "current_elapsed_s": 229.1720000000205,
+      "includes_forced_restart": false,
+      "kind": "covertype",
+      "prior_elapsed_s": 223.53100000001723,
+      "split_policy": "group_aware"
+    },
+    {
+      "current_elapsed_s": 118.04700000002049,
+      "includes_forced_restart": true,
+      "kind": "airlines",
+      "prior_elapsed_s": 104.03099999995902,
+      "split_policy": "row_level"
+    },
+    {
+      "current_elapsed_s": 237.81200000003446,
+      "includes_forced_restart": true,
+      "kind": "airlines",
+      "prior_elapsed_s": 213.09299999999348,
+      "split_policy": "group_aware"
+    }
+  ]
+}

@@ -1,0 +1,393 @@
+{
+  "adaptive_report_sha256": "ee2a48fe6558b00ce7a78c8cd66ece1ff796eeac99d079f085d776e848cb6b8f",
+  "all_seven_ready": true,
+  "artifact_type": "reviewer1_launch_readiness_v5",
+  "bounded_verification": {
+    "additional_mapped_vs_pickle_cpu_comparisons": 4,
+    "compared_cells": 1156,
+    "exact_cpu_cells": 1144,
+    "forced_restart_proofs": 4,
+    "gpu_feature_only_cells": 12
+  },
+  "checked_utc": "2026-10-02T00:01:25.101487+00:00",
+  "code_commit_at_freeze": "2fcce1d591e531a6a19723e7b5e60793343a1a5e",
+  "code_fingerprint": "4089328151551ee14c455e2cc5f5c6300c65f3a14d8c5cde9052606c4cbbf365",
+  "focused_tests": [
+    {
+      "elapsed_s": 68.24,
+      "passed": 52,
+      "warnings": 15
+    },
+    {
+      "elapsed_s": 22.11,
+      "passed": 12,
+      "warnings": 13
+    }
+  ],
+  "full_campaign_started": false,
+  "full_suite": {
+    "elapsed_s": 139.06,
+    "environment": "existing Conda p12",
+    "passed": 179,
+    "source_commit": "2fcce1d591e531a6a19723e7b5e60793343a1a5e",
+    "warnings": 26
+  },
+  "host": "SHOAIB_CHANDA",
+  "independent_read_only_review": {
+    "path": "provenance/runtime_work_reuse_agent_review_v1.md",
+    "sha256": "35806b62b22e4afa0f662116e324997ebf7cbffb3248bab297d3b71a0edde0ce",
+    "verdict": "No remaining launch blocker found on this host; no full benchmark launched"
+  },
+  "limitations": [
+    "Memory budgets remain soft admission estimates, not native allocation caps.",
+    "Useful small-data work uses less than20GiB; no artificial RAM allocation.",
+    "External RAM/VRAM pressure can pause admission indefinitely.",
+    "GPU comparisons verify features/candidates; CPU/GPU metric equality and GPU repeatability are not asserted.",
+    "Bounded sequential timing observations do not establish universal speedup or a full-campaign ETA.",
+    "GPU bounded checks cover Raw/AutoFE_Baseline and clean conditions; all operator GPU effects await the corrected matched-backend campaign.",
+    "Input opening time excludes pickle serialization/deserialization; worker-time sums are not wall time.",
+    "Transport telemetry resumes from the last durable snapshot; hard-kill volatile increments may be absent.",
+    "CPU look-ahead during GPU waits remains deferred pending profiling."
+  ],
+  "mechanism_scope_sha256": "b82a1085fc16ad0ada0d96802346f684a93302dd3bce7fe8295cb6460141ec7e",
+  "mechanism_smoke_tasks": 4,
+  "permission_scope": "Frozen and verified only; full campaign not launched.",
+  "preexisting_working_tree_change": {
+    "description": "Existing execution-count edit untouched, excluded from source fingerprint and revision commits.",
+    "path": "notebooks/visualization.ipynb"
+  },
+  "python_executable": "D:\\Conda\\p12\\python.exe",
+  "ready_for_full_campaign": true,
+  "reporting_verification": {
+    "artifact_sha256": {
+      "corrected_runs/runtime_reporting_smoke_v1/assets/asset_manifest.json": "c7a6d59bf6f0941bcf96708e5e5c1ff121c4ceb33a3dbbfd943dfa774e42de7e",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/baseline_operator_candidate_stages.pdf": "b17d611770eca7eec720bb971aaa299c442bd42ac5108f95e2ac4ecabc299712",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/baseline_operator_candidate_stages.png": "3de71f2eb425547c773e471348d0d14f71f1de52c27be29b4668a48c6ce58d0d",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/corrected_results_note.md": "617a81e3cf8d53a871ced47138a6262334c123d8f47089098bc02bc45bed7dac",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/operator_selected_candidates.pdf": "89d420802f6be3d3257c919bf010449a02224a8236c25469937baaa4919fc068",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/operator_selected_candidates.png": "957abb5a0d42268e99973389d924fdc259e0f449c05bfcdeccab990ae95af2bf",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_auc_ablation.pdf": "37aed13aaa4c36278bd822e5c7e54d498265bbaa6d99563f608d273c01eb4d6b",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_auc_ablation.png": "24d1eaf05971aa65601cda12e6e61840e9f6856353299d28ff3648060710f56f",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_auc_coverage.pdf": "c1e713f308cd6a1884f41743b8c125ef7c0aafb1c9f0c3e2617b2451232807ac",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_auc_coverage.png": "0c1ddada32b50b1b72c32433faeb3c4b1215772d93ee23e561e81a7b73c6a3b3",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_condition_auc_summary.csv": "4b7f9eaae36644e881a68b982171e171e9b6ab09d714a4c1e225ca1fb0d1f5e4",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_dataset_auc_coverage.csv": "3d52e72978856b22e38d896a8ca91f264385677dd2b8faf6b44c4189876ce288",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_dataset_condition_auc.csv": "ec11670b58b659adde003605f51d1bd475b542b3bb89c9292c34a5f2260cabea",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_dataset_contrasts.csv": "a171cc5aa93284193cde0f457be847a0bbcb38c6fcc0cb899037b4705a9a9451",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_descriptive_contrasts.csv": "0f04861ab5cdc30db898cd10fb2745a54d750e9de692fe6de20594f4208d8ec8",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_f1_contrasts.csv": "9f28aa7a65b2eb6189dc529abf130294d0bd2a34b3cc48db365f2485fea550f0",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_f1_contrasts.pdf": "a378c946c28ab96c48a06171de13bfb6a26d327d695c40ca952262e15deb01ee",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_f1_contrasts.png": "a2af6eccd15a39f98dbe823559a08d020fd3579ad320a7f23fb9fc68b878df9e",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_missingness_auc_bounds.csv": "0c430f5eaaf713b98522b54c841ba02d88a9f0fe5bde0309c395ad28192c82c6",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_missingness_auc_bounds.pdf": "95a87eb7b0453752c87aef4f74ba5b095d708e3359739f0e1e9f0d6acd9b9d45",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_missingness_auc_bounds.png": "db3c718168ff21da6dcf2b7095469510e1862d92e0341c04bb47e1ffe1172424",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_missingness_contrast_bounds.csv": "ee874cf61fbd7d7e5f117b61d4ea8093d0689d44958e0157488d765189cca855",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_missingness_contrast_summary.csv": "ce4eaa14af21971ec84bc83b1c04a64e9faa09e1ab685c62af5e097654b6649e",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_operator_candidate_counts.csv": "15c8963c19f675ae8fc5b7d8537e0c19967621279e87ea82d322a5c2a2f61e75",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_pipeline_auc_summary.csv": "cbc75db38d1be06389ed080bcb792805386e44ccf509ae56ea85efc520e0bb3f",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_resource_budget_and_use.pdf": "6e711646a7b10e889759fb5fef9d45e06620363d019c53a3d9b88f6f3b39438f",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_resource_budget_and_use.png": "aa78985c9b3388bc4ea28b877c1a3e52b6112736400c70ead8d99d41a3be9082",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/primary_resource_policy_and_use.csv": "2d51ab77a67fed5a912c1ca8e2a346f7e425210b40c08a4ef06ae4b4ce70ecbd",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/row_group_auc_difference.pdf": "89379165957b8624bacc15720e802188c1698f886a3fa51e9715a9a6272a544a",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/row_group_auc_difference.png": "2d074e5899246b0fc280bf172430d5695d2f6a7146cba45135c4e87541245992",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/row_group_dataset_auc.csv": "b0bd475f3ad781db6ab6dc814a41e8e2b7fd108c2ae1b16298145c3cf8d82199",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/row_group_f1_contrast_comparison.csv": "7779fcff9879a8a1d215d333bd693443eab077b50f33d5c7f2623589c2ced6d1",
+      "corrected_runs/runtime_reporting_smoke_v1/assets/row_group_pipeline_auc_summary.csv": "badc96f5f0a05bbbd7ddbbe64c0c0b2e21de3e43ea6d019c94e0e281675dd11f",
+      "corrected_runs/runtime_reporting_smoke_v1/gpu_resource_assets/asset_manifest.json": "2a4322f8975195ef535e0335b86a11201152d56f486a16866352c634a4639833",
+      "corrected_runs/runtime_reporting_smoke_v1/gpu_resource_assets/primary_resource_budget_and_use.pdf": "217bb1f2439985e2074c70acfdb3b4f3132878740aba011547e8d9d61a5bcc11",
+      "corrected_runs/runtime_reporting_smoke_v1/gpu_resource_assets/primary_resource_budget_and_use.png": "612a39c394fc4ff322aecaae187495cd959df3486e8fedc354839e504987092a",
+      "corrected_runs/runtime_reporting_smoke_v1/gpu_resource_assets/primary_resource_policy_and_use.csv": "b6cef6a89162d66b6b54c621384bd22e14b12a275bcd27b0ddd9e351971d3891",
+      "corrected_runs/runtime_reporting_smoke_v1/gpu_scope.json": "4694e6a9c7b80cc3f47656027bcae2e1ee64eab6b372004fa11916f835602d6d",
+      "corrected_runs/runtime_reporting_smoke_v1/scope.json": "024877a16c5fb033feb8aa614463e298eb3d1bde91a4607a30d054634df3fc6b"
+    },
+    "gpu_resource_cells_per_policy": 4,
+    "primary_csvs": 15,
+    "primary_png_pdf_pairs": 8,
+    "repository_diagnostic_figure_sha256": {
+      "provenance/figures/runtime_work_reuse_resource_diagnostic.pdf": "217bb1f2439985e2074c70acfdb3b4f3132878740aba011547e8d9d61a5bcc11",
+      "provenance/figures/runtime_work_reuse_resource_diagnostic.png": "612a39c394fc4ff322aecaae187495cd959df3486e8fedc354839e504987092a"
+    },
+    "scientific_complete": false,
+    "visual_review": "Both resource figures have readable diagnostic banners, backend/transport counts and worker phase timings; pilot diagnostic, not corrected performance."
+  },
+  "requirements_constraints_checked": 22,
+  "resource_plan": {
+    "backend_by_model": {
+      "catboost": "gpu",
+      "extra_trees": "cpu",
+      "gaussian_nb": "cpu",
+      "knn": "cpu",
+      "lightgbm": "cpu",
+      "linear_svm": "cpu",
+      "logistic_regression": "cpu",
+      "mlp": "cpu",
+      "random_forest": "cpu",
+      "xgboost": "gpu"
+    },
+    "cache_max_bytes": 12802300211,
+    "cache_override": null,
+    "cpu_reserve_satisfied": true,
+    "gpu_backend_comparison_rule": "Common training-schema matrix bound across every configured pipeline for the same dataset/split/seed/fold/condition/model; static oversize uses CPU for the whole comparison in auto mode",
+    "gpu_capacity_matrix_factor": 2,
+    "gpu_probe": {
+      "catboost": {
+        "devices": {
+          "0": {
+            "supported": true
+          }
+        },
+        "supported": true
+      },
+      "xgboost": {
+        "devices": {
+          "0": {
+            "supported": true
+          }
+        },
+        "supported": true
+      }
+    },
+    "gpu_worker_pool": "one persistent process per verified device; all CPU/GPU fits share the total admission ceiling",
+    "hardware": {
+      "allowed_cpu_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "cuda_visible_devices": null,
+      "disk_total_bytes": 512092008448,
+      "gpu_devices": [
+        {
+          "device_index": 0,
+          "driver_version": "616.64",
+          "name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "physical_index": 0,
+          "total_bytes": 4294967296,
+          "uuid": "GPU-c0408868-2c5d-efec-4592-c83aefdb847d"
+        }
+      ],
+      "logical_cpus": 8,
+      "physical_cpus": 4,
+      "ram_total_bytes": 34073251840
+    },
+    "memory_limit_type": "soft estimated admission; native allocation is not forcibly capped",
+    "policy": "adaptive-v3",
+    "ram_budget_bytes": 27258601472,
+    "ram_reserve_bytes": 6814650367,
+    "settings": {
+      "gpu_policy": "auto",
+      "ram_target_fraction": 0.8,
+      "reserve_cpus": 2,
+      "vram_target_fraction": 0.8
+    },
+    "worker_ceiling": 6,
+    "worker_cpu_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "worker_override": null
+  },
+  "runs": [
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-primary-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-primary-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-domain-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-availability-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-availability-group"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-relabel-row"
+    },
+    {
+      "active_heavy_coordinators": [],
+      "adaptive_evidence_error": null,
+      "adaptive_evidence_status": "passed",
+      "checks": {
+        "adaptive_cpu_gpu_large_and_recovery_evidence": true,
+        "adaptive_hardware": true,
+        "analysis_definitions": true,
+        "code_fingerprint": true,
+        "dataset_list": true,
+        "datasets": true,
+        "disk_margin": true,
+        "existing_p12": true,
+        "group_seed_audit": true,
+        "mechanism_history_scope": true,
+        "numerical_threads": true,
+        "one_heavy_coordinator": true,
+        "requirements_pins": true,
+        "run_identity": true
+      },
+      "free_gib": 431.82,
+      "mechanism_history_status": "ready",
+      "minimum_free_gib": 99.03,
+      "package_mismatches": [],
+      "ready_for_frozen_command": true,
+      "run_id": "r1-v5-relabel-group"
+    }
+  ],
+  "runtime_work_reuse_report_sha256": "78d7db4559e5d28019285a63d5d7189df4365c2ae2480db58e7dc5e1e458a778",
+  "scientific_status": "PENDING CORRECTED RUN",
+  "scope_sha256": "3e29210511894867df33fd1fe352583e0c09503ccf23572d7854721a0398c183"
+}

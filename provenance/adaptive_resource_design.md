@@ -1,3 +1,5 @@
+> Current execution follow-up: [runtime_work_reuse_design.md](runtime_work_reuse_design.md) and [v5 readiness](reviewer1_launch_readiness_v5.json) supersede the v4 launch identity/storage/evidence described below. CPU/RAM/VRAM rules remain; v5 adds a separate transport disk allowance and verifies mapped CPU/GPU recovery. The v4 records below are retained as engineering history.
+
 # Adaptive host resource policy
 
 Implemented for the 2026-10-01 request to replace fixed execution limits with machine-aware CPU/RAM/VRAM admission. The corrected campaign has not started. Use the existing Conda p12; no packages or environments were added.

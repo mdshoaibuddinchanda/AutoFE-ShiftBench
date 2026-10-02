@@ -1,6 +1,18 @@
 # Reviewer #1 corrected run plan
 
-## Current plan: v4 adaptive execution (2026-10-01)
+## Current plan: v5 runtime work reuse (2026-10-02)
+
+Use [launch_commands_v5.md](launch_commands_v5.md), [reviewer1_launch_scope_v5.json](reviewer1_launch_scope_v5.json), [runtime_work_reuse_design.md](runtime_work_reuse_design.md), and [v5 readiness](reviewer1_launch_readiness_v5.json). V4 and earlier scope/readiness artifacts remain historical. The full campaign has not started. Re-run the host gate before each long command; use existing p12 and one heavy coordinator at a time.
+
+V5 removes unused training hard predictions/metrics, reuses identical training-only preprocessing across pipelines, and shares large numeric inputs through private copy-on-write views. Models, scientific caps, candidate selection, seeds, folds, conditions, the 14 pipelines and all seven task counts remain fixed. Every setting enters execution identity. Temporary transport files are regenerable and reclaimed; durable result/checkpoint ledgers remain research records.
+
+Performance scope remains **2,275,000 intended; 84,000 planned group-AUC skips; at most 2,191,000 eligible before condition-specific skips**. Group primary AUC covers at most 23 datasets with explicit infeasibility records for wine-quality-red/kddcup99. Separate mechanism scope remains 1,250 intended feature tasks, 50 skips and 1,200 histories.
+
+The host-derived 11.923 GiB transport cap has its own reservation, in addition to ready feature cache and staging. The doubled 31.13 GiB result/checkpoint estimate plus all three 11.923 GiB temporary allowances and 1 GiB mechanism reserve requires **99.03 GiB free**. This is a conservative planning estimate, not a guaranteed output bound. Host CPU/RAM/VRAM rules remain dynamic; no artificial memory allocation or new environment is used.
+
+Fresh bounded evidence includes all-operator/all-classifier CPU parity, Covertype, mapped XGBoost/CatBoost recovery, separate real-data mapped/pickle CPU comparisons/recovery, and mechanism matrix parity. The readiness artifact binds tests, hashes, storage and reporting evidence. The authoritative exporter retains 15 primary CSVs and eight PNG/PDF pairs, with additional transport and worker timing values. Corrected scientific effects remain **PENDING CORRECTED RUN**. CPU look-ahead during GPU waits remains deferred pending measured evidence; bounded timings are not a full-campaign ETA.
+
+## Historical plan: v4 adaptive execution (2026-10-01)
 
 The user requested machine-aware CPU/RAM/VRAM use. The fixed-policy v3 freeze and completed evidence remain historical. Current instructions are [launch_commands_v4.md](launch_commands_v4.md), [reviewer1_launch_scope_v4.json](reviewer1_launch_scope_v4.json), [adaptive resource policy](adaptive_resource_design.md), and the fresh v4 readiness artifact. The full campaign has not started. Re-run the verifier before every long command; use existing p12 and one heavy coordinator at a time.
 
