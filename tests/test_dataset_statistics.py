@@ -123,6 +123,16 @@ class DatasetStatisticsTests(unittest.TestCase):
         self.assertIn("n_datasets", summary.columns)
         self.assertTrue(output.exists())
 
+    def test_active_stats_reader_can_analyse_declared_fair_control(self) -> None:
+        rows = []
+        for dataset in ("d1", "d2"):
+            rows.extend([_record(dataset, 1, "Raw_Capped", 0.5), _record(dataset, 1, "AutoFE_Baseline", 0.7)])
+        ledger = self._write(rows)
+        output = ledger.parent / "fair_control.csv"
+        summary = run_wilcoxon_analysis(ledger, output, pipeline_a="Raw_Capped", pipeline_b="AutoFE_Baseline")
+        self.assertEqual(set(summary["pipeline_a"]), {"Raw_Capped"})
+        self.assertEqual(set(summary["pipeline_b"]), {"AutoFE_Baseline"})
+
 
 if __name__ == "__main__":
     unittest.main()

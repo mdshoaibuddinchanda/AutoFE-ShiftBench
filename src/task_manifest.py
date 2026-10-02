@@ -336,6 +336,30 @@ class ManifestStore:
             raise ManifestError(f"Unknown task: {task_id}")
         return json.loads(task["payload_json"])
 
+    def snapshot(self, run_id: str) -> dict[str, Any]:
+        """Read one consistent SQLite snapshot for analysis and provenance.
+
+        All three tables are read under one SQLite transaction so a coverage
+        report cannot mix task states from one coordinator moment with attempt
+        or durable-result rows from another.
+        """
+        captured_at = _now()
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            run = connection.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            if run is None:
+                raise ManifestError(f"Unknown run: {run_id}")
+            tasks = connection.execute("SELECT * FROM tasks WHERE run_id = ? ORDER BY scientific_task_id", (run_id,)).fetchall()
+            attempts = connection.execute("SELECT * FROM attempts WHERE run_id = ? ORDER BY attempt_id", (run_id,)).fetchall()
+            durable_results = connection.execute("SELECT * FROM durable_results WHERE run_id = ? ORDER BY scientific_task_id", (run_id,)).fetchall()
+        return {
+            "captured_at": captured_at,
+            "run": dict(run),
+            "tasks": [dict(row) for row in tasks],
+            "attempts": [dict(row) for row in attempts],
+            "durable_results": [dict(row) for row in durable_results],
+        }
+
     def claim_task(self, run_id: str, task_id: str, *, worker_id: str = "unknown", timeout_seconds: float | None = None) -> str | None:
         now = _now()
         with self._connect() as connection:

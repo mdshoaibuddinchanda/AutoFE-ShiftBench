@@ -136,6 +136,19 @@ class TaskManifestTests(unittest.TestCase):
         self.assertEqual(report["malformed_lines"], 1)
         self.assertEqual(store.get_task("run_test", task_id)["state"], "completed")
 
+    def test_snapshot_reads_run_tasks_attempts_and_durable_results_together(self) -> None:
+        records = build_task_records(["d1"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
+        store = self._store(records)
+        task_id = records[0]["scientific_task_id"]
+        attempt = store.claim_task("run_test", task_id, worker_id="snapshot")
+        store.commit_result("run_test", task_id, attempt, {"status": "success", "roc_auc": 0.75})
+        snapshot = store.snapshot("run_test")
+        self.assertEqual(snapshot["run"]["run_id"], "run_test")
+        self.assertEqual(len(snapshot["tasks"]), 1)
+        self.assertEqual(len(snapshot["attempts"]), 1)
+        self.assertEqual(len(snapshot["durable_results"]), 1)
+        self.assertEqual(snapshot["tasks"][0]["state"], "completed")
+
 
 if __name__ == "__main__":
     unittest.main()
