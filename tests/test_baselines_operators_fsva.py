@@ -18,6 +18,7 @@ from src.operator_registry import (
     expression_to_string,
     op_expression,
     raw_expression,
+    operator_set_manifest,
 )
 from src.pipeline_runner import PIPELINE_CONFIGS, pipeline_identity_token
 
@@ -57,6 +58,10 @@ class BaselineOperatorFsvaTests(unittest.TestCase):
             self.assertEqual(tuple(PIPELINE_CONFIGS[name].trans_primitives), OPERATOR_SET_REGISTRY[operator_set])
         self.assertNotEqual(pipeline_identity_token("Raw_Full"), pipeline_identity_token("Raw_Capped"))
         self.assertIn("legacy", PIPELINE_CONFIGS["AutoFE_NoMultiply"].display_identity)
+        self.assertEqual(
+            operator_set_manifest()["add_sub_div_v1"]["operators"],
+            ["add_numeric", "subtract_numeric", "divide_numeric"],
+        )
 
     def test_full_raw_and_cap_matched_raw_have_declared_dimensions(self) -> None:
         full, _, full_meta = expand_features_with_dfs(

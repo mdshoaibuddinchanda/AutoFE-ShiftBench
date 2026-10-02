@@ -46,6 +46,18 @@ OPERATOR_SET_REGISTRY: dict[str, tuple[str, ...]] = {
     "none_v1": (),
 }
 
+
+def operator_set_manifest() -> dict[str, dict[str, Any]]:
+    """Return a serializable registry manifest for result and artifact metadata."""
+    return {
+        set_id: {
+            "operator_set_id": set_id,
+            "registry_version": OPERATOR_REGISTRY_VERSION,
+            "operators": list(operators),
+        }
+        for set_id, operators in OPERATOR_SET_REGISTRY.items()
+    }
+
 Expression = tuple[Any, ...]
 
 

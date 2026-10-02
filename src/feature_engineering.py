@@ -24,6 +24,7 @@ from src.operator_registry import (
     op_expression,
     raw_expression,
     validate_operator_set,
+    operator_set_manifest,
 )
 
 
@@ -248,6 +249,7 @@ def expand_features_with_dfs(
         "operator_registry_version": OPERATOR_REGISTRY_VERSION,
         "operator_set_id": cfg.operator_set_id,
         "operator_set": list(validate_operator_set(cfg.operator_set_id)),
+        "operator_set_manifest": operator_set_manifest()[cfg.operator_set_id],
         "baseline_kind": cfg.baseline_kind or ("autofe" if cfg.enable_dfs else "raw"),
         "display_identity": cfg.display_identity,
         "cap_policy_version": CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1",

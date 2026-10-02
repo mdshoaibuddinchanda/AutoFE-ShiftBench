@@ -612,6 +612,7 @@ def train_unit(kwargs):
             "operator_registry_version": meta.get("operator_registry_version"),
             "operator_set_id": meta.get("operator_set_id"),
             "operator_set": meta.get("operator_set", []),
+            "operator_set_manifest": meta.get("operator_set_manifest"),
             "baseline_kind": meta.get("baseline_kind"),
             "cap_policy_version": meta.get("cap_policy_version"),
             "requested_cap": meta.get("requested_cap"),
