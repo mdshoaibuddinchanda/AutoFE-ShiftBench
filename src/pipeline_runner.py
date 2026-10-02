@@ -61,6 +61,7 @@ from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
+from src.provenance import collect_code_identity
 from src.seeding import (
     SEED_SCHEME_VERSION,
     corruption_seed,
@@ -1068,6 +1069,7 @@ def main() -> None:
     manifest_config = {
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
+        "code_identity": collect_code_identity(Path.cwd()),
         "datasets": datasets,
         "seeds": seeds,
         "folds": folds,

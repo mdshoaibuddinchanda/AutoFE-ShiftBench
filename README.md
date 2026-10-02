@@ -221,6 +221,33 @@ dir /b data\cache\predictor_only_geometry_v2_baselines_operators_fsva_v1\sha256_
 ls data/cache/predictor_only_geometry_v2_baselines_operators_fsva_v1/sha256_canonical_json_u32_v1/adult/*_train.pkl | wc -l
 ```
 
+### Incomplete-run sensitivity and provenance
+
+The manifest is the declared task universe. The read-only sensitivity reader
+freezes one SQLite manifest snapshot and one ledger hash, then reports planned,
+completed, failed, skipped, and unresolved model tasks. It emits the historical
+`Raw` contrast and the predeclared `Raw_Capped` and `Raw_Full` controls against
+`AutoFE_Baseline`, with matched-task, common-eligible, complete-dataset,
+coverage-threshold, stop-prefix, leave-one-dataset-out, and ROC-AUC
+identification-bound outputs:
+
+```bash
+python -m src.stats_analysis --sensitivity --manifest-db reports/manifests/task_manifest.db --ledger reports/tables/results_stream.jsonl --run-id <run_id>
+```
+
+Create or verify a metadata-only provenance package without copying data or
+caches:
+
+```bash
+python -m src.provenance_cli package --output-dir reports/provenance --manifest-db reports/manifests/task_manifest.db --ledger reports/tables/results_stream.jsonl --run-id <run_id>
+python -m src.provenance_cli verify --manifest-db reports/manifests/task_manifest.db --ledger reports/tables/results_stream.jsonl --run-id <run_id> --package-dir reports/provenance
+```
+
+The package records dataset availability and hashes when local CSV bytes exist,
+code and environment identity, manifest and ledger lineage, compatibility
+checks, and reproduction commands. Missing raw datasets remain explicitly
+unavailable; a package does not imply that the full benchmark has run.
+
 ---
 
 ## Project Structure
@@ -255,9 +282,14 @@ AutoFE-ShiftBench/
 │   ├── shap_explainer.py          # SHAP feature importance
 │   ├── shift_generator.py         # 8 perturbation families
 │   ├── splitters.py               # Stratified / Covariate / Population splits
-│   └── stats_analysis.py          # Cliff's Delta, Wilcoxon, Friedman, Nemenyi
+│   ├── stats_analysis.py          # Active dataset-level and sensitivity readers
+│   ├── sensitivity_analysis.py    # Manifest-backed incomplete-run regimes
+│   ├── provenance.py              # Dataset, code, environment, and lineage package
+│   └── provenance_cli.py          # Read-only provenance package/verify CLI
 ├── notebooks/
 │   └── visualization.ipynb        # Interactive exploration notebook
+├── reproduction/
+│   └── README.md                  # Bounded P12 reproduction commands
 ├── main.py                        # Single entry point: download + run
 ├── setup_and_run.bat              # Windows one-command setup
 ├── requirements.txt               # Python dependencies
