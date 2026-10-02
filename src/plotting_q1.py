@@ -16,6 +16,8 @@ import seaborn as sns
 import scikit_posthocs as sp
 import scipy.stats as ss
 
+from src.protocol import results_ledger_path
+
 
 # The primary paper scope is the 22 datasets for which the run produced a
 # complete or near-complete block of results.  The three remaining configured
@@ -126,7 +128,7 @@ def _save_figure(fig, out_dir: Path, stem: str, dpi: int = 300):
 
 
 def _load_data(
-    results_path="reports/tables/results_stream.jsonl",
+    results_path=results_ledger_path(),
     datasets: Iterable[str] | None = PRIMARY_DATASETS,
 ):
     path = Path(results_path)
@@ -396,7 +398,7 @@ def plot_fig10_ablation(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
 
 
 def generate_all(
-    results_path="reports/tables/results_stream.jsonl",
+    results_path=results_ledger_path(),
     out_dir="reports/figures/q1_paper_regenerated",
     datasets: Iterable[str] | None = PRIMARY_DATASETS,
     dpi: int = 300,

@@ -6,7 +6,10 @@ import pandas as pd
 import numpy as np
 import scipy.stats as ss
 
-def _load_data(results_path="reports/tables/results_stream.jsonl"):
+from src.protocol import results_ledger_path
+
+
+def _load_data(results_path=results_ledger_path()):
     path = Path(results_path)
     if not path.exists():
         return pd.DataFrame()

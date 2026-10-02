@@ -29,6 +29,6 @@ echo [3/3] Starting benchmark with full parallelization...
 python -m src.pipeline_runner
 echo.
 echo ============================================================
-echo   Benchmark complete! Results in reports/tables/results_stream.jsonl
+echo   Benchmark complete! Results in reports/tables/results_stream_predictor_only_geometry_v2.jsonl
 echo ============================================================
 pause

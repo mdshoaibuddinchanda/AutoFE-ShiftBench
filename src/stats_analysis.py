@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon, friedmanchisquare
 
+from src.protocol import results_ledger_path
+
 
 def cliffs_delta(x: np.ndarray, y: np.ndarray) -> float:
     """Compute Cliff's Delta effect size for two non-parametric samples."""
@@ -59,7 +61,7 @@ def run_friedman_nemenyi(data: pd.DataFrame, value_col: str, group_col: str, blo
 
 
 def run_wilcoxon_analysis(
-    final_results_path: str | Path = "reports/tables/results_stream.jsonl",
+    final_results_path: str | Path = results_ledger_path(),
     output_path: str | Path = "reports/tables/statistical_results.csv",
     alpha: float = 0.05,
 ) -> pd.DataFrame:

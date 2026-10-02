@@ -5,8 +5,10 @@ import json
 from scipy.stats import friedmanchisquare
 from pathlib import Path
 import os
+from src.protocol import results_ledger_path
 
-def load_results(jsonl_path="reports/tables/results_stream.jsonl"):
+
+def load_results(jsonl_path=results_ledger_path()):
     records = []
     if not os.path.exists(jsonl_path):
         return pd.DataFrame()

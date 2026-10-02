@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from src.protocol import results_ledger_path
+
 
 def set_publication_style():
     """Set seaborn styles for IEEE/ACM publication quality."""
@@ -52,7 +54,7 @@ def plot_overall_robustness_cd(
 
 
 def plot_performance_degradation(
-    results_path: str | Path = "reports/tables/results_stream.jsonl",
+    results_path: str | Path = results_ledger_path(),
     output_dir: str | Path = "reports/figures"
 ):
     """Plot AUC degradation vs Perturbation Severity for Raw vs AutoFE."""
@@ -131,7 +133,7 @@ def plot_performance_degradation(
 
 
 def plot_runtime_efficiency(
-    results_path: str | Path = "reports/tables/results_stream.jsonl",
+    results_path: str | Path = results_ledger_path(),
     output_dir: str | Path = "reports/figures"
 ):
     """Plot inference and training time overheads of AutoFE vs Raw."""
@@ -173,7 +175,7 @@ def plot_runtime_efficiency(
     plt.savefig(out_dir / "inference_time_comparison.png")
     plt.close()
 
-def generate_all_plots(results_path: str | Path = "reports/tables/results_stream.jsonl"):
+def generate_all_plots(results_path: str | Path = results_ledger_path()):
     """Generate the full 30-figure suite from results."""
     plot_performance_degradation(results_path)
     plot_runtime_efficiency(results_path)

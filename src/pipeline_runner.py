@@ -1,13 +1,11 @@
 """Benchmark orchestrator with human-readable caching and full parallelization.
 
 Cache Layout (human-readable):
-    data/cache/{dataset}/splits_s{seed}_{shift_family}.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_train.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_test.pkl
-    data/cache/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_meta.json
+    data/cache/{protocol}/{seed_scheme}/{dataset}/splits_s{seed}_{split_policy}.pkl
+    data/cache/{protocol}/{seed_scheme}/{dataset}/{pipeline}_s{seed}_f{fold}_{condition}_*.{pkl,json}
 
 Progress Tracking:
-    Each dataset gets its own subdirectory under data/cache/.
+    Each dataset gets a subdirectory under the versioned data/cache namespace.
     To check progress:  python -m src.check_progress
     Or simply:          dir /b data\\cache\\<dataset>\\*_train.pkl | find /c /v ""
 """
@@ -48,7 +46,9 @@ from src.feature_engineering import expand_features_with_dfs, DFSConfig
 from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
+from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
 from src.shift_generator import apply_perturbation
+from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
 from src.shap_explainer import compute_shap_values
 
 # ---------------------------------------------------------------------------
@@ -119,15 +119,34 @@ def setup_logger(log_file: str | Path) -> logging.Logger:
 # ---------------------------------------------------------------------------
 
 def _cache_dir_for_dataset(dataset_name: str) -> Path:
-    """Return data/cache/{dataset_name}/, creating it if needed."""
-    d = Path("data/cache") / dataset_name
+    """Return the current protocol's dataset cache directory."""
+    d = cache_root() / dataset_name
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-def _split_cache_path(dataset_name: str, seed: int, shift_family: str) -> Path:
-    """data/cache/{dataset}/splits_s{seed}_{shift_family}.pkl"""
-    return _cache_dir_for_dataset(dataset_name) / f"splits_s{seed}_{shift_family}.pkl"
+def _split_cache_path(dataset_name: str, seed: int, split_policy: str) -> Path:
+    """Return a split cache path keyed by dataset, replicate, and split policy."""
+    return _cache_dir_for_dataset(dataset_name) / f"splits_s{seed}_{split_policy}.pkl"
+
+
+def split_predictors_and_target(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, str]:
+    """Separate one declared target column from the predictor matrix."""
+    target_col = "target_label" if "target_label" in frame.columns else "target"
+    if target_col not in frame.columns:
+        raise KeyError("Dataset must contain either 'target_label' or 'target'")
+    y = frame[target_col].copy()
+    X = frame.drop(columns=[target_col]).copy()
+    if target_col in X.columns:
+        raise AssertionError("The target column entered the predictor frame")
+    return X, y, target_col
+
+
+def split_policy_for_condition(shift_family: str) -> str:
+    """Resolve the partition policy from a benchmark condition family."""
+    if shift_family in {"covariate_shift", "population_shift"}:
+        return shift_family
+    return "stratified"
 
 
 def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
@@ -135,9 +154,9 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
     """Return (train_pkl, test_pkl, meta_json) with human-readable names.
 
     Example:
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_train.pkl
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_test.pkl
-        data/cache/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_meta.json
+        data/cache/{protocol}/{seed_scheme}/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_train.pkl
+        data/cache/{protocol}/{seed_scheme}/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_test.pkl
+        data/cache/{protocol}/{seed_scheme}/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_meta.json
     """
     d = _cache_dir_for_dataset(dataset_name)
     base = f"{pipeline_name}_s{seed}_f{fold}_{condition}"
@@ -153,7 +172,7 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
 # ---------------------------------------------------------------------------
 
 def _run_pipeline_generation(x_train, x_test, y_train,
-                             dataset_name, seed, fold, condition):
+                             dataset_name, split_policy, seed, fold, condition):
     """Generate all 7 pipeline variants for one experimental unit.
 
     Returns:
@@ -219,40 +238,52 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
 def get_data_splits(data_path, dataset_name, seed, fold, condition,
                     shift_family, severity):
-    """Load data, create splits, apply perturbation, run pipeline generation."""
-    df = load_csv_dataset(data_path)
-    target_col = "target_label" if "target_label" in df.columns else "target"
-    y = df[target_col]
+    """Load data and keep labels out of feature-based split geometry.
 
-    split_cache = _split_cache_path(dataset_name, seed, shift_family)
+    Covariate/population fold definitions intentionally use all predictor rows
+    to establish an unsupervised stress-test geometry. All learned model-input
+    transformations still fit only on the corrupted training partition.
+    """
+    df = load_csv_dataset(data_path)
+    X, y, _target_col = split_predictors_and_target(df)
+
+    split_policy = split_policy_for_condition(shift_family)
+
+    split_cache = _split_cache_path(dataset_name, seed, split_policy)
     if split_cache.exists():
         splits = pd.read_pickle(split_cache)
     else:
-        from src.splitters import (
-            get_stratified_splits, get_covariate_splits, get_population_splits,
-        )
-        if shift_family == "covariate_shift":
-            splits = get_covariate_splits(df, 5, seed)
-        elif shift_family == "population_shift":
-            splits = get_population_splits(df, 5, seed)
-        else:
-            splits = get_stratified_splits(df, y, 5, seed)
+        splits = get_splits(X, y, split_policy, n_splits=5, seed=seed)
         split_cache.parent.mkdir(parents=True, exist_ok=True)
         pd.to_pickle(splits, split_cache)
 
+    assert_fold_integrity(splits, len(X))
+    if fold < 1 or fold > len(splits):
+        raise SplitInfeasibleError(
+            f"Requested fold {fold} is outside the available 1..{len(splits)} range"
+        )
     train_idx, test_idx = splits[fold - 1]
 
-    x_train = df.iloc[train_idx].drop(columns=[target_col]).copy()
+    x_train = X.iloc[train_idx].copy()
     y_train = y.iloc[train_idx].copy()
-    x_test = df.iloc[test_idx].drop(columns=[target_col]).copy()
+    x_test = X.iloc[test_idx].copy()
     y_test = y.iloc[test_idx].copy()
 
-    rng_seed = hash((seed, fold, condition)) % (2**31)
-    x_train_cond, y_train_cond = apply_perturbation(
+    derived_corruption_seed = hash((seed, fold, condition)) % (2**31)
+    x_train_cond, y_train_cond, x_test_cond, y_test_cond = apply_training_condition(
         x_train, y_train, shift_family=shift_family,
-        severity=severity, random_state=rng_seed,
+        x_test=x_test, y_test=y_test, severity=severity,
+        random_state=derived_corruption_seed,
     )
-    x_test_cond, y_test_cond = x_test.copy(), y_test.copy()
+
+    train_classes = set(y_train_cond.dropna().astype(str))
+    test_classes = set(y_test_cond.dropna().astype(str))
+    missing_train_classes = test_classes.difference(train_classes)
+    if missing_train_classes:
+        raise SplitInfeasibleError(
+            "Requested split leaves held-out target classes absent from training: "
+            f"{sorted(missing_train_classes)}"
+        )
 
     from sklearn.preprocessing import LabelEncoder
     label_enc = LabelEncoder()
@@ -277,10 +308,27 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
 
     res_pipelines, res_meta = _run_pipeline_generation(
         x_train_prep, x_test_prep, y_train_enc,
-        dataset_name, seed, fold, condition,
+        dataset_name, split_policy, seed, fold, condition,
     )
-
     return res_pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean_prep
+
+
+def apply_training_condition(
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    *,
+    x_test: pd.DataFrame,
+    y_test: pd.Series,
+    shift_family: str,
+    severity: float,
+    random_state: int,
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+    """Corrupt copies of training data and return untouched held-out copies."""
+    x_train_cond, y_train_cond = apply_perturbation(
+        x_train.copy(), y_train.copy(), shift_family=shift_family,
+        severity=severity, random_state=random_state,
+    )
+    return x_train_cond, y_train_cond, x_test.copy(), y_test.copy()
 
 
 # ---------------------------------------------------------------------------
@@ -310,8 +358,11 @@ def train_unit(kwargs):
         condition = kwargs["condition"]
         pipeline_name = kwargs["pipeline"]
         model_type = kwargs["model"]
+        split_policy = split_policy_for_condition(kwargs["shift_family"])
 
-        if has_run(dataset_name, seed, fold, condition, pipeline_name, model_type):
+        if has_run(
+            dataset_name, seed, fold, condition, pipeline_name, model_type, split_policy,
+        ):
             return
 
         pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean = (
@@ -350,13 +401,18 @@ def train_unit(kwargs):
         metrics_test = compute_classification_metrics(y_test_enc, y_pred, y_proba, label_enc.classes_)
         metrics_train = compute_classification_metrics(y_train_enc, y_pred_train, y_proba_train, label_enc.classes_)
 
-        dist_metrics = compute_distribution_distance(x_test_clean, pipelines[pipeline_name][1])
+        dist_metrics = compute_distribution_distance(
+            x_test_clean,
+            pipelines[pipeline_name][1],
+        )
         if condition == "clean":
             dist_metrics["wasserstein"] = 0.0
             dist_metrics["ks_stat"] = 0.0
 
         res = {
+            "evaluation_protocol_version": EVALUATION_PROTOCOL_VERSION,
             "dataset": dataset_name,
+            "split_policy": split_policy,
             "seed": seed,
             "fold": fold,
             "condition": condition,
@@ -407,6 +463,7 @@ def writer_process(queue, results_path):
             log_run(
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
+                res["split_policy"],
             )
 
 
@@ -473,7 +530,7 @@ def main() -> None:
     init_db()
     detect_hardware()
     logger = setup_logger("reports/terminal.log")
-    results_path = Path("reports/tables/results_stream.jsonl")
+    results_path = results_ledger_path()
 
     # ---- Load experiment grid ----
     datasets = load_dataset_names("config/dataset_list.yaml")
@@ -551,13 +608,19 @@ def main() -> None:
         for pt in dataset_tasks:
             for p in PIPELINE_NAMES:
                 for m in CPU_MODELS:
-                    if not has_run(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m):
+                    if not has_run(
+                        pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
+                        split_policy_for_condition(pt["shift_family"]),
+                    ):
                         t = pt.copy()
                         t["pipeline"] = p
                         t["model"] = m
                         cpu_tasks.append(t)
                 for m in GPU_MODELS:
-                    if not has_run(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m):
+                    if not has_run(
+                        pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m,
+                        split_policy_for_condition(pt["shift_family"]),
+                    ):
                         t = pt.copy()
                         t["pipeline"] = p
                         t["model"] = m
@@ -588,7 +651,7 @@ def main() -> None:
 
         # ---- Phase 3: Cleanup cache to prevent 600GB disk usage ----
         import shutil
-        cache_dir = Path("data/cache") / d
+        cache_dir = cache_root() / d
         if cache_dir.exists():
             shutil.rmtree(cache_dir, ignore_errors=True)
             logger.info(f"Phase 3 [{d}]: Deleted cache directory {cache_dir}")

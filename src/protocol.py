@@ -1,0 +1,18 @@
+"""Version identifiers for incompatible benchmark protocols and outputs."""
+
+from pathlib import Path
+
+# Geometry-based folds now use predictors only. Keep their artifacts in a new
+# namespace so that historical splits, representations, and task checkpoints
+# cannot be mistaken for outputs from this corrected evaluation protocol.
+EVALUATION_PROTOCOL_VERSION = "predictor_only_geometry_v2"
+
+
+def cache_root() -> Path:
+    """Return the cache namespace for the active evaluation protocol."""
+    return Path("data/cache") / EVALUATION_PROTOCOL_VERSION
+
+
+def results_ledger_path() -> Path:
+    """Return a new ledger path without appending to historical results."""
+    return Path("reports/tables") / f"results_stream_{EVALUATION_PROTOCOL_VERSION}.jsonl"

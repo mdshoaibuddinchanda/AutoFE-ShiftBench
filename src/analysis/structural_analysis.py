@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import os
 from sklearn.ensemble import RandomForestRegressor
+from src.protocol import results_ledger_path
 
 # Dataset Taxonomy Mapping
 DOMAIN_MAP = {
@@ -33,7 +34,7 @@ DOMAIN_MAP = {
 def load_data():
     # Load Results
     records = []
-    results_path = "reports/tables/results_stream.jsonl"
+    results_path = str(results_ledger_path())
     if os.path.exists(results_path):
         with open(results_path, "r") as f:
             for line in f:
