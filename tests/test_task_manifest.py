@@ -102,6 +102,20 @@ class TaskManifestTests(unittest.TestCase):
         self.assertEqual(counts["pending"], 0)
         self.assertTrue(all(record["planned_skip_reason"] == "dataset_unavailable" for record in records))
 
+    def test_stale_recovery_respects_max_attempts(self) -> None:
+        records = build_task_records(["d1"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
+        store = self._store(records)
+        task_id = records[0]["scientific_task_id"]
+        first = store.claim_task("run_test", task_id, worker_id="dead-1")
+        with store._connect() as connection:
+            connection.execute("UPDATE attempts SET started_at = ? WHERE run_id = ? AND attempt_id = ?", ("2000-01-01T00:00:00+00:00", "run_test", first))
+        self.assertEqual(store.recover_stale_attempts("run_test", stale_after_seconds=1), 1)
+        second = store.claim_task("run_test", task_id, worker_id="dead-2")
+        with store._connect() as connection:
+            connection.execute("UPDATE attempts SET started_at = ? WHERE run_id = ? AND attempt_id = ?", ("2000-01-01T00:00:00+00:00", "run_test", second))
+        self.assertEqual(store.recover_stale_attempts("run_test", stale_after_seconds=1), 1)
+        self.assertEqual(store.get_task("run_test", task_id)["state"], "failed")
+
     def test_stale_attempt_recovery_and_result_reconciliation(self) -> None:
         records = build_task_records(["d1"], [1], [1], [("clean", 0.0)], ["Raw"], ["logistic_regression"], include_precompute=False)
         store = self._store(records)

@@ -49,6 +49,7 @@ class ExecutionConfig:
     max_attempts: int = 1
     retryable_failure_classes: tuple[str, ...] = tuple(sorted(RETRYABLE_FAILURES))
     stop_after_tasks: int | None = None
+    stale_after_seconds: float = 3600.0
     graceful_stop: bool = True
 
     def __post_init__(self) -> None:
@@ -60,6 +61,8 @@ class ExecutionConfig:
             raise ValueError("run_wall_time_seconds must be positive")
         if self.stop_after_tasks is not None and self.stop_after_tasks < 1:
             raise ValueError("stop_after_tasks must be positive")
+        if self.stale_after_seconds <= 0:
+            raise ValueError("stale_after_seconds must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -430,11 +433,17 @@ class ManifestStore:
             for row in rows:
                 started = datetime.fromisoformat(row["started_at"]).timestamp()
                 if started <= cutoff:
-                    task = connection.execute("SELECT attempt_count FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, row["scientific_task_id"])).fetchone()
+                    task = connection.execute("SELECT attempt_count, stage FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, row["scientific_task_id"])).fetchone()
                     self._finish_attempt(connection, run_id, row["attempt_id"], "failed", outcome="coordinator_crash")
                     retry_allowed = retry and task is not None and int(task["attempt_count"]) < max_attempts
                     next_state = "pending" if retry_allowed else "failed"
                     connection.execute("UPDATE tasks SET state = ?, outcome_reason = 'coordinator_crash', active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (next_state, _now(), run_id, row["scientific_task_id"]))
+                    if next_state == "failed" and task is not None and task["stage"] == "precompute":
+                        dependents = connection.execute("SELECT scientific_task_id, payload_json FROM tasks WHERE run_id = ? AND state = 'pending'", (run_id,)).fetchall()
+                        for dependent in dependents:
+                            payload = json.loads(dependent["payload_json"])
+                            if row["scientific_task_id"] in payload.get("depends_on", []):
+                                connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = 'dependency_failure', updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (_now(), run_id, dependent["scientific_task_id"]))
                     recovered += 1
         return recovered
 
