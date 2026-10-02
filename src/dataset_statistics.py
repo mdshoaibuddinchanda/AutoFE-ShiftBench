@@ -275,15 +275,21 @@ def _sign_flip_test(values: np.ndarray, config: AnalysisConfig, *, stratum_label
         return {"status": "all_zero_effect", "p_value": 1.0, "n_datasets": len(finite), "zero_differences": int(len(finite)), "observed_mean": observed, "method": "sign_flip_exact"}
     values_for_test = nonzero
     n = len(values_for_test)
+    denominator = len(finite)
     if n <= 16:
         signs = np.asarray(list(itertools.product((-1.0, 1.0), repeat=n)), dtype=float)
-        null_means = signs @ values_for_test / n
+        # Keep zero differences in the dataset-level mean denominator.  They
+        # are omitted from the sign enumeration because their sign is
+        # immaterial, but they remain part of the independent dataset sample.
+        null_means = signs @ values_for_test / denominator
         p_value = float(np.mean(np.abs(null_means) >= abs(observed)))
         return {"status": "complete", "p_value": p_value, "n_datasets": len(finite), "zero_differences": int(len(finite) - n), "observed_mean": observed, "method": "sign_flip_exact", "resamples": int(len(null_means)), "exchangeability_assumption": "symmetric_dataset_level_differences"}
+    if config.permutation_resamples <= 0:
+        return {"status": "permutation_disabled", "p_value": None, "n_datasets": len(finite), "zero_differences": int(len(finite) - n), "observed_mean": observed, "method": "sign_flip_monte_carlo", "resamples": 0}
     seed = stable_seed("analysis_dataset_sign_flip", {"config": config.to_dict(), "stratum": stratum_label, "input_fingerprint": fingerprint})
     rng = np.random.default_rng(seed)
     signs = rng.choice(np.array([-1.0, 1.0]), size=(config.permutation_resamples, n))
-    null_means = signs @ values_for_test / n
+    null_means = signs @ values_for_test / denominator
     extreme = int(np.count_nonzero(np.abs(null_means) >= abs(observed)))
     p_value = float((extreme + 1) / (len(null_means) + 1))
     return {"status": "complete", "p_value": p_value, "n_datasets": len(finite), "zero_differences": int(len(finite) - n), "observed_mean": observed, "method": "sign_flip_monte_carlo", "resamples": config.permutation_resamples, "seed": seed, "exchangeability_assumption": "symmetric_dataset_level_differences", "finite_resampling_convention": "(extreme+1)/(resamples+1)"}
@@ -405,8 +411,11 @@ def analyze_ledger(
             "pipeline_b": config.pipeline_b,
             "estimate_b_minus_a": float(np.mean(values)) if len(values) else None,
             "n_intended_tasks": int(len(stratum_frame)),
+            "n_valid_tasks_a": int(stratum_frame["metric_a"].notna().sum()),
+            "n_valid_tasks_b": int(stratum_frame["metric_b"].notna().sum()),
             "n_completed_tasks": int((stratum_frame["pair_status"] == "paired").sum()),
             "n_paired_tasks": int(len(paired)),
+            "n_unpaired_tasks": int((stratum_frame["pair_status"] != "paired").sum()),
             "n_datasets": int(len(values)),
             "contributing_datasets": json.dumps(sorted(str(value) for value in paired["dataset"].dropna().unique())),
             "confidence_level": config.confidence_level,

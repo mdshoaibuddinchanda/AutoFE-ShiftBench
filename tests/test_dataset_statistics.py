@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.dataset_statistics import AnalysisConfig, AnalysisInputError, _holm, analyze_ledger
+from src.dataset_statistics import AnalysisConfig, AnalysisInputError, _holm, _sign_flip_test, analyze_ledger
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION
 from src.stats_analysis import run_wilcoxon_analysis
@@ -92,6 +92,26 @@ class DatasetStatisticsTests(unittest.TestCase):
         self.assertEqual(zero.summaries.iloc[0]["status"], "all_zero_effect")
         one = analyze_ledger(self._write([_record("d1", 1, "Raw", 0.5), _record("d1", 1, "AutoFE_Baseline", 0.7)]), AnalysisConfig(bootstrap_resamples=10, permutation_resamples=10))
         self.assertEqual(one.summaries.iloc[0]["status"], "too_few_datasets")
+
+    def test_sign_flip_keeps_zero_datasets_in_mean_denominator(self) -> None:
+        result = _sign_flip_test(
+            np.asarray([0.0, 1.0, 2.0]),
+            AnalysisConfig(bootstrap_resamples=0, permutation_resamples=0),
+            stratum_label="test",
+            fingerprint="fixture",
+        )
+        self.assertEqual(result["method"], "sign_flip_exact")
+        self.assertAlmostEqual(result["observed_mean"], 1.0)
+        self.assertAlmostEqual(result["p_value"], 0.5)
+
+    def test_summary_reports_valid_and_unpaired_counts(self) -> None:
+        rows = [_record("d1", 1, "Raw", 0.5), _record("d1", 1, "AutoFE_Baseline", 0.7)]
+        rows.append(_record("d1", 2, "Raw", 0.6))
+        summary = analyze_ledger(self._write(rows), AnalysisConfig(bootstrap_resamples=0, permutation_resamples=0)).summaries.iloc[0]
+        self.assertEqual(int(summary["n_intended_tasks"]), 2)
+        self.assertEqual(int(summary["n_valid_tasks_a"]), 2)
+        self.assertEqual(int(summary["n_valid_tasks_b"]), 1)
+        self.assertEqual(int(summary["n_unpaired_tasks"]), 1)
 
     def test_active_stats_reader_uses_dataset_level_outputs(self) -> None:
         rows = []
