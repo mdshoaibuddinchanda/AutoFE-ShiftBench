@@ -62,7 +62,7 @@ Invoke-FrozenRun r1-v5-relabel-group majority_label_relabeling group_aware
 
 The frozen adaptive policy leaves two logical CPU slots, uses a soft 80% RAM budget, and probes XGBoost/CatBoost on visible NVIDIA GPUs. This host resolves to six workers, 25.39 GiB RAM budget and about 11.92 GiB ready cache plus 11.92 GiB staging. GPU admission reserves 20% VRAM, permits one active fit per device and records comparison-wide static capacity CPU fallback in `auto` mode. These are admission estimates; native memory allocations can exceed estimates. Every model and feature parameter remains in the study, and the actual resolved model parameter catalog documents backend defaults. CPU/GPU metric equivalence is not asserted.
 
-The storage plan reserves 31.13 GiB results/checkpoints/catalog metadata plus 1 GiB mechanism history; the doubled-results margin and both cache allowances require about **87.11 GiB free**. Recheck the gate before each command. No candidate history is enabled in performance runs. Do not add `--cache-audit` to the compact full grid. Omit fixed worker/cache overrides when using this frozen command. Other hosts need a new host freeze and diagnostic evidence.
+The storage plan reserves 31.13 GiB results/checkpoints/catalog metadata plus 1 GiB mechanism history; the doubled-results margin, both cache allowances and the separate 11.92 GiB array-transport allowance require about **99.03 GiB free**. Recheck the gate before each command. No candidate history is enabled in performance runs. Do not add `--cache-audit` to the compact full grid. Omit fixed worker/cache overrides when using this frozen command. Other hosts need a new host freeze and diagnostic evidence.
 
 ## Separate clean-condition mechanism runs
 
