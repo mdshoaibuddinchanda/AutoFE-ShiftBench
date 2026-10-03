@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
+from src.resource_limits import require_bytes
 
 from src.operator_registry import (
     OPERATOR_REGISTRY,
@@ -81,7 +82,13 @@ def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
     numeric = frame.select_dtypes(include=["number", "bool"]).copy()
     if numeric.empty:
         raise ValueError("No numeric columns available.")
-    numeric = numeric.astype(float).replace([np.inf, -np.inf], np.nan)
+    for column in numeric:
+        if isinstance(numeric[column].dtype,pd.SparseDtype):
+            values=numeric[column].to_numpy(dtype=float)
+            numeric[column]=pd.arrays.SparseArray(np.where(np.isfinite(values),values,0.),fill_value=0.)
+        else:
+            numeric[column]=numeric[column].astype(float)
+    numeric = numeric.replace([np.inf, -np.inf], np.nan)
     return numeric.fillna(0.0)
 
 
@@ -90,7 +97,7 @@ def _base_columns(x_train: pd.DataFrame, cfg: DFSConfig) -> tuple[pd.DataFrame, 
     eligible = list(numeric.columns)
     if cfg.max_base_features is None or len(eligible) <= cfg.max_base_features:
         return numeric, eligible, []
-    variances = numeric.var(axis=0).fillna(0.0)
+    variances = pd.Series({col:pd.Series(numeric[col].to_numpy(dtype=float)).var() for col in numeric}).fillna(0.0)
     ranked = sorted(eligible, key=lambda col: (-float(variances[col]), str(col)))
     retained = ranked[: cfg.max_base_features]
     excluded = [col for col in eligible if col not in set(retained)]
@@ -191,6 +198,7 @@ def expand_features_with_dfs(
     test_base = test_numeric[base_columns]
 
     expressions = _generate_expressions(base_columns, cfg.operator_set_id if cfg.enable_dfs else "none_v1", cfg.depth if cfg.enable_dfs else 0)
+    require_bytes((len(train_base)+len(test_base))*len(expressions)*8*3,purpose='candidate matrices and scoring workspace')
     train_values: dict[str, np.ndarray] = {}
     test_values: dict[str, np.ndarray] = {}
     validity: dict[str, dict[str, int]] = {}

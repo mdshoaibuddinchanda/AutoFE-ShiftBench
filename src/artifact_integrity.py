@@ -39,8 +39,16 @@ def array_identity(values) -> dict:
 
 
 def frame_identity(frame: pd.DataFrame) -> dict:
+    if any(isinstance(dtype,pd.SparseDtype) for dtype in frame.dtypes):
+        # Hash the exact logical dense row order in bounded blocks.
+        digest=hashlib.sha256()
+        for start in range(0,len(frame),128):
+            digest.update(np.ascontiguousarray(frame.iloc[start:start+128].to_numpy(dtype=np.float64)).tobytes())
+        values={'dtype':'float64','shape':list(frame.shape),'sha256':digest.hexdigest()}
+    else:
+        values=array_identity(frame.to_numpy())
     return {"columns": list(map(str,frame.columns)), "dtypes": list(map(str,frame.dtypes)),
-        "index": array_identity(frame.index.to_numpy()), "values": array_identity(frame.to_numpy()), "shape": list(frame.shape)}
+        "index": array_identity(frame.index.to_numpy()), "values": values, "shape": list(frame.shape)}
 
 
 def dataset_identity(path, *, frame=None) -> dict:

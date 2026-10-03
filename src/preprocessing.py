@@ -14,6 +14,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from src.resource_limits import require_bytes
 
 
 SUPPORTED_ENCODINGS = {"onehot", "label"}
@@ -66,7 +67,7 @@ def _build_preprocessor(
 
     if categorical_cols:
         if encoding == "onehot":
-            encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+            encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=True,dtype=np.float64)
         else:
             encoder = OrdinalEncoder(
                 handle_unknown="use_encoded_value",
@@ -89,6 +90,7 @@ def _build_preprocessor(
         transformers=transformers,
         remainder="drop",
         verbose_feature_names_out=False,
+        sparse_threshold=1.0,
     )
 
 
@@ -104,11 +106,18 @@ def _get_stratify_target(target: pd.Series) -> pd.Series | None:
     return target
 
 
-def _to_dense_array(values: Any) -> np.ndarray:
+def _to_dense_array(values: Any,*,budget=None) -> np.ndarray:
     """Convert scipy sparse outputs to dense arrays when needed."""
     if hasattr(values, "toarray"):
+        require_bytes(int(values.shape[0])*int(values.shape[1])*values.dtype.itemsize,purpose='dense arithmetic conversion',budget=budget)
         values = values.toarray()
     return np.asarray(values)
+
+
+def processed_frame(values,columns):
+    if hasattr(values,'tocsr'):
+        return pd.DataFrame.sparse.from_spmatrix(values,columns=columns)
+    return pd.DataFrame(values,columns=columns)
 
 
 def preprocess_dataset(

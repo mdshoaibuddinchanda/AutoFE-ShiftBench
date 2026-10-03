@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
+from src.resource_limits import require_bytes
 
 from src.operator_registry import (
     FINITE_CLIP,
@@ -27,6 +28,8 @@ DEFAULT_PERTURBATION_MAGNITUDES = (1e-3, 1e-2, 5e-2)
 
 
 def _sample_rows(frame: pd.DataFrame, max_rows: int, random_state: int) -> pd.DataFrame:
+    if max_rows < 1:
+        raise ValueError('Diagnostic max_rows must be positive')
     if len(frame) <= max_rows:
         return frame.copy()
     return frame.sample(n=max_rows, random_state=random_state).copy()
@@ -113,6 +116,9 @@ def compute_jacobian_diagnostic(
     """Measure exact derivatives of the frozen executed arithmetic mapping."""
     sampled = _sample_rows(base_inputs, max_rows, random_state)
     expressions = list(expressions)
+    if raw_control_expressions is not None:
+        raw_control_expressions=list(raw_control_expressions)
+    require_bytes(len(sampled)*len(base_inputs.columns)*(len(expressions)+len(raw_control_expressions or []))*8*3,purpose='exact Jacobian diagnostic workspace')
     jacobians: list[np.ndarray] = []
     statuses = Counter()
     for expression in expressions:

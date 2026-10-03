@@ -40,7 +40,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 from src.checkpoint import init_db, has_run, log_run
 from src.artifact_integrity import (CACHE_SCHEMA_VERSION, PREPROCESSING_SEMANTICS_VERSION,
     array_identity, artifact_lock, atomic_json, atomic_pickle, dataset_identity,
-    file_sha256, fingerprint, frame_identity, validate_feature_cache)
+    file_sha256, fingerprint, frame_identity, validate_feature_cache,atomic_bytes)
 from src.data_loader import load_csv_dataset, load_dataset_names
 from src.evaluation import (
     compute_classification_metrics,
@@ -65,7 +65,9 @@ from src.operator_registry import OPERATOR_REGISTRY_VERSION, OPERATOR_SEMANTICS_
 from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.device_policy import fitted_device,UnsupportedDeviceError
-from src.preprocessing import _build_preprocessor, _to_dense_array
+from src.resource_limits import ResourceLimitError
+from src.preprocessing import _build_preprocessor, _to_dense_array,processed_frame
+from src.prepared_inputs import publish_unit,load_pipeline,artifact
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
 from src.provenance import collect_code_identity, collect_environment_identity
 from src.seeding import (
@@ -159,6 +161,8 @@ _stop_requested = False
 
 def _json_safe(value: Any) -> Any:
     """Convert NumPy scalars and nonfinite floats to strict JSON values."""
+    if isinstance(value,Path):
+        return str(value)
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -320,138 +324,147 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             "labels": array_identity(y_train), "data_identity": data_identity,
             "discrete_features":x_train.attrs.get('discrete_features',[]),
             "pipeline_spec": asdict(cfg_copy), "protocol": EVALUATION_PROTOCOL_VERSION,
-            "seed_scheme": SEED_SCHEME_VERSION, "preprocessing": PREPROCESSING_SEMANTICS_VERSION})
+            "seed_scheme": SEED_SCHEME_VERSION, "preprocessing": PREPROCESSING_SEMANTICS_VERSION,
+            "diagnostics_enabled":diagnostics_enabled,"diagnostic_config":diagnostic_config if diagnostics_enabled else None})
         train_cache, test_cache, meta_cache, history_path, fsva_path = _diagnostic_paths(
             dataset_name, p_name, seed, fold, condition, dependency
         )
 
-        verified_cache = validate_feature_cache(train_cache,test_cache,meta_cache,dependency)
-        cache_compatible = verified_cache is not None
-        if diagnostics_enabled:
-            cache_compatible = cache_compatible and history_path.exists() and fsva_path.exists()
-        if cache_compatible:
-            x_train_fe,x_test_fe,meta = verified_cache
+        with artifact_lock(meta_cache.with_suffix(".lock")):
+            verified_cache = validate_feature_cache(train_cache,test_cache,meta_cache,dependency)
+            cache_compatible = verified_cache is not None
             if diagnostics_enabled:
-                with history_path.open(encoding="utf-8") as history_file:
-                    meta["selection_history"] = [json.loads(line) for line in history_file if line.strip()]
-            meta["dfs_cache_hit"] = True
-        else:
-            t0 = time.time()
-            x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(
-                x_train, x_test, y_train, config=cfg_copy,
-            )
-            gen_time = time.time() - t0
+                cache_compatible = cache_compatible and all(
+                    path.exists() and file_sha256(path) == verified_cache[2].get('artifacts',{}).get(role,{}).get('sha256')
+                    for role,path in (('history',history_path),('fsva',fsva_path)))
+                cache_compatible = cache_compatible and verified_cache[2].get('diagnostic_status') == 'diagnostic_complete' 
+            if cache_compatible:
+                x_train_fe,x_test_fe,meta = verified_cache
+                if diagnostics_enabled:
+                    with history_path.open(encoding="utf-8") as history_file:
+                        meta["selection_history"] = [json.loads(line) for line in history_file if line.strip()]
+                meta["dfs_cache_hit"] = True
+            else:
+                t0 = time.time()
+                x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(
+                    x_train, x_test, y_train, config=cfg_copy,
+                )
+                gen_time = time.time() - t0
 
-            meta = {
-                **dfs_meta,
-                "num_original": dfs_meta["num_original"],
-                "num_generated": dfs_meta["num_generated"],
-                "num_selected": dfs_meta["num_selected"],
-                "generation_time_s": gen_time,
-                "ram_used_mb": dfs_meta.get("ram_used_mb", 0),
-                "feature_metadata": dfs_meta.get("feature_metadata", []),
-                "dfs_cache_hit": False,
-            }
-            with artifact_lock(meta_cache.with_suffix(".lock")):
+                meta = {
+                    **dfs_meta,
+                    "num_original": dfs_meta["num_original"],
+                    "num_generated": dfs_meta["num_generated"],
+                    "num_selected": dfs_meta["num_selected"],
+                    "generation_time_s": gen_time,
+                    "ram_used_mb": dfs_meta.get("ram_used_mb", 0),
+                    "feature_metadata": dfs_meta.get("feature_metadata", []),
+                    "dfs_cache_hit": False,
+                }
                 atomic_pickle(train_cache,x_train_fe)
                 atomic_pickle(test_cache,x_test_fe)
                 meta.update({"cache_schema": CACHE_SCHEMA_VERSION, "dependency_signature": dependency,
                     "data_identity": data_identity, "preprocessing_semantics": PREPROCESSING_SEMANTICS_VERSION,
                     "artifacts": {role: {"path": str(path), "sha256": file_sha256(path), "identity": frame_identity(frame)}
                         for role,path,frame in (("train",train_cache,x_train_fe),("test",test_cache,x_test_fe))}})
-                atomic_json(meta_cache,{key:value for key,value in meta.items() if key != "selection_history"})
 
-        meta["pipeline_identity"] = pipeline_identity_token(p_name)
-        meta["operator_registry_version"] = OPERATOR_REGISTRY_VERSION
-        meta["operator_semantics_version"] = OPERATOR_SEMANTICS_VERSION
-        meta["operator_set_id"] = cfg.operator_set_id
-        meta["operator_set"] = list(cfg.trans_primitives)
-        meta["cap_policy_version"] = meta.get("cap_policy_version", CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1")
-        meta["selection_seed"] = selection_random_state
+            meta["pipeline_identity"] = pipeline_identity_token(p_name)
+            meta["operator_registry_version"] = OPERATOR_REGISTRY_VERSION
+            meta["operator_semantics_version"] = OPERATOR_SEMANTICS_VERSION
+            meta["operator_set_id"] = cfg.operator_set_id
+            meta["operator_set"] = list(cfg.trans_primitives)
+            meta["cap_policy_version"] = meta.get("cap_policy_version", CAP_POLICY_VERSION if cfg.max_features is not None else "none_v1")
+            meta["selection_seed"] = selection_random_state
 
-        history = meta.get("selection_history", [])
-        if diagnostics_enabled and not history:
-            # Reconstruct candidate metadata from the frozen selected matrices only
-            # is intentionally disallowed; a diagnostic-enabled cache must have
-            # been generated with real candidate events.
-            raise RuntimeError("Diagnostic history is missing from the generated candidate event stream")
-        if diagnostics_enabled:
-            task_context = {
-                "dataset": dataset_name,
-                "split_policy": split_policy,
-                "seed": seed,
-                "fold": fold,
-                "condition": condition,
-                "pipeline": p_name,
-                "pipeline_identity": pipeline_identity_token(p_name),
-                "operator_set_id": cfg.operator_set_id,
-                "cap_policy_version": meta.get("cap_policy_version"),
-                "requested_cap": meta.get("requested_cap"),
-                "requested_base_cap": meta.get("requested_base_cap"),
-                "candidate_count": meta.get("candidate_count"),
-                "selection_stage": meta.get("selector_identity"),
-            }
-            with history_path.open("w", encoding="utf-8") as history_file:
-                for event in history:
-                    history_file.write(json.dumps({**task_context, **event}, sort_keys=True) + "\n")
-            diagnostic_cfg = diagnostic_config or {}
-            max_rows = int(diagnostic_cfg.get("max_rows", 128))
-            diag_seed = int(diagnostic_cfg.get("random_state", seed))
-            selected_expressions = [item["expression"] for item in meta.get("selected_feature_expressions", [])]
-            # Expression dictionaries are converted by the helper below.
-            from src.fsva import expression_from_dict
-            selected_exprs = [expression_from_dict(item) for item in selected_expressions]
-            raw_exprs = [raw_expression(column) for column in x_train.columns]
-            settings = {
-                "max_rows": max_rows,
-                "random_state": diag_seed,
-                "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES)),
-            }
-            try:
-                jac = compute_jacobian_diagnostic(
-                    x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                    max_rows=max_rows, random_state=diag_seed,
-                )
-                amp = compute_empirical_amplification(
-                    x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                    magnitudes=settings["magnitudes"],
-                    max_rows=max_rows, random_state=diag_seed,
-                )
-                derivative_validation = validate_jacobian_finite_difference(
-                    x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
-                )
-                diagnostic_status = "diagnostic_complete"
-                diagnostics = {
-                    "schema_version": FSVA_SCHEMA_VERSION,
-                    "diagnostic_status": diagnostic_status,
-                    "task": task_context,
-                    "settings": settings,
-                    "jacobian": jac,
-                    "empirical_amplification": amp,
-                    "derivative_validation": derivative_validation,
+            history = meta.get("selection_history", [])
+            if diagnostics_enabled and not history:
+                # Reconstruct candidate metadata from the frozen selected matrices only
+                # is intentionally disallowed; a diagnostic-enabled cache must have
+                # been generated with real candidate events.
+                raise RuntimeError("Diagnostic history is missing from the generated candidate event stream")
+            if diagnostics_enabled and not cache_compatible:
+                task_context = {
+                    "dataset": dataset_name,
+                    "split_policy": split_policy,
+                    "seed": seed,
+                    "fold": fold,
+                    "condition": condition,
+                    "pipeline": p_name,
+                    "pipeline_identity": pipeline_identity_token(p_name),
+                    "operator_set_id": cfg.operator_set_id,
+                    "cap_policy_version": meta.get("cap_policy_version"),
+                    "requested_cap": meta.get("requested_cap"),
+                    "requested_base_cap": meta.get("requested_base_cap"),
+                    "candidate_count": meta.get("candidate_count"),
+                    "selection_stage": meta.get("selector_identity"),
                 }
-            except Exception as diagnostic_error:
-                # Feature caches and benchmark results remain usable, but the
-                # artifact is explicitly marked incomplete and cannot be
-                # mistaken for diagnostic-complete evidence.
-                diagnostic_status = "diagnostic_failed"
-                diagnostics = {
-                    "schema_version": FSVA_SCHEMA_VERSION,
-                    "diagnostic_status": diagnostic_status,
-                    "task": task_context,
-                    "settings": settings,
-                    "error_type": type(diagnostic_error).__name__,
-                    "error_message": str(diagnostic_error),
+                atomic_bytes(history_path,("".join(json.dumps({**task_context,**event},sort_keys=True)+"\n" for event in history)).encode('utf-8'))
+                diagnostic_cfg = diagnostic_config or {}
+                max_rows = int(diagnostic_cfg.get("max_rows", 128))
+                diag_seed = int(diagnostic_cfg.get("random_state", seed))
+                selected_expressions = [item["expression"] for item in meta.get("selected_feature_expressions", [])]
+                # Expression dictionaries are converted by the helper below.
+                from src.fsva import expression_from_dict
+                selected_exprs = [expression_from_dict(item) for item in selected_expressions]
+                raw_exprs = [raw_expression(column) for column in x_train.columns]
+                settings = {
+                    "max_rows": max_rows,
+                    "random_state": diag_seed,
+                    "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES)),
                 }
-            fsva_path.write_text(json.dumps(diagnostics, sort_keys=True), encoding="utf-8")
-            meta["diagnostic_schema_version"] = FSVA_SCHEMA_VERSION
-            meta["diagnostic_status"] = diagnostic_status
-            meta["diagnostic_path"] = str(fsva_path)
-            meta["history_path"] = str(history_path)
-        else:
-            meta["diagnostic_schema_version"] = None
-            meta["diagnostic_status"] = "diagnostic_disabled"
+                try:
+                    jac = compute_jacobian_diagnostic(
+                        x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                        max_rows=max_rows, random_state=diag_seed,
+                    )
+                    amp = compute_empirical_amplification(
+                        x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                        magnitudes=settings["magnitudes"],
+                        max_rows=max_rows, random_state=diag_seed,
+                    )
+                    derivative_validation = validate_jacobian_finite_difference(
+                        x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
+                    )
+                    diagnostic_status = "diagnostic_complete"
+                    diagnostics = {
+                        "schema_version": FSVA_SCHEMA_VERSION,
+                        "diagnostic_status": diagnostic_status,
+                        "task": task_context,
+                        "settings": settings,
+                        "jacobian": jac,
+                        "empirical_amplification": amp,
+                        "derivative_validation": derivative_validation,
+                    }
+                except Exception as diagnostic_error:
+                    # Feature caches and benchmark results remain usable, but the
+                    # artifact is explicitly marked incomplete and cannot be
+                    # mistaken for diagnostic-complete evidence.
+                    diagnostic_status = "diagnostic_failed"
+                    diagnostics = {
+                        "schema_version": FSVA_SCHEMA_VERSION,
+                        "diagnostic_status": diagnostic_status,
+                        "task": task_context,
+                        "settings": settings,
+                        "error_type": type(diagnostic_error).__name__,
+                        "error_message": str(diagnostic_error),
+                    }
+                atomic_json(fsva_path,_json_safe(diagnostics))
+                if diagnostic_status != "diagnostic_complete":
+                    raise RuntimeError("Required diagnostic failed; precompute dependency is incomplete")
+                meta["diagnostic_schema_version"] = FSVA_SCHEMA_VERSION
+                meta["diagnostic_status"] = diagnostic_status
+                meta["diagnostic_path"] = str(fsva_path)
+                meta["history_path"] = str(history_path)
+            elif not diagnostics_enabled:
+                meta["diagnostic_schema_version"] = None
+                meta["diagnostic_status"] = "diagnostic_disabled"
 
+            if not cache_compatible:
+                if diagnostics_enabled:
+                    for role,path in (('history',history_path),('fsva',fsva_path)):
+                        meta['artifacts'][role]={'path':str(path),'sha256':file_sha256(path)}
+                atomic_json(meta_cache,_json_safe({key:value for key,value in meta.items() if key != 'selection_history'}))
+            meta['metadata_path']=str(meta_cache)
         res_pipelines[p_name] = (x_train_fe, x_test_fe)
         res_meta[p_name] = meta
 
@@ -529,21 +542,25 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     y_test_enc = label_enc.transform(y_test_cond.astype(str))
 
     preprocessor = _build_preprocessor(x_train_cond, encoding="onehot", scale_numeric=True)
-    x_train_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.fit_transform(x_train_cond)),
+    x_train_prep = processed_frame(
+        preprocessor.fit_transform(x_train_cond),
         columns=preprocessor.get_feature_names_out(),
     )
-    x_test_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.transform(x_test_cond)),
+    x_test_prep = processed_frame(
+        preprocessor.transform(x_test_cond),
         columns=preprocessor.get_feature_names_out(),
     )
     discrete_columns=list(preprocessor.get_feature_names_out()[preprocessor.output_indices_.get('cat',slice(0,0))])
     discrete_columns += [col for col in x_train_prep if col in x_train_cond and pd.api.types.is_bool_dtype(x_train_cond[col])]
     x_train_prep.attrs['discrete_features']=discrete_columns
+    preprocessing_path=_cache_dir_for_dataset(dataset_name)/('preprocessor_'+fingerprint({'split':split_dependency,'fold':fold,'condition':condition,'train':frame_identity(x_train_cond),'labels':array_identity(y_train_cond)})[:32]+'.pkl')
+    with artifact_lock(preprocessing_path.with_suffix('.lock')):
+        if not preprocessing_path.exists():
+            atomic_pickle(preprocessing_path,preprocessor)
 
     # Clean test set for Wasserstein distances
-    x_test_clean_prep = pd.DataFrame(
-        _to_dense_array(preprocessor.transform(x_test)),
+    x_test_clean_prep = processed_frame(
+        preprocessor.transform(x_test),
         columns=preprocessor.get_feature_names_out(),
     )
 
@@ -558,7 +575,7 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         from src.operator_registry import expression_from_dict
         from src.feature_engineering import _evaluate_expression
         selected_exprs=[expression_from_dict(item['expression']) for item in meta['selected_feature_expressions']]
-        clean_train=pd.DataFrame(_to_dense_array(preprocessor.transform(x_train)),columns=preprocessor.get_feature_names_out())
+        clean_train=processed_frame(preprocessor.transform(x_train),columns=preprocessor.get_feature_names_out())
         map_clean=lambda frame:pd.DataFrame({fid:_evaluate_expression(expr,frame)[0] for fid,expr in zip(meta['selected_feature_identities'],selected_exprs)},index=frame.index)
         distance_state=distance_sample_seed(dataset_name,split_policy,seed,fold,condition)
         meta['training_distribution_distance']=compute_distribution_distance(map_clean(clean_train),res_pipelines[pipeline_name][0],random_state=distance_state)
@@ -566,6 +583,7 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
         meta["corruption_seed"] = derived_corruption_seed
         meta["seed_scheme_version"] = SEED_SCHEME_VERSION
+        meta['input_artifacts']=[artifact(split_cache,'split_indices',split_dependency),artifact(split_meta,'split_metadata',split_dependency),artifact(preprocessing_path,'fitted_preprocessor')]
 
     return res_pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean_prep
 
@@ -622,7 +640,8 @@ def _record_manifest_failure(task: dict[str, Any], attempt_id: str | None, *, fa
             failure_class=failure_class, exception=exception,
             timeout_seconds=task.get("task_timeout_seconds"), retry=retry,
         )
-        if failure_class == "precompute_failure" and next_state in {"failed", "timeout"}:
+        task_state=store.get_task(str(task['run_id']),str(task['scientific_task_id']))
+        if task_state['stage'] == 'precompute' and next_state in {"failed", "timeout"}:
             store.propagate_dependency_failure(str(task["run_id"]), str(task["scientific_task_id"]))
     except ManifestConflictError:
         # A newer retry may already own the task.  Preserve that authoritative
@@ -647,15 +666,23 @@ def precompute_unit(kwargs):
     if kwargs.get("manifest_db") and kwargs.get("scientific_task_id") and attempt_id is None:
         return kwargs.get("dataset_name")
     try:
-        kwargs_copy = kwargs.copy()
-        for key in ("size", "run_id", "manifest_db", "manifest_path", "scientific_task_id", "task_timeout_seconds", "retry", "attempt_id"):
-            kwargs_copy.pop(key, None)
-        get_data_splits(**kwargs_copy)
+        allowed=('data_path','dataset_name','seed','fold','condition','shift_family','severity','diagnostics_enabled','diagnostic_config')
+        kwargs_copy={key:kwargs[key] for key in allowed if key in kwargs}
+        store = _manifest_for_task(kwargs)
+        if store is not None:
+            expected=store.task_payload(str(kwargs['run_id']),str(kwargs['scientific_task_id']))['data_identity']
+            if dataset_identity(kwargs['data_path']) != expected:
+                raise ManifestConflictError('Dataset changed after the run manifest was frozen')
+        prepared=get_data_splits(**kwargs_copy)
+        unit_path=_cache_dir_for_dataset(kwargs['dataset_name'])/('unit_'+str(kwargs.get('scientific_task_id') or fingerprint(_json_safe(kwargs_copy))[:24])+'.pkl')
+        first_meta=next(iter(prepared[4].values()))
+        descriptor=publish_unit(unit_path,prepared,input_artifacts=first_meta['input_artifacts'])
         store = _manifest_for_task(kwargs)
         if store is not None and attempt_id:
             store.commit_result(
                 str(kwargs["run_id"]), str(kwargs["scientific_task_id"]), str(attempt_id),
-                {**_manifest_result_fields(kwargs, attempt_id), "stage": "precompute", "status": "completed"},
+                {**_manifest_result_fields(kwargs, attempt_id), "stage": "precompute", "status": "completed",
+                    'prepared_descriptor':descriptor,'artifacts':[descriptor,*first_meta['input_artifacts']]},
                 result_ref=str(cache_root() / kwargs["dataset_name"]),
             )
         gc.collect()
@@ -688,13 +715,20 @@ def train_unit(kwargs):
         ):
             return
 
-        pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean = (
-            get_data_splits(
+        owning_store=_manifest_for_task(kwargs)
+        if owning_store is not None:
+            dependencies=owning_store.task_payload(str(kwargs['run_id']),str(kwargs['scientific_task_id']))['depends_on']
+            if len(dependencies) != 1:
+                raise ManifestError('Production model needs exactly one prepared dependency')
+            dependency=owning_store.durable_payload(str(kwargs['run_id']),dependencies[0])
+            prepared=load_pipeline(dependency['prepared_descriptor'],pipeline_name)
+        else:
+            prepared=get_data_splits(
                 kwargs["data_path"], dataset_name, seed, fold, condition,
                 kwargs["shift_family"], kwargs["severity"],
                 kwargs.get("diagnostics_enabled", False), kwargs.get("diagnostic_config"),
             )
-        )
+        pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean = prepared
 
         X_tr, X_te = pipelines[pipeline_name]
         # Replace infs with large finite values so models don't crash
@@ -765,7 +799,8 @@ def train_unit(kwargs):
             **_manifest_result_fields(kwargs, attempt_id),
             "n_train": len(X_tr),
             "n_test": len(X_te),
-            "n_original": x_test_clean.shape[1],
+            "n_original":meta['eligible_base_feature_count'],
+            "artifacts":meta.get('executed_artifacts',[]),
             "train_time_s": train_time,
             "infer_time_s": infer_time,
             "autofe_gen_time_s": meta.get("generation_time_s", 0),
@@ -819,7 +854,8 @@ def train_unit(kwargs):
         gc.collect()
 
     except Exception as exc:
-        _record_manifest_failure(kwargs, attempt_id, failure_class="worker_exception", exception=exc, retry=kwargs.get("retry", False))
+        failure='resource_limit' if isinstance(exc,ResourceLimitError) else ('unsupported_gpu' if isinstance(exc,UnsupportedDeviceError) else 'worker_exception')
+        _record_manifest_failure(kwargs, attempt_id, failure_class=failure, exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase2_error.log", "a") as f:
             f.write(f"Train error {kwargs}: {traceback.format_exc()}\n")
 
@@ -969,24 +1005,13 @@ def detect_hardware():
     print(f"  Workers (GPU):   {N_GPU_WORKERS}")
     print(f"  RAM:             {ram_gb:.1f} GB")
 
-    # GPU detection
     try:
-        import torch
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
-            print(f"  GPU:             {gpu_name} ({gpu_mem:.1f} GB VRAM)")
-        else:
-            print("  GPU:             Not detected (CUDA unavailable)")
-    except Exception:
-        # Try xgboost device detection instead
-        try:
-            from xgboost import XGBClassifier
-            m = XGBClassifier(device="cuda", n_estimators=1, verbosity=0)
-            print("  GPU:             Available (XGBoost CUDA)")
-        except Exception:
-            print("  GPU:             Not detected")
-
+        import subprocess
+        output=subprocess.run(['nvidia-smi','--query-gpu=name,memory.total,driver_version','--format=csv,noheader'],capture_output=True,text=True,timeout=5)
+        print('  GPU hardware:    '+(output.stdout.strip() if output.returncode == 0 else 'unverified'))
+        print('  GPU usability:   actual fitted device is checked per executed GPU task')
+    except (OSError,subprocess.TimeoutExpired):
+        print('  GPU hardware:    unverified; task fits decide support')
     print("=" * 60)
 
 
@@ -1017,6 +1042,10 @@ def main() -> None:
     parser.add_argument("--stop-after-tasks", type=int, default=None)
     parser.add_argument("--stale-after-seconds", type=float, default=3600.0, help="Recover running attempts older than this on resume")
     args = parser.parse_args()
+    for name in ('max_datasets','max_seeds','max_folds','max_conditions','fsva_max_rows','max_workers'):
+        value=getattr(args,name)
+        if value is not None and value < 1:
+            parser.error(name.replace('_','-')+' must be positive')
 
     def _request_stop(_signal_number, _frame):
         global _stop_requested
@@ -1115,6 +1144,9 @@ def main() -> None:
         "code_identity": collect_code_identity(Path.cwd()),
         "environment_identity": collect_environment_identity(Path.cwd()),
         "durability_protocol": "sqlite_result_outbox_v2",
+        "scheduler_version":"dependency_ready_supervised_attempts_v1",
+        "stop_limit_unit":"model_attempt_launches_including_retries",
+        "run_deadline_policy":"hard during work; bounded cleanup/export follows",
         "datasets": datasets,
         "dataset_identities": data_identities,
         "seeds": seeds,
@@ -1138,6 +1170,7 @@ def main() -> None:
         },
         data_paths=data_paths,
         data_identities=data_identities,
+        precompute_metadata={"diagnostics_enabled":args.enable_fsva_diagnostics,"max_rows":args.fsva_max_rows,"schema":FSVA_SCHEMA_VERSION,"magnitudes":list(DEFAULT_PERTURBATION_MAGNITUDES)},
     )
     manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
     expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)
@@ -1176,141 +1209,12 @@ def main() -> None:
         print(json.dumps({"run_id": run_id, "manifest_db": str(manifest_db), "manifest_path": str(manifest_path), "state_counts": manifest_store.state_counts(run_id)}, sort_keys=True))
         return
 
-    # Sort datasets so we still process the smallest ones first for fast feedback
-    # Calculate dataset sizes
-    dataset_sizes = {}
-    for pt in precompute_tasks:
-        dataset_sizes[pt["dataset_name"]] = pt["size"]
-    
-    sorted_datasets = sorted([d for d in datasets if d in dataset_sizes], key=lambda x: dataset_sizes[x])
-
-    # ---- Setup Writer ----
-    manager = multiprocessing.Manager()
-    queue = manager.Queue()
-    writer = multiprocessing.Process(target=writer_process, args=(queue, results_path, str(manifest_db), run_id))
-    writer.start()
-
-    phase1_workers = min(args.max_workers or N_CPU_WORKERS, 4)  # Capped at 4 to prevent OOM
-    
-    # Process each dataset completely to allow cache cleanup
-    run_started = time.monotonic()
-    dispatched_model_tasks = 0
-    for d in sorted_datasets:
-        if _stop_requested or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks) or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
-            manifest_store.request_stop(run_id, reason="run_wall_time_or_signal")
-            break
-        logger.info(f"--- Processing dataset: {d} ---")
-        dataset_tasks = [t for t in precompute_tasks if t["dataset_name"] == d]
-        
-        if not dataset_tasks:
-            continue
-            
-        # ---- Phase 1: Precompute splits + AutoFE caches for this dataset ----
-        logger.info(f"Phase 1 [{d}]: {len(dataset_tasks)} units using {phase1_workers} workers...")
-        total = len(dataset_tasks)
-        for precompute_round in range(execution_config.max_attempts):
-            pending_precompute: list[dict[str, Any]] = []
-            for task in dataset_tasks:
-                task_id = str(task["scientific_task_id"])
-                manifest_task = manifest_store.get_task(run_id, task_id)
-                if manifest_task is None or manifest_task["state"] != "pending":
-                    continue
-                task["retry"] = precompute_round + 1 < execution_config.max_attempts
-                pending_precompute.append(task)
-            if not pending_precompute:
-                break
-            completed = total - len(pending_precompute)
-            logger.info(f"Phase 1 [{d}] attempt {precompute_round + 1}/{execution_config.max_attempts}: {len(pending_precompute)} pending units")
-            with multiprocessing.Pool(phase1_workers, maxtasksperchild=1) as pool:
-                for _result in pool.imap_unordered(precompute_unit, pending_precompute):
-                    completed += 1
-                    if completed % 50 == 0 or completed == total:
-                        ram_pct = psutil.virtual_memory().percent
-                        logger.info(f"Phase 1 [{d}]: {completed}/{total} ({100*completed/total:.1f}%) | RAM: {ram_pct:.0f}%")
-            if _stop_requested or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
-                break
-
-        if not all(
-            (manifest_store.get_task(run_id, str(task["scientific_task_id"])) or {}).get("state") == "completed"
-            for task in dataset_tasks
-        ):
-            # Model tasks remain pending/skipped until every precompute
-            # dependency is authoritative; a cache or a running lease alone
-            # is never treated as estimator completion.
-            continue
-
-        # ---- Phase 2: Train models for this dataset with bounded retries ----
-        for attempt_round in range(execution_config.max_attempts):
-            if _stop_requested:
-                break
-            if execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds:
-                break
-            cpu_tasks: list[dict[str, Any]] = []
-            gpu_tasks: list[dict[str, Any]] = []
-            for pt in dataset_tasks:
-                for p in selected_pipelines:
-                    for m in selected_cpu_models:
-                        model_task_id = model_ids[(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m)]
-                        manifest_task = manifest_store.get_task(run_id, model_task_id)
-                        if manifest_task is None or manifest_task["state"] != "pending":
-                            continue
-                        t = pt.copy()
-                        t["pipeline"] = p
-                        t["model"] = m
-                        t["model_task_id"] = model_task_id
-                        t["scientific_task_id"] = model_task_id
-                        t["task_timeout_seconds"] = args.task_timeout_seconds
-                        t["retry"] = attempt_round + 1 < execution_config.max_attempts
-                        cpu_tasks.append(t)
-                    for m in selected_gpu_models:
-                        model_task_id = model_ids[(pt["dataset_name"], pt["seed"], pt["fold"], pt["condition"], p, m)]
-                        manifest_task = manifest_store.get_task(run_id, model_task_id)
-                        if manifest_task is None or manifest_task["state"] != "pending":
-                            continue
-                        t = pt.copy()
-                        t["pipeline"] = p
-                        t["model"] = m
-                        t["model_task_id"] = model_task_id
-                        t["scientific_task_id"] = model_task_id
-                        t["task_timeout_seconds"] = args.task_timeout_seconds
-                        t["retry"] = attempt_round + 1 < execution_config.max_attempts
-                        gpu_tasks.append(t)
-
-            logger.info(f"Phase 2 [{d}] attempt {attempt_round + 1}/{execution_config.max_attempts}: evaluating {len(cpu_tasks)} CPU and {len(gpu_tasks)} GPU tasks...")
-            if execution_config.stop_after_tasks is not None:
-                remaining = max(0, execution_config.stop_after_tasks - dispatched_model_tasks)
-                cpu_tasks = cpu_tasks[:remaining]
-                remaining = max(0, execution_config.stop_after_tasks - dispatched_model_tasks - len(cpu_tasks))
-                gpu_tasks = gpu_tasks[:remaining]
-            dispatched_model_tasks += len(cpu_tasks) + len(gpu_tasks)
-            dispatch_training_tasks(cpu_tasks, gpu_tasks, queue, execution_config)
-            _wait_for_manifest_tasks(
-                manifest_store,
-                run_id,
-                [str(task["scientific_task_id"]) for task in cpu_tasks + gpu_tasks],
-                timeout_seconds=max(30.0, (args.task_timeout_seconds or 0.0) * 2.0),
-            )
-            if not (cpu_tasks or gpu_tasks) or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks):
-                break
-
-        # ---- Phase 3: Cleanup cache to prevent 600GB disk usage ----
-        import shutil
-        cache_dir = cache_root() / d
-        if cache_dir.exists():
-            shutil.rmtree(cache_dir, ignore_errors=True)
-            logger.info(f"Phase 3 [{d}]: Deleted cache directory {cache_dir}")
-            
-    queue.put("DONE")
-    writer.join()
-    if writer.exitcode != 0:
-        manifest_store.set_run_status(run_id, "failed")
-        logger.error(f"Result writer exited with code {writer.exitcode}; reconciliation is required")
-    elif _stop_requested or (execution_config.stop_after_tasks is not None and dispatched_model_tasks >= execution_config.stop_after_tasks) or (execution_config.run_wall_time_seconds is not None and time.monotonic() - run_started >= execution_config.run_wall_time_seconds):
-        manifest_store.request_stop(run_id, reason="declared_stop_limit")
-        manifest_store.set_run_status(run_id, "stopped")
-    else:
-        manifest_store.set_run_status(run_id, "completed")
-    logger.info(f"Benchmark finished. Manifest counts: {manifest_store.state_counts(run_id)}")
+    from src.coordinator import execute_manifest
+    outcome=execute_manifest(manifest_store,run_id,results_path,execution_config,stop_requested=lambda:_stop_requested)
+    logger.info(f"Benchmark status and exact counts: {outcome}")
+    print(json.dumps(outcome,sort_keys=True))
+    if outcome['status'] in ('failed','finished_with_errors','unfinished'):
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

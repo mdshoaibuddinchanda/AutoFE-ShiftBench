@@ -137,6 +137,7 @@ def build_task_records(
     protocol_version: str = EVALUATION_PROTOCOL_VERSION,
     seed_scheme_version: str = SEED_SCHEME_VERSION,
     include_precompute: bool = True,
+    precompute_metadata: Mapping[str,Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Build a complete deterministic manifest for a bounded or full grid."""
     datasets = [str(value) for value in datasets]
@@ -167,7 +168,9 @@ def build_task_records(
                         "severity": severity,
                         "condition": condition,
                     }
-                    pre_identity = {**base, "stage": "precompute", "pipeline": "__all__", "model": "__all__"}
+                    pre_identity = {**base, "stage": "precompute", "pipeline": "__all__", "model": "__all__",
+                        "prepared_pipelines":{name:pipeline_identity(name) if pipeline_identity else name for name in pipelines},
+                        "preparation_contract":dict(precompute_metadata or {})}
                     pre_id = scientific_task_id(pre_identity)
                     precompute_ids[(dataset, seed, fold, condition)] = pre_id
                     if include_precompute:
@@ -203,7 +206,7 @@ def build_task_records(
                                 "stage": "model",
                                 "initial_state": "skipped" if dataset_reason else "pending",
                                 "planned_skip_reason": dataset_reason,
-                                "depends_on": [pre_id],
+                                "depends_on": [pre_id] if include_precompute else [],
                             })
     ids = [record["scientific_task_id"] for record in records]
     if len(ids) != len(set(ids)):
@@ -307,6 +310,7 @@ class ManifestStore:
                     recorded_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_task_events_run ON task_events(run_id,event_order);
+                CREATE INDEX IF NOT EXISTS idx_tasks_ready ON tasks(run_id,state,stage);
                 """
             )
 
@@ -391,6 +395,29 @@ class ManifestStore:
             raise ManifestError(f"Unknown task: {task_id}")
         return json.loads(task["payload_json"])
 
+    def ready_tasks(self,run_id: str,*,limit=64):
+        """Bounded indexed query; a missing dependency is not ready."""
+        with self._connect() as connection:
+            for stage in ('model','precompute'):
+                rows=connection.execute("""SELECT t.payload_json,t.attempt_count FROM tasks t
+                    WHERE t.run_id=? AND t.state='pending' AND t.stage=? AND NOT EXISTS
+                    (SELECT 1 FROM json_each(t.payload_json,'$.depends_on') dep LEFT JOIN tasks parent
+                     ON parent.run_id=t.run_id AND parent.scientific_task_id=dep.value
+                     WHERE parent.state IS NULL OR parent.state != 'completed') LIMIT ?""",(run_id,stage,limit)).fetchall()
+                if rows:
+                    return [{**json.loads(row['payload_json']),'attempt_count':row['attempt_count']} for row in rows]
+        return []
+
+    def durable_payload(self,run_id,task_id):
+        with self._connect() as connection:
+            row=connection.execute('SELECT payload_json,payload_hash FROM durable_results WHERE run_id=? AND scientific_task_id=?',(run_id,task_id)).fetchone()
+        if row is None:
+            raise ManifestError('Dependency has no authoritative payload')
+        payload=json.loads(row['payload_json'])
+        if hashlib.sha256(_canonical(payload).encode()).hexdigest() != row['payload_hash']:
+            raise ManifestConflictError('Dependency payload is corrupt')
+        return payload
+
     def snapshot(self, run_id: str) -> dict[str, Any]:
         """Read one consistent SQLite snapshot for analysis and provenance.
 
@@ -424,11 +451,15 @@ class ManifestStore:
         now = _now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT state, attempt_count, stage FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
+            row = connection.execute("SELECT state, attempt_count, stage,payload_json FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if row is None:
                 raise ManifestError(f"Unknown task: {task_id}")
             if row["state"] != "pending":
                 return None
+            for dependency in json.loads(row['payload_json']).get('depends_on',[]):
+                parent=connection.execute('SELECT state FROM tasks WHERE run_id=? AND scientific_task_id=?',(run_id,dependency)).fetchone()
+                if parent is None or parent['state'] != 'completed':
+                    return None
             attempt_number = int(row["attempt_count"]) + 1
             attempt_id = attempt_id_for(run_id, task_id, attempt_number)
             connection.execute("UPDATE tasks SET state = 'running', attempt_count = ?, active_attempt_id = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (attempt_number, attempt_id, now, run_id, task_id))

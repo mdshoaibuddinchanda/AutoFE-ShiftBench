@@ -228,67 +228,99 @@
     {
       "id": "B13",
       "title": "Categorical memory safety",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original dependency controls failed; 9 scheduler/production/memory tests passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "preprocessing.py",
+      "supporting_locations": "src/coordinator.py; src/prepared_inputs.py; src/resource_limits.py; tests/test_coordinator.py; tests/test_prepared_execution.py; tests/test_memory_safety.py",
       "original_reproducer": null,
       "required_correction": "Categorical memory safety",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_memory_safety.py",
+        "tests/test_dependency_dispatch.py"
+      ],
+      "status": "corrected_regression_and_production_smoke_verified",
+      "limitations": [
+        "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
+      ]
     },
     {
       "id": "B14",
       "title": "Dependency-ready dispatch",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original dependency controls failed; 9 scheduler/production/memory tests passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py",
+      "supporting_locations": "src/coordinator.py; src/prepared_inputs.py; src/resource_limits.py; tests/test_coordinator.py; tests/test_prepared_execution.py; tests/test_memory_safety.py",
       "original_reproducer": null,
       "required_correction": "Dependency-ready dispatch",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_memory_safety.py",
+        "tests/test_dependency_dispatch.py"
+      ],
+      "status": "corrected_regression_and_production_smoke_verified",
+      "limitations": [
+        "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
+      ]
     },
     {
       "id": "B15",
       "title": "Deadlines stop limits and run status",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original dependency controls failed; 9 scheduler/production/memory tests passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py",
+      "supporting_locations": "src/coordinator.py; src/prepared_inputs.py; src/resource_limits.py; tests/test_coordinator.py; tests/test_prepared_execution.py; tests/test_memory_safety.py",
       "original_reproducer": null,
       "required_correction": "Deadlines stop limits and run status",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_memory_safety.py",
+        "tests/test_dependency_dispatch.py"
+      ],
+      "status": "corrected_regression_and_production_smoke_verified",
+      "limitations": [
+        "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
+      ]
     },
     {
       "id": "B16",
       "title": "Concurrent artifact publication",
       "evidence_level": "supplied_audit; pending checkout regression",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py",
+      "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py; src/provenance_evidence.py; tests/test_prepared_execution.py",
       "original_reproducer": null,
       "required_correction": "Concurrent artifact publication",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_prepared_execution.py"
+      ],
+      "status": "partially_corrected_pending_repair_and_analysis_lineage_controls",
+      "limitations": [
+        "Model artifacts now record actual split/preprocessor/feature/history/FSVA dependencies. Missing-artifact repair, concurrent creation and verified analysis edges still require controls."
+      ]
     },
     {
       "id": "B17",
       "title": "Worker/writer errors and retention",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original dependency controls failed; 9 scheduler/production/memory tests passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py",
+      "supporting_locations": "src/coordinator.py; src/prepared_inputs.py; src/resource_limits.py; tests/test_coordinator.py; tests/test_prepared_execution.py; tests/test_memory_safety.py",
       "original_reproducer": null,
       "required_correction": "Worker/writer errors and retention",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_memory_safety.py",
+        "tests/test_dependency_dispatch.py"
+      ],
+      "status": "corrected_regression_and_production_smoke_verified",
+      "limitations": [
+        "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
+      ]
     },
     {
       "id": "B18",
@@ -373,15 +405,17 @@
       "title": "Actual artifact lineage",
       "evidence_level": "actual task/data/result graph regression verified; production artifact links pending B16",
       "path": "active lineage",
-      "supporting_locations": "src/provenance_evidence.py actual_lineage",
+      "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py; src/provenance_evidence.py; tests/test_prepared_execution.py",
       "original_reproducer": null,
       "required_correction": "Actual artifact lineage",
       "compatibility_impact": "real task IDs and declared dependencies; unsupported links explicit incomplete",
       "tests": [
-        "test_lineage_contains_actual_tasks_not_generic_nodes"
+        "tests/test_prepared_execution.py"
       ],
-      "status": "partially_corrected",
-      "limitations": []
+      "status": "partially_corrected_pending_repair_and_analysis_lineage_controls",
+      "limitations": [
+        "Model artifacts now record actual split/preprocessor/feature/history/FSVA dependencies. Missing-artifact repair, concurrent creation and verified analysis edges still require controls."
+      ]
     },
     {
       "id": "C05",
