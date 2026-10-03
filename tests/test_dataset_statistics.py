@@ -11,10 +11,13 @@ from src.dataset_statistics import AnalysisConfig, AnalysisInputError, _holm, _s
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION
 from src.stats_analysis import run_wilcoxon_analysis
+from src.operator_registry import OPERATOR_REGISTRY_VERSION,OPERATOR_SEMANTICS_VERSION
+from src.evaluation import METRIC_SEMANTICS_VERSION
 
 
 def _record(dataset: str, seed: int, pipeline: str, metric: float, *, status: str = "success", condition: str = "clean") -> dict:
     return {
+        "run_id":"controlled_analysis_fixture",
         "evaluation_protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
         "dataset": dataset,
@@ -27,6 +30,12 @@ def _record(dataset: str, seed: int, pipeline: str, metric: float, *, status: st
         "pipeline_identity": pipeline + "__v1",
         "operator_set_id": "none_v1" if pipeline == "Raw" else "full_arithmetic_v1",
         "cap_policy_version": "none_v1",
+        "operator_registry_version":OPERATOR_REGISTRY_VERSION,
+        "operator_semantics_version":OPERATOR_SEMANTICS_VERSION,
+        "metric_semantics_version":METRIC_SEMANTICS_VERSION,
+        "source_code_fingerprint":"controlled_fixture_source",
+        "environment_fingerprint":"controlled_fixture_environment",
+        "dataset_fingerprint":"controlled_fixture_data_"+dataset,
         "model": "logistic_regression",
         "status": status,
         "roc_auc": metric,

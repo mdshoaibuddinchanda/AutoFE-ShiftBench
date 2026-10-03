@@ -110,28 +110,42 @@
     {
       "id": "B07",
       "title": "Metric ranges and complete bounds",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "dataset_statistics.py,sensitivity_analysis.py",
-      "original_reproducer": null,
+      "evidence_level": "six original failing controls reproduced; corrected affected-suite verification",
+      "path": "active dataset/sensitivity input readers",
+      "supporting_locations": "dataset_statistics analyze_ledger/_finite_metric/_validate_pipeline_semantics; sensitivity snapshot_manifest_ledger/_dataset_summary",
+      "original_reproducer": "tests/test_critical_analysis.py: original 6 failures; hand-built AUC, one-sided, mixed-run and partial-bounds cases",
       "required_correction": "Metric ranges and complete bounds",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "dataset_equal_paired_run_v2; original analysis roots retained; old unverified inputs rejected",
+      "tests": [
+        "tests/test_critical_analysis.py",
+        "tests/test_dataset_statistics.py",
+        "tests/test_sensitivity_analysis.py",
+        "tests/test_production_task_resume.py: 19 passed, 12.51s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
+      ]
     },
     {
       "id": "B08",
       "title": "Missing comparison sides",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "dataset_statistics.py",
-      "original_reproducer": null,
+      "evidence_level": "six original failing controls reproduced; corrected affected-suite verification",
+      "path": "active dataset/sensitivity input readers",
+      "supporting_locations": "dataset_statistics analyze_ledger/_finite_metric/_validate_pipeline_semantics; sensitivity snapshot_manifest_ledger/_dataset_summary",
+      "original_reproducer": "tests/test_critical_analysis.py: original 6 failures; hand-built AUC, one-sided, mixed-run and partial-bounds cases",
       "required_correction": "Missing comparison sides",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "dataset_equal_paired_run_v2; original analysis roots retained; old unverified inputs rejected",
+      "tests": [
+        "tests/test_critical_analysis.py",
+        "tests/test_dataset_statistics.py",
+        "tests/test_sensitivity_analysis.py",
+        "tests/test_production_task_resume.py: 19 passed, 12.51s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
+      ]
     },
     {
       "id": "B09",
@@ -272,28 +286,42 @@
     {
       "id": "C01",
       "title": "One run and full analysis compatibility",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
-      "original_reproducer": null,
+      "evidence_level": "six original failing controls reproduced; corrected affected-suite verification",
+      "path": "active dataset/sensitivity input readers",
+      "supporting_locations": "dataset_statistics analyze_ledger/_finite_metric/_validate_pipeline_semantics; sensitivity snapshot_manifest_ledger/_dataset_summary",
+      "original_reproducer": "tests/test_critical_analysis.py: original 6 failures; hand-built AUC, one-sided, mixed-run and partial-bounds cases",
       "required_correction": "One run and full analysis compatibility",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "dataset_equal_paired_run_v2; original analysis roots retained; old unverified inputs rejected",
+      "tests": [
+        "tests/test_critical_analysis.py",
+        "tests/test_dataset_statistics.py",
+        "tests/test_sensitivity_analysis.py",
+        "tests/test_production_task_resume.py: 19 passed, 12.51s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
+      ]
     },
     {
       "id": "C02",
       "title": "Authoritative snapshot identity",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
-      "original_reproducer": null,
+      "evidence_level": "six original failing controls reproduced; corrected affected-suite verification",
+      "path": "active dataset/sensitivity input readers",
+      "supporting_locations": "dataset_statistics analyze_ledger/_finite_metric/_validate_pipeline_semantics; sensitivity snapshot_manifest_ledger/_dataset_summary",
+      "original_reproducer": "tests/test_critical_analysis.py: original 6 failures; hand-built AUC, one-sided, mixed-run and partial-bounds cases",
       "required_correction": "Authoritative snapshot identity",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "dataset_equal_paired_run_v2; original analysis roots retained; old unverified inputs rejected",
+      "tests": [
+        "tests/test_critical_analysis.py",
+        "tests/test_dataset_statistics.py",
+        "tests/test_sensitivity_analysis.py",
+        "tests/test_production_task_resume.py: 19 passed, 12.51s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
+      ]
     },
     {
       "id": "C03",
@@ -468,14 +496,14 @@
     {
       "id": "C15",
       "title": "Duplicate payloads and attempt chronology",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "source correction; dedicated duplicate/chronology controls pending",
+      "path": "active sensitivity duplicate comparison and latest attempts",
+      "supporting_locations": "sensitivity_analysis._coverage_rows",
       "original_reproducer": null,
       "required_correction": "Duplicate payloads and attempt chronology",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "exclude reader metadata from payload identity; chronological attempt sequence",
       "tests": [],
-      "status": "pending",
+      "status": "partially_corrected",
       "limitations": []
     },
     {

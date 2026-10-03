@@ -65,7 +65,7 @@ from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
-from src.provenance import collect_code_identity
+from src.provenance import collect_code_identity, collect_environment_identity
 from src.seeding import (
     SEED_SCHEME_VERSION,
     corruption_seed,
@@ -687,6 +687,8 @@ def train_unit(kwargs):
         X_tr = np.nan_to_num(X_tr.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
         X_te = np.nan_to_num(X_te.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
         meta = res_meta[pipeline_name]
+        owning_store=_manifest_for_task(kwargs)
+        run_config=owning_store.run_config(str(kwargs["run_id"])) if owning_store is not None else {}
 
         use_gpu = model_type in GPU_MODELS
         t0 = time.time()
@@ -736,6 +738,9 @@ def train_unit(kwargs):
         res = {
             "evaluation_protocol_version": EVALUATION_PROTOCOL_VERSION,
             "seed_scheme_version": SEED_SCHEME_VERSION,
+            "dataset_fingerprint":(meta.get("data_identity") or {}).get("fingerprint"),
+            "source_code_fingerprint":run_config.get("code_identity",{}).get("worktree_fingerprint_sha256"),
+            "environment_fingerprint":fingerprint(run_config["environment_identity"]) if run_config.get("environment_identity") else None,
             "dataset": dataset_name,
             "split_policy": split_policy,
             "seed": seed,
@@ -1091,6 +1096,7 @@ def main() -> None:
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
         "code_identity": collect_code_identity(Path.cwd()),
+        "environment_identity": collect_environment_identity(Path.cwd()),
         "durability_protocol": "sqlite_result_outbox_v2",
         "datasets": datasets,
         "dataset_identities": data_identities,

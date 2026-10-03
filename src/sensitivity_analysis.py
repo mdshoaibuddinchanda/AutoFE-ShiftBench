@@ -194,7 +194,8 @@ def snapshot_manifest_ledger(
     if before != after:
         raise SensitivityInputError("Result ledger changed during the read-only snapshot")
     run_config = json.loads(snapshot["run"]["config_json"])
-    snapshot_id = hashlib.sha256(_canonical({"run_id": run_id, "run_config": run_config, "ledger_sha256": after, "task_ids": [row["scientific_task_id"] for row in snapshot["tasks"]]}).encode("utf-8")).hexdigest()
+    snapshot_id = hashlib.sha256(_canonical({"run_id": run_id, "ledger_sha256": after,
+        "authoritative_contents":{key:snapshot[key] for key in ("run","tasks","attempts","durable_results")}}).encode("utf-8")).hexdigest()
     snapshot["snapshot_id"] = "snapshot_" + snapshot_id[:24]
     snapshot["ledger_path"] = str(ledger)
     snapshot["ledger_sha256"] = after
@@ -219,7 +220,7 @@ def _coverage_rows(snapshot: Mapping[str, Any], ledger_rows: Mapping[str, list[d
         durable_payload = None if durable is None else json.loads(durable["payload_json"])
         ledger_candidates = ledger_rows.get(task_id, [])
         ledger_payload = ledger_candidates[0] if ledger_candidates else None
-        ledger_conflict = len({_canonical(row) for row in ledger_candidates}) > 1
+        ledger_conflict = len({_canonical({key:value for key,value in row.items() if key != "source_line"}) for row in ledger_candidates}) > 1
         if ledger_conflict:
             exclusions.append({"task_id": task_id, "reason": "conflicting_ledger_rows"})
         metric_value = None
@@ -234,7 +235,7 @@ def _coverage_rows(snapshot: Mapping[str, Any], ledger_rows: Mapping[str, list[d
         elif ledger_payload is not None:
             metric_reason = "ledger_only_not_manifest_durable"
         attempts = attempts_by_task.get(task_id, [])
-        latest_attempt = attempts[-1] if attempts else {}
+        latest_attempt = max(attempts,key=lambda row:(int(row.get("attempt_number",0)),str(row.get("started_at","")))) if attempts else {}
         state = str(task["state"])
         planned_skip = task.get("planned_skip_reason") or payload.get("planned_skip_reason")
         if planned_skip:
@@ -433,7 +434,10 @@ def _dataset_summary(
                 bound_by_dataset.append((float(frame["bound_lower"].mean()), float(frame["bound_upper"].mean())))
         overall_lower = float(np.mean([item[0] for item in bound_by_dataset])) if bound_by_dataset else None
         overall_upper = float(np.mean([item[1] for item in bound_by_dataset])) if bound_by_dataset else None
-        bound_status = "complete" if len(bound_by_dataset) == len(expected_by_dataset) and bound_by_dataset else ("partial_eligible_datasets" if bound_by_dataset else "unsupported")
+        all_tasks_bounded=len(all_bound) == len(eligible) and len(eligible)>0
+        bound_status = "complete" if all_tasks_bounded else ("incomplete_eligible_tasks" if len(eligible) else "unsupported")
+        if not all_tasks_bounded:
+            overall_lower=overall_upper=None
         bound_rows.append({
             "regime": regime,
             "label": extra_label,

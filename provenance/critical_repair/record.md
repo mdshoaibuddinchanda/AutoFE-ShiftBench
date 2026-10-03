@@ -154,3 +154,30 @@ valid while readiness is incomplete. This is an intentional stricter contract,
 not suppression of a regression. Current affected tests: 23 passed (provenance
 integrity, prior provenance, task manifest), 24.91 s. Follow-up provenance checks
 after dataset/durable-state controls: results recorded below.
+
+Follow-up B05 provenance suite: 13 passed, 12.03 s.
+
+## B07 / B08 / C01 / C02 / C15: analysis inputs and bounds
+
+Original controls: 6 failed (right-only failed row IndexError, AUC 1.5 accepted,
+disjoint runs pooled, operator semantics ignored, durable change retaining
+snapshot ID, and unbounded eligible task silently dropped). The corrected
+reader selects one declared run, checks every compatibility field and shared
+data/code/environment identity, excludes range-invalid metrics, chooses an
+available source safely and supports explicit empty outcomes. Snapshot IDs
+hash authoritative task/attempt/result contents. Reader-added source-line
+metadata no longer creates false payload conflicts; attempt sequence determines
+latest attempt. Bounds are unsupported if any eligible task lacks a bound.
+
+Analysis version: `dataset_equal_paired_run_v2`. Declared analysis root states
+are retained; new configuration/input semantics make historical inference
+outputs incompatible. Existing synthetic record helpers now supply the required
+declared run and semantics rather than bypassing the integrity checks.
+Affected critical/dataset/sensitivity tests: 17 passed, 2.69 s; added empty-side
+control is included in the next affected check. Historical prefix availability
+and unknown eligibility are addressed separately in B06/C14.
+
+Integrated affected analysis plus production-resume checks: 19 passed,
+13 warnings, 12.51 s. The B06 prefix controls still fail as expected before
+that repair: final bounds 0.125 instead of [-0.4625,0.5375], and changing only
+future metrics changes the prefix interval to 0.5275. These failures are retained.

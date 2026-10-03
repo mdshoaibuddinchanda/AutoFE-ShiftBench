@@ -12,7 +12,7 @@ import hashlib
 import itertools
 import json
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -21,10 +21,11 @@ import pandas as pd
 
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION, stable_seed
+from src.evaluation import METRIC_RANGES, METRIC_SEMANTICS_VERSION
 
 
-ANALYSIS_SCHEMA_VERSION = "dataset_cluster_analysis_v1"
-ANALYSIS_CONFIG_VERSION = "dataset_equal_paired_v1"
+ANALYSIS_SCHEMA_VERSION = "dataset_cluster_analysis_verified_v2"
+ANALYSIS_CONFIG_VERSION = "dataset_equal_paired_run_v2"
 DEFAULT_TASK_FIELDS = (
     "dataset",
     "split_policy",
@@ -42,6 +43,9 @@ COMPATIBILITY_FIELDS = (
     "operator_semantics_version",
     "operator_set_id",
     "cap_policy_version",
+    "metric_semantics_version",
+    "source_code_fingerprint",
+    "environment_fingerprint",
 )
 
 
@@ -75,6 +79,7 @@ class AnalysisConfig:
     expected_protocol_version: str = EVALUATION_PROTOCOL_VERSION
     expected_seed_scheme_version: str = SEED_SCHEME_VERSION
     min_datasets: int = 2
+    run_id: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 < self.confidence_level < 1.0:
@@ -201,6 +206,11 @@ def _finite_metric(row: Mapping[str, Any], metric: str) -> tuple[bool, float | N
         return False, None, "non_numeric_metric"
     if not np.isfinite(numeric):
         return False, None, "nonfinite_metric"
+    bounds=METRIC_RANGES.get(metric)
+    if bounds is None:
+        return False,None,"unsupported_metric_definition"
+    if not bounds[0] <= numeric <= bounds[1]:
+        return False,None,"metric_outside_declared_range"
     return True, numeric, None
 
 
@@ -225,9 +235,25 @@ def _validate_pipeline_semantics(records: list[dict[str, Any]], config: Analysis
         for row in records:
             if row.get("pipeline") != pipeline:
                 continue
-            values.add(tuple(row.get(field) for field in ("operator_set_id", "cap_policy_version")))
+            semantics=tuple(row.get(field) for field in COMPATIBILITY_FIELDS)
+            if any(value is None for value in semantics):
+                raise AnalysisInputError(f"Pipeline {pipeline} has unverified scientific semantics")
+            values.add(semantics)
         if len(values) > 1:
-            raise AnalysisInputError(f"Pipeline {pipeline} has incompatible operator/cap semantics in one ledger")
+            raise AnalysisInputError(f"Pipeline {pipeline} has incompatible scientific semantics in one run")
+    by_dataset={}
+    global_fields={}
+    for row in records:
+        if row.get("pipeline") not in {config.pipeline_a,config.pipeline_b}:
+            continue
+        identity=row.get("dataset_fingerprint")
+        if not identity:
+            raise AnalysisInputError("Dataset identity is unverified")
+        by_dataset.setdefault(row.get("dataset"),set()).add(identity)
+        for field in ("source_code_fingerprint","environment_fingerprint","metric_semantics_version"):
+            global_fields.setdefault(field,set()).add(row.get(field))
+    if any(len(values) != 1 for values in by_dataset.values()) or any(len(values) != 1 for values in global_fields.values()):
+        raise AnalysisInputError("Paired tasks have incompatible data/code/environment/metric semantics")
 
 
 def _holm(p_values: list[float], alpha: float) -> tuple[list[float], list[bool]]:
@@ -312,6 +338,15 @@ def analyze_ledger(
     path = Path(ledger_path)
     fingerprint = _fingerprint(path)
     records, parse_exclusions = _read_ledger(path)
+    run_ids={row.get("run_id") for row in records if row.get("pipeline") in {config.pipeline_a,config.pipeline_b}}
+    if config.run_id is None and run_ids:
+        if len(run_ids) != 1 or None in run_ids:
+            raise AnalysisInputError("Select exactly one declared run_id; mixed/unattributed runs are unsupported")
+        config=replace(config,run_id=str(next(iter(run_ids))))
+    if config.run_id is not None:
+        records=[row for row in records if row.get("run_id") == config.run_id]
+    if not records:
+        parse_exclusions.append({"reason":"empty_selected_run_ledger","detail":"Intended task universe is unavailable without a manifest; no zero outcome is imputed"})
     _validate_protocol(records, config)
     _check_duplicate_successes(records, config)
     _validate_pipeline_semantics(records, config)
@@ -359,11 +394,11 @@ def analyze_ledger(
         else:
             pair_status = "missing_partner" if left is None or right is None else "invalid_metric"
             diff = None
-            source = left or right or sides[config.pipeline_a][0] or sides[config.pipeline_b][0]
+            source = left or right or next(iter(sides[config.pipeline_a]+sides[config.pipeline_b]),None)
             stratum = _stratum_key(source, config)
             missing_side = config.pipeline_a if left is None else config.pipeline_b
             exclusions.append({"task_id": _task_id(source, config), "pipeline": missing_side, "reason": "missing_valid_partner", "stratum": _stratum_label(stratum, config.stratum_fields)})
-        source = left or right or sides[config.pipeline_a][0] or sides[config.pipeline_b][0]
+        source = left or right or next(iter(sides[config.pipeline_a]+sides[config.pipeline_b]),None)
         task_pair_rows.append({
             "task_id": _task_id(source, config),
             "dataset": source.get("dataset"),
@@ -442,7 +477,8 @@ def analyze_ledger(
         multiplicity["alpha"] = config.alpha
 
     bundle = AnalysisBundle(
-        config={**config.to_dict(), "schema_version": ANALYSIS_SCHEMA_VERSION, "input_ledger": str(path), "input_fingerprint_sha256": fingerprint},
+        config={**config.to_dict(), "schema_version": ANALYSIS_SCHEMA_VERSION, "input_ledger": str(path), "input_fingerprint_sha256": fingerprint,
+            "analysis_status":"supported_observed_pairs" if not pair_frame.empty else "empty_or_unsupported_observed_universe"},
         input_fingerprint=fingerprint,
         task_pairs=pair_frame,
         dataset_contrasts=pd.DataFrame(dataset_rows),
