@@ -119,8 +119,12 @@ conda run -n P12 python -B -m reproduction.real_data_preflight report
 ```
 
 The freeze and audit phases preserve existing outputs. Inspect existing budgets
-before any pilot continuation. Final measured outcomes/projections are appended
-after execution; no full-run completion or 500 GB capacity promise is made here.
+before any pilot continuation. Final outcomes/projections are in
+[results.md](results.md). The frozen pilot stopped with 166 completed models,
+11 failed and 523 pending, plus two completed/three pending preparations.
+No full-run completion or 500 GB capacity promise is made. The later probability
+reduction repair changes executed Python content: the archived pilot must not
+be resumed under that changed source.
 
 ## Remaining issue-register classifications
 
@@ -144,3 +148,13 @@ support the exclusive-handle gate.
 [sklearn 1.5 native parallelism](https://scikit-learn.org/1.5/computing/parallelism.html)
 distinguishes estimator n_jobs from native BLAS/OpenMP pools. Neither documentation
 is substituted for actual device fits, mapped-view tests or measured capacity.
+
+## Final verification
+
+After the demonstrated probability-sum repair, the complete P12 suite passed
+**263 tests and seven subtests**, 15 warnings, in 151.60 seconds. Focused metrics
+passed 12 tests. In-memory compilation passed 86 Python files/four notebook code
+cells; `git diff --check` passed. The original pilot remains stopped with its
+failed unit/cache intact. Same-run interruption, completed-unit resume, Windows
+faults and incomplete provenance are reported with their exact scope in
+[results.md](results.md) and [metric_validation_repair.md](metric_validation_repair.md).

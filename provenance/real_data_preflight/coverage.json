@@ -29,7 +29,7 @@
       "path": "src/cache_lifecycle.py",
       "sha256": "c4a9d5b973c39c6495779fbcf0bcd28477f353c6124ae17bcd486a2bbabed15d",
       "lines": 377,
-      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+      "coverage": "production/preflight dependency read fully in chunks"
     },
     {
       "path": "src/check_progress.py",
@@ -75,8 +75,8 @@
     },
     {
       "path": "src/evaluation.py",
-      "sha256": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4",
-      "lines": 169,
+      "sha256": "d6ec4558dfd53d2cbdb87bb8624e150bd079e8b81e26efabd5cc30b116198987",
+      "lines": 172,
       "coverage": "production/preflight dependency read in chunks"
     },
     {
@@ -131,7 +131,7 @@
       "path": "src/performance.py",
       "sha256": "58bf6d3c780d4eb46cd04ae5991fea2d93b3454a49633e19e6893d10a8589012",
       "lines": 13,
-      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+      "coverage": "production/preflight dependency read fully in chunks"
     },
     {
       "path": "src/pipeline_runner.py",
@@ -233,7 +233,7 @@
       "path": "src/stats_analysis.py",
       "sha256": "f112137fb03b221ae3418b2f91b5741701448a1d6dae7c9914952339c53c1556",
       "lines": 134,
-      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+      "coverage": "production/preflight dependency read fully in chunks"
     },
     {
       "path": "src/task_manifest.py",
@@ -252,6 +252,33 @@
       "sha256": "7176c2981ac48a279c08977273fbe0be942cc09fa36971780b0cfc90e94d6c74",
       "coverage": "all notebook code cells read; not executed",
       "code_cells": 3
+    },
+    {
+      "path": "reproduction/real_data_preflight.py",
+      "sha256": "2c03c2392d2f104601949b8dd08cd63b9c2d5f579b86269c73b09c63a1e94ef3",
+      "lines": 364,
+      "coverage": "task implementation or necessary regression read fully; P12 verification recorded"
+    },
+    {
+      "path": "reproduction/pilot_measurement.py",
+      "sha256": "94ba7047ab3da48efc58d88ac62209bebe8237326df8f91814ca7d6a8f1e899f",
+      "lines": 143,
+      "coverage": "task implementation or necessary regression read fully; P12 verification recorded"
+    },
+    {
+      "path": "tests/test_pilot_controls.py",
+      "sha256": "5e88717ab5a9c755f7421efd8a6d7d6bebad74c4958847dc651b750ca75bf7b5",
+      "lines": 86,
+      "coverage": "task implementation or necessary regression read fully; P12 verification recorded"
+    },
+    {
+      "path": "tests/test_critical_metrics.py",
+      "sha256": "e74255d8b1a9b8dea8cf522bf7d8a678789855b5f3e04a1e7edb0cb0ca408f51",
+      "lines": 80,
+      "coverage": "task implementation or necessary regression read fully; P12 verification recorded"
     }
-  ]
+  ],
+  "frozen_executed_commit": "05d6c753248d969cc574fdeb4c9a2955e364a2d0",
+  "probability_repair_commit": "b2bfa35",
+  "final_scope_note": "Current source hashes; executed original pilot uses its immutable pilot_config.json source hashes. Ancillary indexed files are not claimed manually reviewed."
 }
