@@ -1,0 +1,1082 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "analysis_config_version": "dataset_equal_paired_run_v2",
+    "bootstrap_resamples": 2000,
+    "confidence_level": 0.95,
+    "dataset_weighting": "equal_dataset",
+    "datasets": null,
+    "expected_protocol_version": "predictor_only_geometry_v3_integrity_metrics_fsva_v2",
+    "expected_seed_scheme_version": "sha256_canonical_json_u32_v1",
+    "family_id": "primary_dataset_contrasts_v1",
+    "metric": "roc_auc",
+    "min_datasets": 2,
+    "permutation_resamples": 5000,
+    "pipeline_a": "Raw",
+    "pipeline_b": "AutoFE_Baseline",
+    "random_state": 20261002,
+    "run_id": null,
+    "stratum_fields": [
+      "split_policy",
+      "condition",
+      "model"
+    ],
+    "task_fields": [
+      "dataset",
+      "split_policy",
+      "seed",
+      "fold",
+      "condition",
+      "severity",
+      "model"
+    ],
+    "task_weighting": "equal_valid_task_within_dataset"
+  },
+  "conditions": [
+    [
+      "clean",
+      0.0
+    ],
+    [
+      "gaussian_noise",
+      0.01
+    ],
+    [
+      "gaussian_noise",
+      0.05
+    ],
+    [
+      "gaussian_noise",
+      0.1
+    ],
+    [
+      "missing_values",
+      0.05
+    ],
+    [
+      "missing_values",
+      0.1
+    ],
+    [
+      "missing_values",
+      0.2
+    ],
+    [
+      "label_noise",
+      0.05
+    ],
+    [
+      "label_noise",
+      0.1
+    ],
+    [
+      "label_noise",
+      0.2
+    ],
+    [
+      "covariate_shift",
+      0.0
+    ],
+    [
+      "feature_removal",
+      0.2
+    ],
+    [
+      "population_shift",
+      0.0
+    ],
+    [
+      "class_prior_shift",
+      0.0
+    ]
+  ],
+  "datasets": [
+    {
+      "availability": "unavailable",
+      "name": "haberman",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/haberman.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "sonar",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/sonar.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "ionosphere",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/ionosphere.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "heart-disease",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/heart-disease.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "breast-cancer-wisconsin",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/breast-cancer-wisconsin.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "blood-transfusion-service-center",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/blood-transfusion-service-center.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "diabetes",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/diabetes.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "titanic",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/titanic.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "credit-g",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/credit-g.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "wine-quality-red",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/wine-quality-red.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "kr-vs-kp",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/kr-vs-kp.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "mushroom",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/mushroom.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "spambase",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/spambase.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "jm1",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/jm1.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "PhishingWebsites",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/PhishingWebsites.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "default-of-credit-card-clients",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/default-of-credit-card-clients.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "magic-telescope",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/magic-telescope.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "dry-bean-dataset",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/dry-bean-dataset.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "adult",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/adult.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "bank-marketing",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/bank-marketing.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "electricity",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/electricity.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "aps_failure",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/aps_failure.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "covertype",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/covertype.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "airlines",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/airlines.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    },
+    {
+      "availability": "unavailable",
+      "name": "kddcup99",
+      "parsing": "pandas.read_csv defaults",
+      "path": "data/raw/kddcup99.csv",
+      "row_policy": "download cap 100000, pandas sample random_state=42 without replacement",
+      "source_version": "unverified_until_exact_source_metadata_exists",
+      "target_policy": "target_label then target"
+    }
+  ],
+  "diagnostics": {
+    "enabled_default": false,
+    "epsilon": 1e-06,
+    "finite_difference_rows": 32,
+    "history": "all evaluated candidates plus excluded base events",
+    "magnitudes": [
+      0.001,
+      0.01,
+      0.05
+    ],
+    "max_rows": 128,
+    "norm": "Frobenius/L2",
+    "schema": "fsva_diagnostics_v1",
+    "seed_definition": "stable_seed('fsva_diagnostic', dataset/split_policy/seed/fold/condition)"
+  },
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.14 | packaged by conda-forge | (main, Sep  2 2026, 23:18:20) [MSC v.1944 64 bit (AMD64)]",
+    "supported_environment": "Conda P12"
+  },
+  "equivalence_acceptance": {
+    "identity_fields": "exact: task membership, seeds, rows, corruption arrays, vocabularies, candidates, scores/ties/selections, labels, validity, linkage",
+    "rearranged_reductions": {
+      "float64_norms": {
+        "atol": 1e-12,
+        "rtol": 1e-12
+      },
+      "restriction": "no changes to selections, clipping, predictions, validity or inference decisions"
+    },
+    "same_kernel": "exact numerical equality"
+  },
+  "estimators": {
+    "catboost": {
+      "cpu": {
+        "class": "catboost.core.CatBoostClassifier",
+        "parameters": {
+          "allow_writing_files": false,
+          "iterations": 100,
+          "random_state": 42,
+          "thread_count": 1,
+          "verbose": false
+        }
+      },
+      "declared_device": "GPU",
+      "gpu": {
+        "class": "catboost.core.CatBoostClassifier",
+        "parameters": {
+          "allow_writing_files": false,
+          "devices": "0",
+          "iterations": 100,
+          "random_state": 42,
+          "task_type": "GPU",
+          "thread_count": 1,
+          "verbose": false
+        }
+      }
+    },
+    "extra_trees": {
+      "cpu": {
+        "class": "sklearn.ensemble._forest.ExtraTreesClassifier",
+        "parameters": {
+          "bootstrap": false,
+          "ccp_alpha": 0.0,
+          "class_weight": null,
+          "criterion": "gini",
+          "max_depth": null,
+          "max_features": "sqrt",
+          "max_leaf_nodes": null,
+          "max_samples": null,
+          "min_impurity_decrease": 0.0,
+          "min_samples_leaf": 1,
+          "min_samples_split": 2,
+          "min_weight_fraction_leaf": 0.0,
+          "monotonic_cst": null,
+          "n_estimators": 100,
+          "n_jobs": 1,
+          "oob_score": false,
+          "random_state": 42,
+          "verbose": 0,
+          "warm_start": false
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "gaussian_nb": {
+      "cpu": {
+        "class": "sklearn.naive_bayes.GaussianNB",
+        "parameters": {
+          "priors": null,
+          "var_smoothing": 1e-09
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "knn": {
+      "cpu": {
+        "class": "sklearn.neighbors._classification.KNeighborsClassifier",
+        "parameters": {
+          "algorithm": "auto",
+          "leaf_size": 30,
+          "metric": "minkowski",
+          "metric_params": null,
+          "n_jobs": 1,
+          "n_neighbors": 5,
+          "p": 2,
+          "weights": "uniform"
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "lightgbm": {
+      "cpu": {
+        "class": "lightgbm.sklearn.LGBMClassifier",
+        "parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": null,
+          "colsample_bytree": 1.0,
+          "importance_type": "split",
+          "learning_rate": 0.1,
+          "max_depth": -1,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 100,
+          "n_jobs": 1,
+          "num_leaves": 31,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 1.0,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "linear_svm": {
+      "cpu": {
+        "class": "sklearn.calibration.CalibratedClassifierCV",
+        "parameters": {
+          "cv": 3,
+          "ensemble": true,
+          "estimator": {
+            "class": "sklearn.svm._classes.LinearSVC",
+            "parameters": {
+              "C": 1.0,
+              "class_weight": null,
+              "dual": "auto",
+              "fit_intercept": true,
+              "intercept_scaling": 1,
+              "loss": "squared_hinge",
+              "max_iter": 1000,
+              "multi_class": "ovr",
+              "penalty": "l2",
+              "random_state": 42,
+              "tol": 0.0001,
+              "verbose": 0
+            }
+          },
+          "method": "sigmoid",
+          "n_jobs": null
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "logistic_regression": {
+      "cpu": {
+        "class": "sklearn.linear_model._logistic.LogisticRegression",
+        "parameters": {
+          "C": 1.0,
+          "class_weight": null,
+          "dual": false,
+          "fit_intercept": true,
+          "intercept_scaling": 1,
+          "l1_ratio": null,
+          "max_iter": 1000,
+          "multi_class": "deprecated",
+          "n_jobs": 1,
+          "penalty": "l2",
+          "random_state": 42,
+          "solver": "lbfgs",
+          "tol": 0.0001,
+          "verbose": 0,
+          "warm_start": false
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "mlp": {
+      "cpu": {
+        "class": "sklearn.neural_network._multilayer_perceptron.MLPClassifier",
+        "parameters": {
+          "activation": "relu",
+          "alpha": 0.0001,
+          "batch_size": "auto",
+          "beta_1": 0.9,
+          "beta_2": 0.999,
+          "early_stopping": true,
+          "epsilon": 1e-08,
+          "hidden_layer_sizes": [
+            100
+          ],
+          "learning_rate": "constant",
+          "learning_rate_init": 0.001,
+          "max_fun": 15000,
+          "max_iter": 500,
+          "momentum": 0.9,
+          "n_iter_no_change": 10,
+          "nesterovs_momentum": true,
+          "power_t": 0.5,
+          "random_state": 42,
+          "shuffle": true,
+          "solver": "adam",
+          "tol": 0.0001,
+          "validation_fraction": 0.1,
+          "verbose": false,
+          "warm_start": false
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "random_forest": {
+      "cpu": {
+        "class": "sklearn.ensemble._forest.RandomForestClassifier",
+        "parameters": {
+          "bootstrap": true,
+          "ccp_alpha": 0.0,
+          "class_weight": null,
+          "criterion": "gini",
+          "max_depth": null,
+          "max_features": "sqrt",
+          "max_leaf_nodes": null,
+          "max_samples": null,
+          "min_impurity_decrease": 0.0,
+          "min_samples_leaf": 1,
+          "min_samples_split": 2,
+          "min_weight_fraction_leaf": 0.0,
+          "monotonic_cst": null,
+          "n_estimators": 100,
+          "n_jobs": 1,
+          "oob_score": false,
+          "random_state": 42,
+          "verbose": 0,
+          "warm_start": false
+        }
+      },
+      "declared_device": "CPU",
+      "gpu": null
+    },
+    "xgboost": {
+      "cpu": {
+        "class": "xgboost.sklearn.XGBClassifier",
+        "parameters": {
+          "base_score": null,
+          "booster": null,
+          "callbacks": null,
+          "colsample_bylevel": null,
+          "colsample_bynode": null,
+          "colsample_bytree": null,
+          "device": null,
+          "early_stopping_rounds": null,
+          "enable_categorical": false,
+          "eval_metric": "logloss",
+          "feature_types": null,
+          "gamma": null,
+          "grow_policy": null,
+          "importance_type": null,
+          "interaction_constraints": null,
+          "learning_rate": null,
+          "max_bin": null,
+          "max_cat_threshold": null,
+          "max_cat_to_onehot": null,
+          "max_delta_step": null,
+          "max_depth": null,
+          "max_leaves": null,
+          "min_child_weight": null,
+          "missing": {
+            "nonfinite_parameter": "nan"
+          },
+          "monotone_constraints": null,
+          "multi_strategy": null,
+          "n_estimators": 100,
+          "n_jobs": 1,
+          "num_parallel_tree": null,
+          "objective": "binary:logistic",
+          "random_state": 42,
+          "reg_alpha": null,
+          "reg_lambda": null,
+          "sampling_method": null,
+          "scale_pos_weight": null,
+          "subsample": null,
+          "tree_method": "hist",
+          "validate_parameters": null,
+          "verbosity": 0
+        }
+      },
+      "declared_device": "GPU",
+      "gpu": {
+        "class": "xgboost.sklearn.XGBClassifier",
+        "parameters": {
+          "base_score": null,
+          "booster": null,
+          "callbacks": null,
+          "colsample_bylevel": null,
+          "colsample_bynode": null,
+          "colsample_bytree": null,
+          "device": "cuda",
+          "early_stopping_rounds": null,
+          "enable_categorical": false,
+          "eval_metric": "logloss",
+          "feature_types": null,
+          "gamma": null,
+          "grow_policy": null,
+          "importance_type": null,
+          "interaction_constraints": null,
+          "learning_rate": null,
+          "max_bin": null,
+          "max_cat_threshold": null,
+          "max_cat_to_onehot": null,
+          "max_delta_step": null,
+          "max_depth": null,
+          "max_leaves": null,
+          "min_child_weight": null,
+          "missing": {
+            "nonfinite_parameter": "nan"
+          },
+          "monotone_constraints": null,
+          "multi_strategy": null,
+          "n_estimators": 100,
+          "n_jobs": 1,
+          "num_parallel_tree": null,
+          "objective": "binary:logistic",
+          "random_state": 42,
+          "reg_alpha": null,
+          "reg_lambda": null,
+          "sampling_method": null,
+          "scale_pos_weight": null,
+          "subsample": null,
+          "tree_method": "hist",
+          "validate_parameters": null,
+          "verbosity": 0
+        }
+      }
+    }
+  },
+  "folds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "model_tasks": 1225000,
+  "pipelines": {
+    "AutoFE_AddSub": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_AddSub ({add, sub})",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "add_sub_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric"
+      ]
+    },
+    "AutoFE_AddSubDiv": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_AddSubDiv ({add, sub, div})",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "add_sub_div_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric",
+        "divide_numeric"
+      ]
+    },
+    "AutoFE_Baseline": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_Baseline (full arithmetic)",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "full_arithmetic_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ]
+    },
+    "AutoFE_DivideOnly": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_DivideOnly ({div})",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "divide_only_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "divide_numeric"
+      ]
+    },
+    "AutoFE_MI": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_MI (full arithmetic)",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "full_arithmetic_v1",
+      "random_seed": 42,
+      "selection_method": "mi",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ]
+    },
+    "AutoFE_MultiplyOnly": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_MultiplyOnly ({mul})",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "multiply_only_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "multiply_numeric"
+      ]
+    },
+    "AutoFE_NoDivision": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_NoDivision ({add, sub, mul})",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "add_sub_mul_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric"
+      ]
+    },
+    "AutoFE_NoMultiply": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_NoMultiply (legacy add_sub alias)",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "add_sub_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric"
+      ]
+    },
+    "AutoFE_Random": {
+      "baseline_kind": null,
+      "depth": 1,
+      "display_identity": "AutoFE_Random (full arithmetic)",
+      "enable_dfs": true,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "full_arithmetic_v1",
+      "random_seed": 42,
+      "selection_method": "random",
+      "trans_primitives": [
+        "add_numeric",
+        "subtract_numeric",
+        "multiply_numeric",
+        "divide_numeric"
+      ]
+    },
+    "Raw": {
+      "baseline_kind": "historical_raw",
+      "depth": 1,
+      "display_identity": "Raw (historical 20-column control)",
+      "enable_dfs": false,
+      "max_base_features": 20,
+      "max_features": null,
+      "monitor_ram": true,
+      "operator_set_id": "none_v1",
+      "random_seed": 42,
+      "selection_method": "none",
+      "trans_primitives": []
+    },
+    "Raw_Capped": {
+      "baseline_kind": "cap_matched_raw",
+      "depth": 1,
+      "display_identity": "Raw_Capped (post-candidate cap matched)",
+      "enable_dfs": false,
+      "max_base_features": null,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "none_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": []
+    },
+    "Raw_Full": {
+      "baseline_kind": "full_dimensional_raw",
+      "depth": 1,
+      "display_identity": "Raw_Full (all eligible base features)",
+      "enable_dfs": false,
+      "max_base_features": null,
+      "max_features": null,
+      "monitor_ram": true,
+      "operator_set_id": "none_v1",
+      "random_seed": 42,
+      "selection_method": "none",
+      "trans_primitives": []
+    },
+    "Raw_MI": {
+      "baseline_kind": "historical_raw_variant",
+      "depth": 1,
+      "display_identity": "Raw_MI",
+      "enable_dfs": false,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "none_v1",
+      "random_seed": 42,
+      "selection_method": "mi",
+      "trans_primitives": []
+    },
+    "Raw_Variance": {
+      "baseline_kind": "historical_raw_variant",
+      "depth": 1,
+      "display_identity": "Raw_Variance",
+      "enable_dfs": false,
+      "max_base_features": 20,
+      "max_features": 100,
+      "monitor_ram": true,
+      "operator_set_id": "none_v1",
+      "random_seed": 42,
+      "selection_method": "variance",
+      "trans_primitives": []
+    }
+  },
+  "precompute_tasks": 8750,
+  "protocol": "predictor_only_geometry_v3_integrity_metrics_fsva_v2",
+  "role": "corrected_minimal_reference",
+  "root_seeds": [
+    42,
+    123,
+    456,
+    789,
+    2025
+  ],
+  "schema": "scientific_contract_v1",
+  "scientific_definitions": {
+    "src/evaluation.py": "\"\"\"Comprehensive evaluation metrics for benchmark experiments.\"\"\"\n\nfrom __future__ import annotations\n\nimport warnings\nimport numpy as np\nimport pandas as pd\nfrom sklearn.metrics import (\n    accuracy_score,\n    balanced_accuracy_score,\n    brier_score_loss,\n    f1_score,\n    log_loss,\n    matthews_corrcoef,\n    precision_score,\n    recall_score,\n    roc_auc_score,\n    average_precision_score,\n)\n\nMETRIC_SEMANTICS_VERSION = \"encoded_class_probability_metrics_v2\"\nMETRIC_RANGES = {name: (0.0, 1.0) for name in (\"accuracy\", \"balanced_accuracy\", \"precision\", \"recall\", \"f1\", \"f1_macro\", \"roc_auc\", \"pr_auc\", \"brier_score\")}\nMETRIC_RANGES.update({\"mcc\": (-1.0, 1.0), \"log_loss\": (0.0, np.inf)})\n\n\nclass MetricInputError(ValueError):\n    \"\"\"An input violates the declared target/probability coordinate contract.\"\"\"\n\n\ndef compute_classification_metrics(\n    y_true: np.ndarray,\n    y_pred: np.ndarray,\n    y_proba: np.ndarray,\n    classes: np.ndarray | None = None,\n    *,\n    probability_classes: np.ndarray | None = None,\n) -> dict:\n    \"\"\"\n    Compute 10 classification metrics for the benchmark.\n    \n    Supports both Binary and Multiclass tasks automatically.\n    \"\"\"\n    y_true = np.asarray(y_true).reshape(-1)\n    y_pred = np.asarray(y_pred).reshape(-1)\n    declared = np.asarray(classes if classes is not None else np.unique(y_true))\n    if declared.ndim != 1 or len(set(declared.tolist())) != len(declared):\n        raise MetricInputError(\"class coordinates must be unique and one-dimensional\")\n    if len(y_true) != len(y_pred):\n        raise MetricInputError(\"target and prediction lengths differ\")\n    allowed = set(declared.tolist())\n    if not set(y_true.tolist()).issubset(allowed) or not set(y_pred.tolist()).issubset(allowed):\n        raise MetricInputError(\"target/prediction class is absent from declared class coordinates\")\n    # sklearn log_loss orders label coordinates; align to that order explicitly.\n    labels = np.unique(declared)\n    binary = len(labels) == 2\n    names = list(METRIC_RANGES)\n    metrics = {name: np.nan for name in names}\n    statuses = {name: \"undefined_empty_target\" for name in names}\n    metrics.update({\"metric_semantics_version\": METRIC_SEMANTICS_VERSION,\n        \"metric_status\": statuses, \"f1_averaging\": \"binary\" if binary else \"macro\",\n        \"brier_normalization\": \"positive_class_mean_squared_error\" if binary else \"mean_over_samples_and_declared_classes\"})\n    if not len(y_true):\n        return metrics\n    metrics.update(accuracy=float(accuracy_score(y_true, y_pred)),\n        balanced_accuracy=float(balanced_accuracy_score(y_true, y_pred)),\n        mcc=float(matthews_corrcoef(y_true, y_pred)))\n    kwargs = {\"average\": \"binary\", \"pos_label\": labels[1]} if binary else {\"average\": \"macro\", \"labels\": labels}\n    metrics[\"precision\"] = float(precision_score(y_true,y_pred,zero_division=0,**kwargs))\n    metrics[\"recall\"] = float(recall_score(y_true,y_pred,zero_division=0,**kwargs))\n    metrics[\"f1\"] = float(f1_score(y_true,y_pred,zero_division=0,**kwargs))\n    metrics[\"f1_macro\"] = float(f1_score(y_true,y_pred,average=\"macro\",labels=labels,zero_division=0))\n    for name in (\"accuracy\",\"balanced_accuracy\",\"mcc\",\"precision\",\"recall\",\"f1\",\"f1_macro\"):\n        statuses[name] = \"complete\"\n    for name in (\"roc_auc\",\"pr_auc\",\"log_loss\",\"brier_score\"):\n        statuses[name] = \"undefined_no_probabilities\" if y_proba is None else \"undefined_single_declared_class\"\n    if y_proba is None:\n        return metrics\n    probabilities = np.asarray(y_proba)\n    columns = np.asarray(probability_classes if probability_classes is not None else declared)\n    if probabilities.ndim != 2 or probabilities.shape != (len(y_true), len(columns)):\n        raise MetricInputError(\"probability dimensions do not match rows and class columns\")\n    if columns.ndim != 1 or len(set(columns.tolist())) != len(columns) or not set(columns.tolist()).issubset(allowed):\n        raise MetricInputError(\"probability class coordinates are incompatible\")\n    if not np.isfinite(probabilities).all() or np.any(probabilities < 0) or np.any(probabilities > 1):\n        raise MetricInputError(\"probabilities must be finite and within [0,1]\")\n    if not np.allclose(probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-7):\n        raise MetricInputError(\"probability rows must sum to one\")\n    aligned = np.zeros((len(y_true),len(labels)), dtype=probabilities.dtype)\n    positions = {label: i for i,label in enumerate(labels.tolist())}\n    for i,label in enumerate(columns.tolist()):\n        aligned[:,positions[label]] = probabilities[:,i]\n    if len(labels) < 2:\n        return metrics\n    metrics[\"log_loss\"] = float(log_loss(y_true, aligned, labels=labels))\n    if binary:\n        metrics[\"brier_score\"] = float(brier_score_loss(y_true == labels[1], aligned[:,1]))\n    else:\n        metrics[\"brier_score\"] = float(np.mean([brier_score_loss(y_true == label, aligned[:,i]) for i,label in enumerate(labels)]))\n    statuses[\"log_loss\"] = statuses[\"brier_score\"] = \"complete\"\n    if len(np.unique(y_true)) != len(labels):\n        statuses[\"roc_auc\"] = statuses[\"pr_auc\"] = \"undefined_missing_held_out_class\"\n        return metrics\n    if binary:\n        metrics[\"roc_auc\"] = float(roc_auc_score(y_true == labels[1],aligned[:,1]))\n        metrics[\"pr_auc\"] = float(average_precision_score(y_true == labels[1],aligned[:,1]))\n    else:\n        metrics[\"roc_auc\"] = float(roc_auc_score(y_true,aligned,labels=labels,multi_class=\"ovr\",average=\"macro\"))\n        metrics[\"pr_auc\"] = float(np.mean([average_precision_score(y_true == label,aligned[:,i]) for i,label in enumerate(labels)]))\n    statuses[\"roc_auc\"] = statuses[\"pr_auc\"] = \"complete\"\n    return metrics\n\nfrom scipy.stats import wasserstein_distance, ks_2samp\n\nDISTRIBUTION_SEMANTICS_VERSION='frozen_mapping_training_corruption_distance_v2'\n\ndef compute_distribution_distance(\n    x_clean: pd.DataFrame,\n    x_shifted: pd.DataFrame,\n    max_samples: int = 5000,\n    random_state: int = 42,\n) -> dict[str, float]:\n    \"\"\"Compare identical numeric coordinates under one frozen fitted mapping.\n\n    Callers declare training corruption or held-out input scope. Independently\n    selected/generated coordinate systems are unsupported.\n    \"\"\"\n    status={'distribution_semantics_version':DISTRIBUTION_SEMANTICS_VERSION}\n    if x_clean.empty or x_shifted.empty:\n        return {**status,'distance_status':'unsupported_empty_inputs','wasserstein': None, 'ks_stat': None}\n    if list(x_clean.columns) != list(x_shifted.columns):\n        return {**status,'distance_status':'unsupported_coordinate_mismatch','wasserstein':None,'ks_stat':None}\n\n    # Sample rows to keep compute feasible\n    if len(x_clean) > max_samples:\n        x_clean = x_clean.sample(n=max_samples, random_state=random_state)\n    if len(x_shifted) > max_samples:\n        x_shifted = x_shifted.sample(n=max_samples, random_state=random_state)\n\n    # Ensure we only compare common numeric columns\n    cols = [c for c in x_clean.columns if c in x_shifted.columns and pd.api.types.is_numeric_dtype(x_clean[c])]\n    if not cols:\n        return {**status,'distance_status':'unsupported_no_numeric_coordinates','wasserstein':None,'ks_stat':None}\n\n    w_dists = []\n    ks_dists = []\n    for c in cols:\n        # Drop NaNs for stability\n        c_clean = x_clean[c].dropna().values\n        c_shifted = x_shifted[c].dropna().values\n        if len(c_clean) > 0 and len(c_shifted) > 0:\n            try:\n                w_dists.append(wasserstein_distance(c_clean, c_shifted))\n                ks_dists.append(ks_2samp(c_clean, c_shifted).statistic)\n            except Exception:\n                pass\n\n    return {\n        **status,'distance_status':'complete' if len(w_dists) == len(cols) else 'incomplete_numeric_coordinates',\n        'wasserstein': float(np.mean(w_dists)) if w_dists else np.nan,\n        'ks_stat': float(np.mean(ks_dists)) if ks_dists else np.nan,\n    }\n\ndef compute_jaccard_similarity(list_a: list[str], list_b: list[str]) -> float:\n    \"\"\"Compute Jaccard similarity between two lists of feature names.\"\"\"\n    set_a = set(list_a)\n    set_b = set(list_b)\n    if not set_a and not set_b:\n        return 1.0\n    return float(len(set_a.intersection(set_b)) / len(set_a.union(set_b)))\n",
+    "src/feature_engineering.py": "\"\"\"Deterministic arithmetic candidate generation and baseline controls.\"\"\"\n\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nfrom typing import Any\n\nimport numpy as np\nimport pandas as pd\nfrom sklearn.feature_selection import mutual_info_classif\nfrom src.resource_limits import require_bytes\n\nfrom src.operator_registry import (\n    OPERATOR_REGISTRY,\n    OPERATOR_REGISTRY_VERSION,\n    OPERATOR_SEMANTICS_VERSION,\n    OPERATOR_SET_REGISTRY,\n    Expression,\n    candidate_id,\n    evaluate_operator,\n    expression_columns,\n    expression_depth,\n    expression_operators,\n    expression_to_dict,\n    expression_to_string,\n    op_expression,\n    raw_expression,\n    validate_operator_set,\n    operator_set_manifest,\n)\n\n\nCAP_POLICY_VERSION = \"post_candidate_topk_v1\"\nBASE_FEATURE_POLICY_VERSION = \"training_variance_topk_v1\"\nMI_SEMANTICS_VERSION = \"declared_discrete_provenance_v2\"\nCANDIDATE_GENERATION_VERSION = \"unique_depth_expression_trees_v2\"\n\n\n@dataclass(slots=True)\nclass DFSConfig:\n    \"\"\"Configuration for raw controls and arithmetic feature generation.\"\"\"\n\n    enable_dfs: bool = True\n    depth: int = 1\n    max_features: int | None = 100\n    max_base_features: int | None = 20\n    selection_method: str = \"variance\"\n    trans_primitives: list[str] | None = None\n    monitor_ram: bool = True\n    random_seed: int = 42\n    operator_set_id: str = \"full_arithmetic_v1\"\n    baseline_kind: str | None = None\n    display_identity: str | None = None\n\n    def __post_init__(self) -> None:\n        for name in ('max_features','max_base_features'):\n            value=getattr(self,name)\n            if value is not None and (not isinstance(value,int) or value <= 0):\n                raise ValueError(f'{name} must be a positive integer or None')\n        if not isinstance(self.depth,int) or self.depth < 0:\n            raise ValueError('depth must be a nonnegative integer')\n        if self.trans_primitives is None:\n            self.trans_primitives = list(OPERATOR_SET_REGISTRY[self.operator_set_id])\n        else:\n            primitive_tuple = tuple(self.trans_primitives)\n            if primitive_tuple != tuple(OPERATOR_SET_REGISTRY[self.operator_set_id]):\n                matches = [key for key, value in OPERATOR_SET_REGISTRY.items() if value == primitive_tuple]\n                if not matches:\n                    raise ValueError(f\"Primitive list is not a registered operator set: {primitive_tuple}\")\n                self.operator_set_id = matches[0]\n\n\ndef _get_process_ram_mb() -> float | None:\n    try:\n        import psutil\n    except ModuleNotFoundError:\n        return None\n    return float(psutil.Process().memory_info().rss / (1024 * 1024))\n\n\ndef _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:\n    numeric = frame.select_dtypes(include=[\"number\", \"bool\"]).copy()\n    if numeric.empty:\n        raise ValueError(\"No numeric columns available.\")\n    for column in numeric:\n        if isinstance(numeric[column].dtype,pd.SparseDtype):\n            values=numeric[column].to_numpy(dtype=float)\n            numeric[column]=pd.arrays.SparseArray(np.where(np.isfinite(values),values,0.),fill_value=0.)\n        else:\n            numeric[column]=numeric[column].astype(float)\n    numeric = numeric.replace([np.inf, -np.inf], np.nan)\n    return numeric.fillna(0.0)\n\n\ndef _base_columns(x_train: pd.DataFrame, cfg: DFSConfig) -> tuple[pd.DataFrame, list[str], list[str]]:\n    numeric = _numeric_frame(x_train)\n    eligible = list(numeric.columns)\n    if cfg.max_base_features is None or len(eligible) <= cfg.max_base_features:\n        return numeric, eligible, []\n    variances = pd.Series({col:pd.Series(numeric[col].to_numpy(dtype=float)).var() for col in numeric}).fillna(0.0)\n    ranked = sorted(eligible, key=lambda col: (-float(variances[col]), str(col)))\n    retained = ranked[: cfg.max_base_features]\n    excluded = [col for col in eligible if col not in set(retained)]\n    return numeric[retained], retained, excluded\n\n\ndef _generate_expressions(columns: list[str], operator_set_id: str, depth: int) -> list[Expression]:\n    operators = validate_operator_set(operator_set_id)\n    if depth < 0:\n        raise ValueError(\"depth must be non-negative\")\n    expressions: list[Expression] = [raw_expression(col) for col in columns]\n    if not operators or depth == 0:\n        return expressions\n\n    by_depth: dict[int, list[Expression]] = {0: list(expressions)}\n    for current_depth in range(1, depth + 1):\n        left_pool = [expr for d in range(current_depth) for expr in by_depth.get(d, [])]\n        right_pool = by_depth[0]\n        generated: list[Expression] = []\n        for operator in operators:\n            spec = OPERATOR_REGISTRY[operator]\n            if spec.commutative:\n                for left in left_pool:\n                    for right in right_pool:\n                        if expression_to_string(left) <= expression_to_string(right):\n                            generated.append(op_expression(operator, left, right))\n            else:\n                for left in left_pool:\n                    for right in right_pool:\n                        generated.append(op_expression(operator, left, right))\n        generated=list({candidate_id(expr):expr for expr in generated if expression_depth(expr) == current_depth}.values())\n        generated.sort(key=candidate_id)\n        by_depth[current_depth] = generated\n        expressions.extend(generated)\n    return expressions\n\n\ndef _evaluate_expression(expression: Expression, frame: pd.DataFrame) -> tuple[np.ndarray, dict[str, int]]:\n    if expression[0] == \"raw\":\n        return frame[str(expression[1])].to_numpy(dtype=float), {\"nonfinite_count\": 0, \"clipped_count\": 0, \"protected_count\": 0}\n    left, left_status = _evaluate_expression(expression[2], frame)\n    right, right_status = _evaluate_expression(expression[3], frame)\n    values, status = evaluate_operator(str(expression[1]), left, right)\n    merged = {key: left_status.get(key, 0) + right_status.get(key, 0) + status.get(key, 0) for key in (\"nonfinite_count\", \"clipped_count\", \"protected_count\")}\n    return values, merged\n\n\ndef _score_candidates(matrix: pd.DataFrame, y_train: np.ndarray | None, cfg: DFSConfig) -> dict[str, float | None]:\n    method = cfg.selection_method\n    if method == \"none\":\n        return {column: None for column in matrix.columns}\n    cleaned = matrix.replace([np.inf, -np.inf], np.nan).fillna(0.0)\n    if method == \"variance\":\n        return {column: float(cleaned[column].var(ddof=1)) for column in matrix.columns}\n    if method == \"mi\":\n        if y_train is None:\n            raise ValueError(\"y_train is required for MI selection.\")\n        discrete=set(matrix.attrs.get('discrete_features',[]))\n        scores = mutual_info_classif(cleaned, y_train, discrete_features=[col in discrete for col in matrix.columns], random_state=cfg.random_seed)\n        return {column: float(score) for column, score in zip(matrix.columns, scores)}\n    if method == \"random\":\n        rng = np.random.default_rng(cfg.random_seed)\n        return {column: float(rng.random()) for column in matrix.columns}\n    raise ValueError(f\"Unknown selection method {method!r}\")\n\n\ndef _metadata_for_expression(expression: Expression, feature_id: str, status: dict[str, int]) -> dict[str, Any]:\n    return {\n        \"feature_id\": feature_id,\n        \"name\": expression_to_string(expression),\n        \"expression\": expression_to_dict(expression),\n        \"parents\": list(expression_columns(expression)),\n        \"operators\": list(expression_operators(expression)),\n        \"depth\": expression_depth(expression),\n        \"validity\": status,\n    }\n\n\ndef expand_features_with_dfs(\n    x_train: pd.DataFrame,\n    x_test: pd.DataFrame,\n    y_train: np.ndarray | None = None,\n    config: DFSConfig | None = None,\n) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:\n    \"\"\"Fit candidate construction and selection on training rows only.\"\"\"\n    cfg = config or DFSConfig()\n    if cfg.operator_set_id not in OPERATOR_SET_REGISTRY:\n        raise ValueError(f\"Unknown operator set: {cfg.operator_set_id}\")\n    if tuple(cfg.trans_primitives) != tuple(validate_operator_set(cfg.operator_set_id)):\n        raise ValueError(\"trans_primitives must exactly match the declared operator set\")\n\n    ram_before = _get_process_ram_mb() if cfg.monitor_ram else None\n    train_base, base_columns, excluded_base = _base_columns(x_train, cfg)\n    test_numeric = _numeric_frame(x_test)\n    missing = [col for col in base_columns if col not in test_numeric.columns]\n    if missing:\n        raise ValueError(f\"Held-out predictors are missing training columns: {missing}\")\n    test_base = test_numeric[base_columns]\n\n    expressions = _generate_expressions(base_columns, cfg.operator_set_id if cfg.enable_dfs else \"none_v1\", cfg.depth if cfg.enable_dfs else 0)\n    require_bytes((len(train_base)+len(test_base))*len(expressions)*8*3,purpose='candidate matrices and scoring workspace')\n    train_values: dict[str, np.ndarray] = {}\n    test_values: dict[str, np.ndarray] = {}\n    validity: dict[str, dict[str, int]] = {}\n    expression_by_id: dict[str, Expression] = {}\n    for expression in expressions:\n        fid = candidate_id(expression)\n        train_value, train_status = _evaluate_expression(expression, train_base)\n        test_value, _test_status = _evaluate_expression(expression, test_base)\n        train_values[fid] = train_value\n        test_values[fid] = test_value\n        validity[fid] = train_status\n        expression_by_id[fid] = expression\n\n    train_matrix = pd.DataFrame(train_values, index=train_base.index)\n    test_matrix = pd.DataFrame(test_values, index=test_base.index)\n    discrete_base=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if pd.api.types.is_bool_dtype(x_train[col])}\n    train_matrix.attrs['discrete_features']=[fid for fid,expr in expression_by_id.items() if set(expression_columns(expr)).issubset(discrete_base)]\n    scores = _score_candidates(train_matrix, y_train, cfg)\n    ranked = sorted(train_matrix.columns, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))\n    selected = ranked if cfg.max_features is None else ranked[: cfg.max_features]\n    selected = list(selected)\n    selected_set = set(selected)\n\n    rank_by_id = {fid: rank for rank, fid in enumerate(ranked, start=1)}\n    history: list[dict[str, Any]] = []\n    for fid in train_matrix.columns:\n        expr = expression_by_id[fid]\n        selected_flag = fid in selected_set\n        score = scores[fid]\n        history.append({\n            \"candidate_id\": fid,\n            \"expression\": expression_to_dict(expr),\n            \"expression_text\": expression_to_string(expr),\n            \"parents\": list(expression_columns(expr)),\n            \"operators\": list(expression_operators(expr)),\n            \"depth\": expression_depth(expr),\n            \"selection_stage\": cfg.selection_method,\n            \"score\": score,\n            \"eligible\": True,\n            \"evaluated\": True,\n            \"selected\": selected_flag,\n            \"final_retained\": selected_flag,\n            \"candidate_rank\": rank_by_id[fid],\n            \"decision\": \"selected\" if selected_flag else \"not_selected_by_cap\",\n            \"rejection_reason\": None if selected_flag else \"post_candidate_cap\",\n            \"pruned\": not selected_flag,\n            \"validity\": validity[fid],\n        })\n    for column in excluded_base:\n        expression = raw_expression(column)\n        history.append({\n            \"candidate_id\": candidate_id(expression),\n            \"expression\": expression_to_dict(expression),\n            \"expression_text\": expression_to_string(expression),\n            \"parents\": [column],\n            \"operators\": [],\n            \"depth\": 0,\n            \"selection_stage\": \"base_feature_cap\",\n            \"score\": None,\n            \"eligible\": False,\n            \"evaluated\": False,\n            \"selected\": False,\n            \"final_retained\": False,\n            \"candidate_rank\": None,\n            \"decision\": \"not_generated_by_base_cap\",\n            \"rejection_reason\": \"base_feature_cap\",\n            \"pruned\": True,\n            \"validity\": {},\n        })\n    history.sort(key=lambda row: row[\"candidate_id\"])\n\n    selected_train = train_matrix[selected].copy()\n    selected_test = test_matrix[selected].copy()\n    selected_meta = [_metadata_for_expression(expression_by_id[fid], fid, validity[fid]) for fid in selected]\n    generated_selected = sum(bool(expression_operators(expression_by_id[fid])) for fid in selected)\n    raw_selected = len(selected) - generated_selected\n    metadata: dict[str, Any] = {\n        \"operator_registry_version\": OPERATOR_REGISTRY_VERSION,\n        \"mi_semantics_version\":MI_SEMANTICS_VERSION,\n        \"candidate_generation_version\":CANDIDATE_GENERATION_VERSION,\n        \"discrete_base_features\":sorted(discrete_base),\n        \"operator_semantics_version\": OPERATOR_SEMANTICS_VERSION,\n        \"operator_set_id\": cfg.operator_set_id,\n        \"operator_set\": list(validate_operator_set(cfg.operator_set_id)),\n        \"operator_set_manifest\": operator_set_manifest()[cfg.operator_set_id],\n        \"baseline_kind\": cfg.baseline_kind or (\"autofe\" if cfg.enable_dfs else \"raw\"),\n        \"display_identity\": cfg.display_identity,\n        \"cap_policy_version\": CAP_POLICY_VERSION if cfg.max_features is not None else \"none_v1\",\n        \"base_feature_policy_version\": BASE_FEATURE_POLICY_VERSION if cfg.max_base_features is not None else \"none_v1\",\n        \"requested_cap\": cfg.max_features,\n        \"requested_base_cap\": cfg.max_base_features,\n        \"eligible_base_feature_count\": len(base_columns) + len(excluded_base),\n        \"base_feature_count\": len(base_columns),\n        \"candidate_count\": len(train_matrix.columns),\n        \"num_original\": len(base_columns),\n        \"num_generated\": sum(bool(expression_operators(expression_by_id[fid])) for fid in train_matrix.columns),\n        \"num_selected\": len(selected),\n        \"retained_raw_count\": raw_selected,\n        \"retained_generated_count\": generated_selected,\n        \"actual_estimator_input_dimension\": len(selected),\n        \"selector_identity\": cfg.selection_method,\n        \"selected_feature_identities\": selected,\n        \"selected_feature_expressions\": selected_meta,\n        \"selection_history\": history,\n        \"generation_time_s\": 0.0,\n        \"ram_used_mb\": (_get_process_ram_mb() - ram_before) if ram_before else 0,\n        \"feature_metadata\": selected_meta,\n    }\n    return selected_train, selected_test, metadata\n",
+    "src/feature_selection.py": "\"\"\"Feature selection using L1 regularization and mutual information.\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport pickle\nfrom dataclasses import dataclass\nfrom pathlib import Path\nfrom typing import Any\n\nimport numpy as np\nimport pandas as pd\nfrom sklearn.feature_selection import mutual_info_classif, mutual_info_regression\nfrom sklearn.linear_model import Lasso, LogisticRegression\n\n\n@dataclass(slots=True)\nclass FeatureSelectionConfig:\n    \"\"\"Configuration for feature selection.\"\"\"\n\n    max_features: int = 100\n    l1_strength: float = 0.1\n    random_state: int = 42\n    task: str | None = None\n\n\ndef _infer_task(y: pd.Series) -> str:\n    \"\"\"Infer task type from target properties.\"\"\"\n    if y.dtype.kind in {\"O\", \"b\", \"U\", \"S\"}:\n        return \"classification\"\n\n    unique_values = y.nunique(dropna=False)\n    threshold = max(20, int(0.1 * len(y)))\n    if unique_values <= threshold:\n        return \"classification\"\n    return \"regression\"\n\n\ndef _encode_feature_frame(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Encode all columns numerically for score computation.\"\"\"\n    encoded = pd.DataFrame(index=df.index)\n    for column in df.columns:\n        series = df[column]\n        if pd.api.types.is_numeric_dtype(series):\n            numeric_series = pd.to_numeric(series, errors=\"coerce\")\n            numeric_series = numeric_series.replace([np.inf, -np.inf], np.nan)\n            fill_value = float(numeric_series.mean()) if numeric_series.notna().any() else 0.0\n            encoded[column] = numeric_series.fillna(fill_value).clip(-1e12, 1e12)\n        else:\n            categories, _ = pd.factorize(series.fillna(\"missing\"), sort=True)\n            encoded[column] = categories.astype(float)\n    return encoded\n\n\ndef _normalize_scores(scores: pd.Series) -> pd.Series:\n    \"\"\"Min-max normalize score series to [0, 1].\"\"\"\n    if scores.empty:\n        return scores\n    min_value = float(scores.min())\n    max_value = float(scores.max())\n    if np.isclose(min_value, max_value):\n        return pd.Series(np.zeros(len(scores)), index=scores.index)\n    return (scores - min_value) / (max_value - min_value)\n\n\ndef _compute_l1_scores(\n    x_train: pd.DataFrame,\n    y_train: pd.Series,\n    task: str,\n    l1_strength: float,\n    random_state: int,\n) -> pd.Series:\n    \"\"\"Compute feature importance scores from L1-regularized models.\"\"\"\n    x_encoded = _encode_feature_frame(x_train)\n\n    if task == \"classification\":\n        model = LogisticRegression(\n            penalty=\"l1\",\n            solver=\"liblinear\",\n            C=l1_strength,\n            max_iter=2000,\n            random_state=random_state,\n        )\n        model.fit(x_encoded, y_train)\n        coefficients = np.abs(np.asarray(model.coef_))\n        score_values = coefficients.mean(axis=0)\n    else:\n        alpha = max(1e-4, 1.0 / max(l1_strength, 1e-4))\n        model = Lasso(alpha=alpha, random_state=random_state, max_iter=5000)\n        model.fit(x_encoded, y_train)\n        score_values = np.abs(np.asarray(model.coef_))\n\n    return pd.Series(score_values, index=x_train.columns, dtype=float)\n\n\ndef _compute_mi_scores(\n    x_train: pd.DataFrame,\n    y_train: pd.Series,\n    task: str,\n    random_state: int,\n) -> pd.Series:\n    \"\"\"Compute feature importance scores from mutual information.\"\"\"\n    x_encoded = _encode_feature_frame(x_train)\n    discrete=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if not pd.api.types.is_numeric_dtype(x_train[col]) or pd.api.types.is_bool_dtype(x_train[col])}\n    mask=[col in discrete for col in x_train]\n    if task == \"classification\":\n        score_values = mutual_info_classif(\n            x_encoded,\n            y_train,\n            random_state=random_state,\n            discrete_features=mask,\n        )\n    else:\n        score_values = mutual_info_regression(\n            x_encoded,\n            y_train,\n            random_state=random_state,\n            discrete_features=mask,\n        )\n\n    return pd.Series(score_values, index=x_train.columns, dtype=float)\n\n\ndef select_top_features(\n    x_train: pd.DataFrame,\n    x_test: pd.DataFrame,\n    y_train: pd.Series,\n    config: FeatureSelectionConfig | None = None,\n) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:\n    \"\"\"Select top features using combined L1 and MI importance.\"\"\"\n    cfg = config or FeatureSelectionConfig()\n    if cfg.max_features <= 0:\n        raise ValueError(\"max_features must be > 0\")\n\n    task = cfg.task or _infer_task(y_train)\n    l1_scores = _compute_l1_scores(\n        x_train=x_train,\n        y_train=y_train,\n        task=task,\n        l1_strength=cfg.l1_strength,\n        random_state=cfg.random_state,\n    )\n    mi_scores = _compute_mi_scores(\n        x_train=x_train,\n        y_train=y_train,\n        task=task,\n        random_state=cfg.random_state,\n    )\n\n    combined_scores = (\n        0.5 * _normalize_scores(l1_scores) + 0.5 * _normalize_scores(mi_scores)\n    )\n    selected_features = combined_scores.sort_values(ascending=False).head(\n        cfg.max_features\n    ).index.tolist()\n\n    x_train_selected = (\n        x_train[selected_features]\n        .replace([np.inf, -np.inf], np.nan)\n        .copy()\n    )\n    x_test_selected = (\n        x_test[selected_features]\n        .replace([np.inf, -np.inf], np.nan)\n        .copy()\n    )\n\n    train_fill_values = x_train_selected.mean(axis=0, numeric_only=True)\n    x_train_selected = x_train_selected.fillna(train_fill_values).fillna(0.0)\n    x_test_selected = x_test_selected.fillna(train_fill_values).fillna(0.0)\n\n    metadata: dict[str, Any] = {\n        \"task\": task,\n        \"max_features\": cfg.max_features,\n        \"l1_strength\": cfg.l1_strength,\n        \"methods\": [\"l1_regularization\", \"mutual_information\"],\n        \"num_features_in\": int(x_train.shape[1]),\n        \"num_features_out\": int(len(selected_features)),\n        \"selected_features\": selected_features,\n        \"l1_scores\": l1_scores[selected_features].to_dict(),\n        \"mi_scores\": mi_scores[selected_features].to_dict(),\n        \"combined_scores\": combined_scores[selected_features].to_dict(),\n    }\n\n    return x_train_selected, x_test_selected, metadata\n\n\ndef _extract_feature_matrices(payload: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:\n    \"\"\"Extract feature matrices with engineered-feature preference.\"\"\"\n    if \"x_train_fe\" in payload and \"x_test_fe\" in payload:\n        return payload[\"x_train_fe\"], payload[\"x_test_fe\"]\n    if \"x_train\" in payload and \"x_test\" in payload:\n        return payload[\"x_train\"], payload[\"x_test\"]\n    raise KeyError(\"Payload must contain x_train/x_test or x_train_fe/x_test_fe\")\n\n\ndef select_features_for_dataset(\n    engineered_path: str | Path,\n    output_dir: str | Path = \"data/processed\",\n    config: FeatureSelectionConfig | None = None,\n) -> Path:\n    \"\"\"Run feature selection for one engineered dataset artifact.\"\"\"\n    cfg = config or FeatureSelectionConfig()\n    path = Path(engineered_path)\n    if not path.exists():\n        raise FileNotFoundError(f\"Engineered artifact not found: {path}\")\n\n    with path.open(\"rb\") as file:\n        payload = pickle.load(file)\n\n    if \"y_train\" not in payload:\n        raise KeyError(f\"Artifact missing y_train: {path}\")\n\n    x_train, x_test = _extract_feature_matrices(payload)\n    y_train = payload[\"y_train\"]\n\n    x_train_selected, x_test_selected, metadata = select_top_features(\n        x_train=x_train,\n        x_test=x_test,\n        y_train=y_train,\n        config=cfg,\n    )\n\n    payload[\"x_train_selected\"] = x_train_selected.reset_index(drop=True)\n    payload[\"x_test_selected\"] = x_test_selected.reset_index(drop=True)\n    payload[\"selected_feature_names\"] = metadata[\"selected_features\"]\n    payload[\"feature_selection\"] = {\n        \"method\": \"l1_plus_mutual_information\",\n        \"metadata\": metadata,\n    }\n\n    dataset_stem = path.stem.replace(\"_features\", \"\")\n    output_path = Path(output_dir) / f\"{dataset_stem}_selected.pkl\"\n    output_path.parent.mkdir(parents=True, exist_ok=True)\n    with output_path.open(\"wb\") as file:\n        pickle.dump(payload, file)\n\n    return output_path\n\n\ndef select_features_for_all(\n    processed_dir: str | Path = \"data/processed\",\n    output_dir: str | Path = \"data/processed\",\n    config: FeatureSelectionConfig | None = None,\n) -> dict[str, Path]:\n    \"\"\"Run feature selection for all engineered dataset artifacts.\"\"\"\n    cfg = config or FeatureSelectionConfig()\n    feature_paths = [\n        path\n        for path in sorted(Path(processed_dir).glob(\"*_features.pkl\"))\n        if \"_selected\" not in path.stem\n    ]\n    if not feature_paths:\n        raise FileNotFoundError(\n            f\"No engineered artifacts (*_features.pkl) found in: {processed_dir}\"\n        )\n\n    selected_paths: dict[str, Path] = {}\n    for feature_path in feature_paths:\n        dataset_name = feature_path.stem.replace(\"_features\", \"\")\n        selected_paths[dataset_name] = select_features_for_dataset(\n            engineered_path=feature_path,\n            output_dir=output_dir,\n            config=cfg,\n        )\n\n    return selected_paths\n\n\ndef _parse_args() -> argparse.Namespace:\n    \"\"\"Parse CLI arguments for feature selection stage.\"\"\"\n    parser = argparse.ArgumentParser(description=\"Run feature selection\")\n    parser.add_argument(\"--processed-dir\", default=\"data/processed\")\n    parser.add_argument(\"--output-dir\", default=\"data/processed\")\n    parser.add_argument(\"--max-features\", type=int, default=100)\n    parser.add_argument(\"--l1-strength\", type=float, default=0.1)\n    parser.add_argument(\"--random-state\", type=int, default=42)\n    parser.add_argument(\n        \"--task\",\n        choices=[\"classification\", \"regression\"],\n        default=None,\n    )\n    return parser.parse_args()\n\n\nif __name__ == \"__main__\":\n    args = _parse_args()\n    config = FeatureSelectionConfig(\n        max_features=args.max_features,\n        l1_strength=args.l1_strength,\n        random_state=args.random_state,\n        task=args.task,\n    )\n    results = select_features_for_all(\n        processed_dir=args.processed_dir,\n        output_dir=args.output_dir,\n        config=config,\n    )\n    for dataset_name, output_path in results.items():\n        print(f\"{dataset_name}: {output_path}\")\n",
+    "src/fsva.py": "\"\"\"Direct, bounded diagnostics for Feature-Synthesis Variance Amplification.\"\"\"\n\nfrom __future__ import annotations\n\nfrom collections import Counter\nfrom itertools import combinations\nfrom typing import Any, Iterable\n\nimport numpy as np\nimport pandas as pd\nfrom src.resource_limits import require_bytes\n\nfrom src.operator_registry import (\n    FINITE_CLIP,\n    SAFE_DIVISION_EPSILON,\n    Expression,\n    OPERATOR_REGISTRY,\n    candidate_id,\n    expression_from_dict,\n    expression_operators,\n    expression_to_string,\n    raw_expression,\n)\n\n\nFSVA_SCHEMA_VERSION = \"fsva_diagnostics_v1\"\nDEFAULT_PERTURBATION_MAGNITUDES = (1e-3, 1e-2, 5e-2)\n\n\ndef _sample_rows(frame: pd.DataFrame, max_rows: int, random_state: int) -> pd.DataFrame:\n    if max_rows < 1:\n        raise ValueError('Diagnostic max_rows must be positive')\n    if len(frame) <= max_rows:\n        return frame.copy()\n    return frame.sample(n=max_rows, random_state=random_state).copy()\n\n\ndef _derivative(expression: Expression, frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, dict[str, int]]:\n    n_rows = len(frame)\n    columns = list(frame.columns)\n    positions = {column: index for index, column in enumerate(columns)}\n    if expression[0] == \"raw\":\n        values = frame[str(expression[1])].to_numpy(dtype=float)\n        jac = np.zeros((n_rows, len(columns)), dtype=float)\n        jac[:, positions[str(expression[1])]] = 1.0\n        return values, jac, {\"protected_count\": 0, \"nonsmooth_count\": 0, \"nonfinite_count\": int(np.count_nonzero(~np.isfinite(values)))}\n\n    left_value, left_jac, left_status = _derivative(expression[2], frame)\n    right_value, right_jac, right_status = _derivative(expression[3], frame)\n    operator = str(expression[1])\n    status = {\n        \"protected_count\": left_status.get(\"protected_count\", 0) + right_status.get(\"protected_count\", 0),\n        \"nonsmooth_count\": left_status.get(\"nonsmooth_count\", 0) + right_status.get(\"nonsmooth_count\", 0),\n        \"nonfinite_count\": left_status.get(\"nonfinite_count\", 0) + right_status.get(\"nonfinite_count\", 0),\n    }\n    if operator == \"add_numeric\":\n        raw_values = left_value + right_value\n        jac = left_jac + right_jac\n    elif operator == \"subtract_numeric\":\n        raw_values = left_value - right_value\n        jac = left_jac - right_jac\n    elif operator == \"multiply_numeric\":\n        raw_values = left_value * right_value\n        jac = left_jac * right_value[:, None] + right_jac * left_value[:, None]\n    elif operator == \"divide_numeric\":\n        safe = np.abs(right_value) >= SAFE_DIVISION_EPSILON\n        raw_values = np.zeros_like(left_value, dtype=float)\n        np.divide(left_value, right_value, out=raw_values, where=safe)\n        jac = np.zeros_like(left_jac)\n        valid = safe & np.isfinite(raw_values) & (np.abs(raw_values) <= FINITE_CLIP)\n        jac[valid] = (left_jac[valid] * right_value[valid, None] - right_jac[valid] * left_value[valid, None]) / (right_value[valid, None] ** 2)\n        status[\"protected_count\"] += int(np.count_nonzero(~safe))\n        status[\"nonsmooth_count\"] += int(np.count_nonzero(~valid))\n    else:\n        raise ValueError(f\"Unsupported operator in expression: {operator}\")\n    finite = np.isfinite(raw_values) & np.all(np.isfinite(jac), axis=1)\n    clipped = finite & (np.abs(raw_values) > FINITE_CLIP)\n    valid = finite & ~clipped\n    status[\"nonfinite_count\"] += int(np.count_nonzero(~finite))\n    status[\"nonsmooth_count\"] += int(np.count_nonzero(clipped))\n    values = np.clip(np.where(np.isfinite(raw_values), raw_values, 0.0), -FINITE_CLIP, FINITE_CLIP)\n    jac[~valid] = 0.0\n    jac = np.nan_to_num(jac, nan=0.0, posinf=0.0, neginf=0.0)\n    return values, jac, status\n\n\ndef _summary(jacobian: np.ndarray, *, status: dict[str, Any], method: str = \"exact\") -> dict[str, Any]:\n    # jacobian shape: rows x outputs x inputs\n    fro = float(np.linalg.norm(jacobian.reshape(-1), ord=2))\n    n_outputs = int(jacobian.shape[1])\n    n_inputs = int(jacobian.shape[2])\n    per_output = np.linalg.norm(jacobian, axis=2)\n    return {\n        \"matrix_norm\": \"frobenius\",\n        \"norm_method\": method,\n        \"measurement_scope\": \"exact_on_sampled_rows\",\n        \"frobenius_norm\": fro,\n        \"dimension_adjusted_frobenius\": float(fro / np.sqrt(max(n_outputs, 1))),\n        \"mean_output_l2\": float(np.mean(per_output)) if per_output.size else 0.0,\n        \"max_output_l2\": float(np.max(per_output)) if per_output.size else 0.0,\n        \"n_rows\": int(jacobian.shape[0]),\n        \"n_outputs\": n_outputs,\n        \"n_inputs\": n_inputs,\n        \"status\": status,\n    }\n\n\ndef compute_jacobian_diagnostic(\n    base_inputs: pd.DataFrame,\n    expressions: Iterable[Expression],\n    *,\n    raw_control_expressions: Iterable[Expression] | None = None,\n    max_rows: int = 128,\n    random_state: int = 0,\n) -> dict[str, Any]:\n    \"\"\"Measure exact derivatives of the frozen executed arithmetic mapping.\"\"\"\n    sampled = _sample_rows(base_inputs, max_rows, random_state)\n    expressions = list(expressions)\n    if raw_control_expressions is not None:\n        raw_control_expressions=list(raw_control_expressions)\n    require_bytes(len(sampled)*len(base_inputs.columns)*(len(expressions)+len(raw_control_expressions or []))*8*3,purpose='exact Jacobian diagnostic workspace')\n    jacobians: list[np.ndarray] = []\n    statuses = Counter()\n    for expression in expressions:\n        _values, jac, status = _derivative(expression, sampled)\n        jacobians.append(jac)\n        statuses.update(status)\n    jacobian = np.stack(jacobians, axis=1) if jacobians else np.zeros((len(sampled), 0, len(base_inputs.columns)))\n    result = {\n        \"schema_version\": FSVA_SCHEMA_VERSION,\n        \"diagnostic_status\": \"diagnostic_complete\" if expressions else \"unsupported\",\n        \"input_coordinates\": list(base_inputs.columns),\n        \"input_definition\": \"preprocessed_corrupted_training_rows; frozen during diagnostic\",\n        \"output_definition\": \"selected_executed_arithmetic_features\",\n        \"unsupported_coordinates\": [\n            \"categorical_level_changes\",\n            \"estimator_predictions\",\n        ],\n        \"sample_identity\": {\"random_state\": int(random_state), \"max_rows\": int(max_rows)},\n        \"selected\": _summary(jacobian, status=dict(statuses)),\n        \"per_output\": [\n            {\n                \"candidate_id\": candidate_id(expression),\n                \"expression\": expression_to_string(expression),\n                \"mean_l2\": float(np.mean(np.linalg.norm(jacobians[index], axis=1))) if len(jacobians[index]) else 0.0,\n            }\n            for index, expression in enumerate(expressions)\n        ],\n    }\n    if raw_control_expressions is not None:\n        raw_expressions = list(raw_control_expressions)\n        raw_jacobians: list[np.ndarray] = []\n        raw_statuses = Counter()\n        for expression in raw_expressions:\n            _values, jac, status = _derivative(expression, sampled)\n            raw_jacobians.append(jac)\n            raw_statuses.update(status)\n        raw_jacobian = np.stack(raw_jacobians, axis=1) if raw_jacobians else np.zeros((len(sampled), 0, len(base_inputs.columns)))\n        result[\"raw_control\"] = _summary(raw_jacobian, status=dict(raw_statuses))\n    return result\n\n\ndef _evaluate_mapping(\n    expressions: list[Expression], frame: pd.DataFrame, *, return_status: bool = False,\n) -> np.ndarray | tuple[np.ndarray, dict[str, int]]:\n    outputs: list[np.ndarray] = []\n    status = Counter()\n    for expression in expressions:\n        values, _jac, expression_status = _derivative(expression, frame)\n        outputs.append(values)\n        status.update(expression_status)\n    values = np.stack(outputs, axis=1) if outputs else np.zeros((len(frame), 0))\n    return (values, dict(status)) if return_status else values\n\n\ndef compute_empirical_amplification(\n    base_inputs: pd.DataFrame,\n    expressions: Iterable[Expression],\n    *,\n    raw_control_expressions: Iterable[Expression] | None = None,\n    magnitudes: Iterable[float] = DEFAULT_PERTURBATION_MAGNITUDES,\n    max_rows: int = 128,\n    random_state: int = 0,\n) -> dict[str, Any]:\n    \"\"\"Measure frozen-map output/input ratios for bounded deterministic perturbations.\"\"\"\n    sampled = _sample_rows(base_inputs, max_rows, random_state)\n    expressions = list(expressions)\n    raw_expressions = list(raw_control_expressions or [])\n    rng = np.random.default_rng(random_state)\n    directions = rng.normal(size=sampled.shape)\n    norms = np.linalg.norm(directions, axis=1, keepdims=True)\n    directions = directions / np.where(norms == 0.0, 1.0, norms)\n    baseline, baseline_status = _evaluate_mapping(expressions, sampled, return_status=True)\n    if raw_expressions:\n        raw_baseline, raw_status = _evaluate_mapping(raw_expressions, sampled, return_status=True)\n    else:\n        raw_baseline, raw_status = None, {}\n    rows: list[dict[str, Any]] = []\n    for magnitude in magnitudes:\n        magnitude = float(magnitude)\n        perturbed = sampled + magnitude * directions\n        perturbed_values, perturbed_status = _evaluate_mapping(expressions, perturbed, return_status=True)\n        changed = perturbed_values - baseline\n        input_norm = np.linalg.norm(magnitude * directions, axis=1)\n        output_norm = np.linalg.norm(changed, axis=1)\n        valid = input_norm > 0.0\n        ratios = output_norm[valid] / input_norm[valid] if np.any(valid) else np.array([], dtype=float)\n        row: dict[str, Any] = {\n            \"magnitude\": magnitude,\n            \"input_norm_mean\": float(np.mean(input_norm)) if len(input_norm) else 0.0,\n            \"output_norm_mean\": float(np.mean(output_norm)) if len(output_norm) else 0.0,\n            \"amplification_ratio_mean\": float(np.mean(ratios)) if len(ratios) else None,\n            \"amplification_ratio_max\": float(np.max(ratios)) if len(ratios) else None,\n            \"valid_rows\": int(np.count_nonzero(valid)),\n            \"baseline_validity\": baseline_status,\n            \"perturbed_validity\": perturbed_status,\n            \"status\": \"diagnostic_complete\" if len(ratios) else \"zero_input_norm\",\n        }\n        if raw_baseline is not None:\n            raw_perturbed, raw_perturbed_status = _evaluate_mapping(raw_expressions, perturbed, return_status=True)\n            raw_changed = raw_perturbed - raw_baseline\n            raw_output_norm = np.linalg.norm(raw_changed, axis=1)\n            raw_ratios = raw_output_norm[valid] / input_norm[valid] if np.any(valid) else np.array([], dtype=float)\n            row[\"raw_control_amplification_ratio_mean\"] = float(np.mean(raw_ratios)) if len(raw_ratios) else None\n            row[\"raw_control_baseline_validity\"] = raw_status\n            row[\"raw_control_perturbed_validity\"] = raw_perturbed_status\n            row[\"dimension_adjusted_ratio\"] = (\n                float(np.mean(ratios) / max(np.sqrt(len(expressions)), 1.0)) if len(ratios) else None\n            )\n        rows.append(row)\n    return {\n        \"schema_version\": FSVA_SCHEMA_VERSION,\n        \"diagnostic_status\": \"diagnostic_complete\" if rows else \"unsupported\",\n        \"perturbation_definition\": \"normalized deterministic Gaussian directions on frozen preprocessed inputs\",\n        \"sample_identity\": {\"random_state\": int(random_state), \"max_rows\": int(max_rows)},\n        \"magnitudes\": rows,\n    }\n\n\ndef validate_jacobian_finite_difference(\n    base_inputs: pd.DataFrame,\n    expressions: Iterable[Expression],\n    *,\n    epsilon: float = 1e-6,\n    max_rows: int = 32,\n    random_state: int = 0,\n) -> dict[str, Any]:\n    \"\"\"Compare analytic derivatives with bounded central finite differences.\"\"\"\n    sampled = _sample_rows(base_inputs, max_rows, random_state)\n    expressions = list(expressions)\n    analytic: list[np.ndarray] = []\n    nonsmooth = 0\n    for expression in expressions:\n        _values, jac, status = _derivative(expression, sampled)\n        analytic.append(jac)\n        nonsmooth += int(status.get(\"nonsmooth_count\", 0))\n    analytic_tensor = np.stack(analytic, axis=1) if analytic else np.zeros((len(sampled), 0, len(sampled.columns)))\n    finite = np.zeros_like(analytic_tensor)\n    for column_index, column in enumerate(sampled.columns):\n        plus = sampled.copy()\n        minus = sampled.copy()\n        plus[column] += epsilon\n        minus[column] -= epsilon\n        finite[:, :, column_index] = (\n            _evaluate_mapping(expressions, plus) - _evaluate_mapping(expressions, minus)\n        ) / (2.0 * epsilon)\n    error = np.abs(analytic_tensor - finite)\n    max_error = float(np.max(error)) if error.size else 0.0\n    return {\n        \"method\": \"central_finite_difference\",\n        \"epsilon\": float(epsilon),\n        \"max_absolute_error\": max_error,\n        \"mean_absolute_error\": float(np.mean(error)) if error.size else 0.0,\n        \"nonsmooth_count\": nonsmooth,\n        \"status\": \"validated\" if max_error <= max(1e-4, epsilon * 1000) else \"tolerance_exceeded\",\n    }\n\n\ndef selection_stability(histories: Iterable[dict[str, Any]]) -> dict[str, Any]:\n    \"\"\"Summarize selected candidate overlap without pooled inference.\"\"\"\n    histories = list(histories)\n    selected_sets = [set(row.get(\"selected_feature_identities\", [])) for row in histories]\n    pairs = []\n    for left, right in combinations(selected_sets, 2):\n        union = left | right\n        pairs.append(float(len(left & right) / len(union)) if union else 1.0)\n    availability = Counter()\n    frequencies = Counter()\n    for history in histories:\n        if 'selection_history' in history and 'candidate_history' in history:\n            raise ValueError('Ambiguous selection and legacy candidate history keys')\n        events=history.get('selection_history',history.get('candidate_history'))\n        if events is None:\n            raise ValueError('Candidate availability requires real selection history')\n        if len({event['candidate_id'] for event in events}) != len(events):\n            raise ValueError('Duplicate candidates in selection history')\n        for candidate in events:\n            availability[candidate[\"candidate_id\"]] += int(candidate.get(\"eligible\", False))\n            frequencies[candidate[\"candidate_id\"]] += int(candidate.get(\"selected\", False))\n    return {\n        \"schema_version\": FSVA_SCHEMA_VERSION,\n        \"n_histories\": len(histories),\n        \"pairwise_jaccard_mean\": float(np.mean(pairs)) if pairs else None,\n        \"pairwise_jaccard_values\": pairs,\n        \"candidate_availability\": dict(availability),\n        \"candidate_selection_frequency\": dict(frequencies),\n        \"empty_set_jaccard\": 1.0,\n    }\n",
+    "src/model.py": "\"\"\"Model factory for the 10 benchmark models.\n\nAll sklearn models use n_jobs=1 because we parallelize at the task level\n(multiprocessing Pool). Setting n_jobs>1 here would cause thread thrashing.\n\nGPU models (XGBoost, CatBoost) are configured to use CUDA automatically.\n\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any\n\nfrom sklearn.base import BaseEstimator\nfrom sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.naive_bayes import GaussianNB\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.neural_network import MLPClassifier\nfrom sklearn.svm import SVC\n\n\ndef build_model(\n    model_type: str,\n    random_state: int = 42,\n    use_gpu: bool = True,\n) -> BaseEstimator:\n    \"\"\"\n    Build one of the 10 benchmark models with sensible defaults.\n\n    All models use n_jobs=1 to prevent CPU thread thrashing when used\n    inside a multiprocessing Pool. GPU models (XGBoost, CatBoost) are\n    configured to use CUDA when use_gpu=True.\n    \"\"\"\n    normalized = model_type.strip().lower()\n\n    if normalized == \"logistic_regression\":\n        return LogisticRegression(\n            random_state=random_state,\n            max_iter=1000,\n            n_jobs=1,\n        )\n\n    elif normalized == \"random_forest\":\n        return RandomForestClassifier(\n            n_estimators=100,\n            random_state=random_state,\n            n_jobs=1,\n        )\n\n    elif normalized == \"extra_trees\":\n        return ExtraTreesClassifier(\n            n_estimators=100,\n            random_state=random_state,\n            n_jobs=1,\n        )\n\n    elif normalized == \"xgboost\":\n        from xgboost import XGBClassifier\n        params = dict(\n            n_estimators=100,\n            random_state=random_state,\n            n_jobs=1,\n            eval_metric=\"logloss\",\n            tree_method=\"hist\",\n            verbosity=0,\n        )\n        if use_gpu:\n            params[\"device\"] = \"cuda\"\n        return XGBClassifier(**params)\n\n    elif normalized == \"lightgbm\":\n        from lightgbm import LGBMClassifier\n        return LGBMClassifier(\n            n_estimators=100,\n            random_state=random_state,\n            n_jobs=1,\n            verbose=-1,\n        )\n\n    elif normalized == \"catboost\":\n        from catboost import CatBoostClassifier\n        params = dict(\n            iterations=100,\n            random_state=random_state,\n            thread_count=1,\n            verbose=False,\n            allow_writing_files=False,\n        )\n        if use_gpu:\n            params[\"task_type\"] = \"GPU\"\n            params[\"devices\"] = \"0\"\n        return CatBoostClassifier(**params)\n\n    elif normalized == \"linear_svm\":\n        from sklearn.svm import LinearSVC\n        from sklearn.calibration import CalibratedClassifierCV\n        base_svm = LinearSVC(\n            random_state=random_state,\n            max_iter=1000,\n            dual=\"auto\",\n        )\n        return CalibratedClassifierCV(base_svm, cv=3)\n\n    elif normalized == \"knn\":\n        return KNeighborsClassifier(\n            n_neighbors=5,\n            n_jobs=1,\n        )\n\n    elif normalized == \"gaussian_nb\":\n        return GaussianNB()\n\n    elif normalized == \"mlp\":\n        return MLPClassifier(\n            hidden_layer_sizes=(100,),\n            max_iter=500,\n            random_state=random_state,\n            early_stopping=True,\n        )\n\n    else:\n        raise ValueError(f\"Unknown model type: {model_type}\")\n",
+    "src/operator_registry.py": "\"\"\"Versioned arithmetic operators and stable expression identities.\n\nThe benchmark only uses the operators declared here.  Expression trees are\nrepresented as nested tuples so candidate generation, evaluation, derivative\ncalculation, and persisted histories share one executable definition.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport hashlib\nimport json\nfrom dataclasses import dataclass\nfrom typing import Any\n\nimport numpy as np\n\n\nOPERATOR_REGISTRY_VERSION = \"arithmetic_operator_registry_v1\"\nOPERATOR_SEMANTICS_VERSION = \"safe_division_1e-12_clip_1e12_v1\"\nSAFE_DIVISION_EPSILON = 1e-12\nFINITE_CLIP = 1e12\n\n\n@dataclass(frozen=True)\nclass OperatorSpec:\n    name: str\n    symbol: str\n    commutative: bool\n\n\nOPERATOR_REGISTRY: dict[str, OperatorSpec] = {\n    \"add_numeric\": OperatorSpec(\"add_numeric\", \"+\", True),\n    \"subtract_numeric\": OperatorSpec(\"subtract_numeric\", \"-\", False),\n    \"multiply_numeric\": OperatorSpec(\"multiply_numeric\", \"*\", True),\n    \"divide_numeric\": OperatorSpec(\"divide_numeric\", \"/\", False),\n}\n\nOPERATOR_SET_REGISTRY: dict[str, tuple[str, ...]] = {\n    \"full_arithmetic_v1\": tuple(OPERATOR_REGISTRY),\n    \"add_sub_v1\": (\"add_numeric\", \"subtract_numeric\"),\n    \"add_sub_div_v1\": (\"add_numeric\", \"subtract_numeric\", \"divide_numeric\"),\n    \"add_sub_mul_v1\": (\"add_numeric\", \"subtract_numeric\", \"multiply_numeric\"),\n    \"multiply_only_v1\": (\"multiply_numeric\",),\n    \"divide_only_v1\": (\"divide_numeric\",),\n    \"add_only_v1\": (\"add_numeric\",),\n    \"subtract_only_v1\": (\"subtract_numeric\",),\n    \"none_v1\": (),\n}\n\n\ndef operator_set_manifest() -> dict[str, dict[str, Any]]:\n    \"\"\"Return a serializable registry manifest for result and artifact metadata.\"\"\"\n    return {\n        set_id: {\n            \"operator_set_id\": set_id,\n            \"registry_version\": OPERATOR_REGISTRY_VERSION,\n            \"semantics_version\": OPERATOR_SEMANTICS_VERSION,\n            \"operators\": list(operators),\n        }\n        for set_id, operators in OPERATOR_SET_REGISTRY.items()\n    }\n\nExpression = tuple[Any, ...]\n\n\ndef validate_operator_set(operator_set_id: str) -> tuple[str, ...]:\n    try:\n        return OPERATOR_SET_REGISTRY[operator_set_id]\n    except KeyError as exc:\n        raise ValueError(f\"Unknown operator set: {operator_set_id}\") from exc\n\n\ndef raw_expression(column: str) -> Expression:\n    return (\"raw\", str(column))\n\n\ndef op_expression(operator: str, left: Expression, right: Expression) -> Expression:\n    if operator not in OPERATOR_REGISTRY:\n        raise ValueError(f\"Unsupported arithmetic operator: {operator}\")\n    return (\"op\", operator, left, right)\n\n\ndef expression_depth(expression: Expression) -> int:\n    if expression[0] == \"raw\":\n        return 0\n    return 1 + max(expression_depth(expression[2]), expression_depth(expression[3]))\n\n\ndef expression_operators(expression: Expression) -> tuple[str, ...]:\n    if expression[0] == \"raw\":\n        return ()\n    return (str(expression[1]),) + expression_operators(expression[2]) + expression_operators(expression[3])\n\n\ndef expression_columns(expression: Expression) -> tuple[str, ...]:\n    if expression[0] == \"raw\":\n        return (str(expression[1]),)\n    return expression_columns(expression[2]) + expression_columns(expression[3])\n\n\ndef expression_to_string(expression: Expression) -> str:\n    if expression[0] == \"raw\":\n        return f\"[{expression[1]}]\"\n    spec = OPERATOR_REGISTRY[expression[1]]\n    return f\"({expression_to_string(expression[2])}{spec.symbol}{expression_to_string(expression[3])})\"\n\n\ndef expression_to_dict(expression: Expression) -> dict[str, Any]:\n    if expression[0] == \"raw\":\n        return {\"kind\": \"raw\", \"column\": str(expression[1])}\n    return {\n        \"kind\": \"operation\",\n        \"operator\": str(expression[1]),\n        \"left\": expression_to_dict(expression[2]),\n        \"right\": expression_to_dict(expression[3]),\n    }\n\n\ndef expression_from_dict(value: dict[str, Any]) -> Expression:\n    if value.get(\"kind\") == \"raw\":\n        return raw_expression(str(value[\"column\"]))\n    if value.get(\"kind\") == \"operation\":\n        return op_expression(\n            str(value[\"operator\"]),\n            expression_from_dict(value[\"left\"]),\n            expression_from_dict(value[\"right\"]),\n        )\n    raise ValueError(f\"Invalid expression mapping: {value!r}\")\n\n\ndef candidate_id(expression: Expression) -> str:\n    payload = {\n        \"registry_version\": OPERATOR_REGISTRY_VERSION,\n        \"semantics_version\": OPERATOR_SEMANTICS_VERSION,\n        \"expression\": expression_to_dict(expression),\n    }\n    encoded = json.dumps(payload, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False).encode(\"utf-8\")\n    return \"cand_\" + hashlib.sha256(encoded).hexdigest()[:20]\n\n\ndef _finite_output(values: np.ndarray) -> tuple[np.ndarray, dict[str, int]]:\n    values = np.asarray(values, dtype=float)\n    finite = np.isfinite(values)\n    clipped = np.clip(np.where(finite, values, 0.0), -FINITE_CLIP, FINITE_CLIP)\n    clipped_count = int(np.count_nonzero(finite & (values != clipped)))\n    nonfinite_count = int(np.count_nonzero(~finite))\n    return clipped, {\"nonfinite_count\": nonfinite_count, \"clipped_count\": clipped_count}\n\n\ndef evaluate_operator(operator: str, left: np.ndarray, right: np.ndarray) -> tuple[np.ndarray, dict[str, int]]:\n    \"\"\"Evaluate one registered operation with the production safety policy.\"\"\"\n    if operator == \"add_numeric\":\n        raw = left + right\n    elif operator == \"subtract_numeric\":\n        raw = left - right\n    elif operator == \"multiply_numeric\":\n        raw = left * right\n    elif operator == \"divide_numeric\":\n        safe = np.abs(right) >= SAFE_DIVISION_EPSILON\n        raw = np.zeros_like(left, dtype=float)\n        np.divide(left, right, out=raw, where=safe)\n        raw[~safe] = 0.0\n    else:\n        raise ValueError(f\"Unsupported arithmetic operator: {operator}\")\n    output, counts = _finite_output(raw)\n    counts[\"protected_count\"] = int(np.count_nonzero(np.abs(right) < SAFE_DIVISION_EPSILON)) if operator == \"divide_numeric\" else 0\n    return output, counts\n",
+    "src/preprocessing.py": "\"\"\"Train/test-safe preprocessing for benchmark tabular datasets.\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport pickle\nfrom dataclasses import dataclass\nfrom pathlib import Path\nfrom typing import Any\nimport pandas as pd\nimport numpy as np\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler\nfrom src.resource_limits import require_bytes\n\n\nSUPPORTED_ENCODINGS = {\"onehot\", \"label\"}\n\n\n@dataclass(slots=True)\nclass PreprocessingConfig:\n    \"\"\"Configuration for preprocessing raw benchmark datasets.\"\"\"\n\n    target_column: str = \"target\"\n    test_size: float = 0.2\n    random_state: int = 42\n    encoding: str = \"onehot\"\n    scale_numeric: bool = False\n\n\ndef _resolve_target_column(df: pd.DataFrame, target_column: str) -> str:\n    \"\"\"Resolve target column name with fallback support.\"\"\"\n    if target_column in df.columns:\n        return target_column\n    if \"target_label\" in df.columns:\n        return \"target_label\"\n    raise KeyError(\n        f\"Target column '{target_column}' not found and fallback 'target_label' is absent\"\n    )\n\n\ndef _build_preprocessor(\n    x_train: pd.DataFrame,\n    encoding: str,\n    scale_numeric: bool,\n) -> ColumnTransformer:\n    \"\"\"Build a split-safe sklearn preprocessor fitted only on training features.\"\"\"\n    if encoding not in SUPPORTED_ENCODINGS:\n        raise ValueError(\n            f\"Unsupported encoding '{encoding}'. Choose from {sorted(SUPPORTED_ENCODINGS)}\"\n        )\n\n    numeric_cols = list(x_train.select_dtypes(include=[\"number\", \"bool\"]).columns)\n    categorical_cols = list(x_train.select_dtypes(exclude=[\"number\", \"bool\"]).columns)\n\n    transformers = []\n    if numeric_cols:\n        numeric_steps: list[tuple[str, Any]] = [\n            (\"imputer\", SimpleImputer(strategy=\"mean\")),\n        ]\n        if scale_numeric:\n            numeric_steps.append((\"scaler\", StandardScaler()))\n        transformers.append((\"num\", Pipeline(steps=numeric_steps), numeric_cols))\n\n    if categorical_cols:\n        if encoding == \"onehot\":\n            encoder = OneHotEncoder(handle_unknown=\"ignore\", sparse_output=True,dtype=np.float64)\n        else:\n            encoder = OrdinalEncoder(\n                handle_unknown=\"use_encoded_value\",\n                unknown_value=-1,\n                encoded_missing_value=-1,\n            )\n\n        categorical_pipeline = Pipeline(\n            steps=[\n                (\"imputer\", SimpleImputer(strategy=\"most_frequent\")),\n                (\"encoder\", encoder),\n            ]\n        )\n        transformers.append((\"cat\", categorical_pipeline, categorical_cols))\n\n    if not transformers:\n        raise ValueError(\"No feature columns available for preprocessing\")\n\n    return ColumnTransformer(\n        transformers=transformers,\n        remainder=\"drop\",\n        verbose_feature_names_out=False,\n        sparse_threshold=1.0,\n    )\n\n\ndef _get_stratify_target(target: pd.Series) -> pd.Series | None:\n    \"\"\"Return stratification target when safe, otherwise None.\"\"\"\n    if target.nunique(dropna=False) < 2:\n        return None\n\n    class_counts = target.value_counts(dropna=False)\n    if class_counts.min() < 2:\n        return None\n\n    return target\n\n\ndef _to_dense_array(values: Any,*,budget=None) -> np.ndarray:\n    \"\"\"Convert scipy sparse outputs to dense arrays when needed.\"\"\"\n    if hasattr(values, \"toarray\"):\n        require_bytes(int(values.shape[0])*int(values.shape[1])*values.dtype.itemsize,purpose='dense arithmetic conversion',budget=budget)\n        values = values.toarray()\n    return np.asarray(values)\n\n\ndef processed_frame(values,columns):\n    if hasattr(values,'tocsr'):\n        return pd.DataFrame.sparse.from_spmatrix(values,columns=columns)\n    return pd.DataFrame(values,columns=columns)\n\n\ndef preprocess_dataset(\n    raw_csv_path: str | Path,\n    output_dir: str | Path = \"data/processed\",\n    config: PreprocessingConfig | None = None,\n) -> Path:\n    \"\"\"Preprocess one raw dataset and store split-safe artifacts as .pkl.\"\"\"\n    cfg = config or PreprocessingConfig()\n    raw_path = Path(raw_csv_path)\n    if not raw_path.exists():\n        raise FileNotFoundError(f\"Raw dataset not found: {raw_path}\")\n\n    df = pd.read_csv(raw_path)\n    target_column = _resolve_target_column(df, cfg.target_column)\n\n    x = df.drop(columns=[target_column])\n    y = df[target_column]\n\n    # Critical rule: split before fitting imputation/encoding/scaling.\n    x_train_raw, x_test_raw, y_train, y_test = train_test_split(\n        x,\n        y,\n        test_size=cfg.test_size,\n        random_state=cfg.random_state,\n        stratify=_get_stratify_target(y),\n    )\n\n    preprocessor = _build_preprocessor(\n        x_train=x_train_raw,\n        encoding=cfg.encoding,\n        scale_numeric=cfg.scale_numeric,\n    )\n\n    x_train_array = _to_dense_array(preprocessor.fit_transform(x_train_raw))\n    x_test_array = _to_dense_array(preprocessor.transform(x_test_raw))\n    feature_names = preprocessor.get_feature_names_out().tolist()\n\n    x_train_processed = pd.DataFrame(x_train_array, columns=feature_names)\n    x_test_processed = pd.DataFrame(x_test_array, columns=feature_names)\n\n    payload = {\n        \"dataset_name\": raw_path.stem,\n        \"target_column\": target_column,\n        \"encoding\": cfg.encoding,\n        \"scale_numeric\": cfg.scale_numeric,\n        \"x_train\": x_train_processed.reset_index(drop=True),\n        \"x_test\": x_test_processed.reset_index(drop=True),\n        \"y_train\": y_train.reset_index(drop=True),\n        \"y_test\": y_test.reset_index(drop=True),\n        \"feature_names\": feature_names,\n        \"preprocessor\": preprocessor,\n    }\n\n    output_path = Path(output_dir) / f\"{raw_path.stem}.pkl\"\n    output_path.parent.mkdir(parents=True, exist_ok=True)\n    with output_path.open(\"wb\") as file:\n        pickle.dump(payload, file)\n\n    return output_path\n\n\ndef preprocess_raw_datasets(\n    raw_dir: str | Path = \"data/raw\",\n    output_dir: str | Path = \"data/processed\",\n    config: PreprocessingConfig | None = None,\n) -> dict[str, Path]:\n    \"\"\"Preprocess all CSV files in data/raw and save to data/processed.\"\"\"\n    csv_paths = sorted(Path(raw_dir).glob(\"*.csv\"))\n    if not csv_paths:\n        raise FileNotFoundError(f\"No CSV files found in: {Path(raw_dir)}\")\n\n    processed_paths: dict[str, Path] = {}\n    for csv_path in csv_paths:\n        processed_paths[csv_path.stem] = preprocess_dataset(\n            raw_csv_path=csv_path,\n            output_dir=output_dir,\n            config=config,\n        )\n\n    return processed_paths\n\n\ndef load_processed_dataset(file_path: str | Path) -> dict[str, Any]:\n    \"\"\"Load a saved preprocessing artifact (.pkl).\"\"\"\n    path = Path(file_path)\n    if not path.exists():\n        raise FileNotFoundError(f\"Processed file not found: {path}\")\n\n    with path.open(\"rb\") as file:\n        payload = pickle.load(file)\n\n    if not isinstance(payload, dict):\n        raise ValueError(\"Processed payload must be a dictionary\")\n\n    return payload\n\n\ndef basic_preprocess(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Compatibility helper for quick in-memory preprocessing.\"\"\"\n    processed = df.copy().drop_duplicates()\n\n    numeric_cols = processed.select_dtypes(include=[\"number\"]).columns\n    categorical_cols = processed.select_dtypes(exclude=[\"number\"]).columns\n\n    for col in numeric_cols:\n        processed[col] = processed[col].fillna(processed[col].mean())\n\n    for col in categorical_cols:\n        mode_value = processed[col].mode(dropna=True)\n        fill_value = mode_value.iloc[0] if not mode_value.empty else \"missing\"\n        processed[col] = processed[col].fillna(fill_value)\n\n    return processed\n\n\ndef _parse_args() -> argparse.Namespace:\n    \"\"\"Parse CLI arguments for batch preprocessing.\"\"\"\n    parser = argparse.ArgumentParser(description=\"Preprocess raw datasets safely\")\n    parser.add_argument(\"--raw-dir\", default=\"data/raw\")\n    parser.add_argument(\"--output-dir\", default=\"data/processed\")\n    parser.add_argument(\"--target-column\", default=\"target\")\n    parser.add_argument(\n        \"--encoding\",\n        default=\"onehot\",\n        choices=sorted(SUPPORTED_ENCODINGS),\n    )\n    parser.add_argument(\"--test-size\", type=float, default=0.2)\n    parser.add_argument(\"--random-state\", type=int, default=42)\n    parser.add_argument(\"--scale-numeric\", action=\"store_true\")\n    return parser.parse_args()\n\n\nif __name__ == \"__main__\":\n    args = _parse_args()\n    config = PreprocessingConfig(\n        target_column=args.target_column,\n        test_size=args.test_size,\n        random_state=args.random_state,\n        encoding=args.encoding,\n        scale_numeric=args.scale_numeric,\n    )\n    paths = preprocess_raw_datasets(\n        raw_dir=args.raw_dir,\n        output_dir=args.output_dir,\n        config=config,\n    )\n    for dataset_name, path in paths.items():\n        print(f\"{dataset_name}: {path}\")\n",
+    "src/seeding.py": "\"\"\"Stable, purpose-separated random seeds for benchmark tasks.\"\"\"\n\nfrom __future__ import annotations\n\nimport hashlib\nimport json\nimport math\nfrom collections.abc import Mapping\nfrom typing import Any\n\n\nSEED_SCHEME_VERSION = \"sha256_canonical_json_u32_v1\"\nSEED_MAX = (1 << 32) - 1\n\n\ndef _canonical_value(value: Any) -> Any:\n    \"\"\"Convert supported task identity values to deterministic JSON values.\"\"\"\n    if value is None or isinstance(value, (str, bool, int)):\n        return value\n    if isinstance(value, float):\n        if not math.isfinite(value):\n            raise ValueError(\"Seed identities cannot contain non-finite floats\")\n        return value\n    if isinstance(value, Mapping):\n        if any(not isinstance(key, str) for key in value):\n            raise TypeError(\"Seed identity mapping keys must be strings\")\n        return {key: _canonical_value(value[key]) for key in sorted(value)}\n    if isinstance(value, (tuple, list)):\n        return [_canonical_value(item) for item in value]\n    raise TypeError(f\"Unsupported seed identity value: {type(value).__name__}\")\n\n\ndef stable_seed(purpose: str, identity: Mapping[str, Any]) -> int:\n    \"\"\"Derive a uint32 seed from a versioned canonical JSON identity.\n\n    Encoding: UTF-8 JSON with sorted object keys, compact separators, and\n    non-ASCII text preserved. The seed is the unsigned big-endian integer from\n    the first four bytes of SHA-256 over that encoding. It is in\n    ``[0, 2**32 - 1]``, the range accepted by NumPy and scikit-learn.\n    \"\"\"\n    if not purpose:\n        raise ValueError(\"A randomness purpose is required\")\n    payload = {\n        \"seed_scheme_version\": SEED_SCHEME_VERSION,\n        \"purpose\": purpose,\n        \"identity\": _canonical_value(identity),\n    }\n    encoded = json.dumps(\n        payload,\n        sort_keys=True,\n        separators=(\",\", \":\"),\n        ensure_ascii=False,\n        allow_nan=False,\n    ).encode(\"utf-8\")\n    return int.from_bytes(hashlib.sha256(encoded).digest()[:4], byteorder=\"big\", signed=False)\n\n\ndef _task_identity(\n    dataset: str,\n    split_policy: str,\n    repetition_seed: int,\n    *,\n    fold: int | None = None,\n    condition: str | None = None,\n    pipeline: str | None = None,\n    model: str | None = None,\n    extra: Mapping[str, Any] | None = None,\n) -> dict[str, Any]:\n    identity: dict[str, Any] = {\n        \"dataset\": dataset,\n        \"split_policy\": split_policy,\n        \"repetition_seed\": int(repetition_seed),\n        \"fold\": fold,\n        \"condition\": condition,\n        \"pipeline\": pipeline,\n        \"model\": model,\n    }\n    if extra:\n        identity.update(extra)\n    return identity\n\n\ndef split_seed(dataset: str, split_policy: str, repetition_seed: int, n_splits: int) -> int:\n    \"\"\"Seed a complete fold assignment; shared by every condition/pipeline.\"\"\"\n    return stable_seed(\n        \"split_assignment\",\n        _task_identity(\n            dataset, split_policy, repetition_seed,\n            extra={\"n_splits\": int(n_splits)},\n        ),\n    )\n\n\ndef corruption_seed(\n    dataset: str,\n    split_policy: str,\n    repetition_seed: int,\n    fold: int,\n    condition: str,\n) -> int:\n    \"\"\"Seed the shared corruption realization for a fold/condition.\"\"\"\n    return stable_seed(\n        \"training_corruption\",\n        _task_identity(\n            dataset, split_policy, repetition_seed,\n            fold=fold, condition=condition,\n        ),\n    )\n\n\ndef feature_selection_seed(\n    dataset: str,\n    split_policy: str,\n    repetition_seed: int,\n    fold: int,\n    condition: str,\n    pipeline: str,\n) -> int:\n    \"\"\"Seed selector randomness in one pipeline without changing shared corruption.\"\"\"\n    return stable_seed(\n        \"feature_selection\",\n        _task_identity(\n            dataset, split_policy, repetition_seed,\n            fold=fold, condition=condition, pipeline=pipeline,\n        ),\n    )\n\n\ndef estimator_seed(\n    dataset: str,\n    split_policy: str,\n    repetition_seed: int,\n    fold: int,\n    condition: str,\n    model: str,\n) -> int:\n    \"\"\"Seed a model fit, shared across pipelines for paired comparisons.\"\"\"\n    return stable_seed(\n        \"estimator_fit\",\n        _task_identity(\n            dataset, split_policy, repetition_seed,\n            fold=fold, condition=condition, model=model,\n        ),\n    )\n\n\ndef distance_sample_seed(\n    dataset: str,\n    split_policy: str,\n    repetition_seed: int,\n    fold: int,\n    condition: str,\n) -> int:\n    \"\"\"Seed paired row subsampling for held-out distribution diagnostics.\"\"\"\n    return stable_seed(\n        \"distribution_distance_sample\",\n        _task_identity(\n            dataset, split_policy, repetition_seed,\n            fold=fold, condition=condition,\n        ),\n    )\n",
+    "src/shift_generator.py": "\"\"\"Shift generation utilities for the 10 perturbation conditions.\"\"\"\n\nfrom __future__ import annotations\n\nimport numpy as np\nimport pandas as pd\n\nCONDITION_SEMANTICS_VERSION='training_corruption_historical_relabel_v2'\nCONDITION_IDENTITIES={'class_prior_shift':'majority_half_relabel_training_v1'}\n\n\ndef _apply_gaussian_noise(\n    x: pd.DataFrame,\n    sigma: float,\n    rng: np.random.Generator,\n) -> pd.DataFrame:\n    \"\"\"Apply Gaussian noise to numeric columns.\"\"\"\n    shifted = x.copy()\n    numeric_cols = shifted.select_dtypes(include=[\"number\", \"bool\"]).columns\n    \n    for col in numeric_cols:\n        series = pd.to_numeric(shifted[col], errors=\"coerce\")\n        # Standardize noise relative to the feature's std dev\n        std = float(series.std(ddof=0))\n        if not np.isfinite(std) or std <= 0.0:\n            std = 1.0\n            \n        noise = rng.normal(loc=0.0, scale=std * sigma, size=len(series))\n        \n        # We don't impute here; the pipeline handles imputation. We just add noise to non-NaNs.\n        # Actually, adding noise to NaNs makes them non-NaN, so let's only add noise to non-NaNs.\n        mask = series.notna()\n        # Cast to float to avoid FutureWarning when adding float noise to int columns\n        if not pd.api.types.is_float_dtype(shifted[col]):\n            shifted[col] = shifted[col].astype(float)\n        shifted.loc[mask, col] = series[mask] + noise[mask]\n        \n    return shifted\n\n\ndef _apply_missing_values(\n    x: pd.DataFrame,\n    fraction: float,\n    rng: np.random.Generator,\n) -> pd.DataFrame:\n    \"\"\"Randomly inject NaNs across all features.\"\"\"\n    shifted = x.copy()\n    n_samples = len(shifted)\n    \n    for col in shifted.columns:\n        mask = rng.random(n_samples) < fraction\n        if mask.any():\n            shifted.loc[mask, col] = np.nan\n            \n    return shifted\n\n\ndef _apply_label_noise(\n    y: pd.Series,\n    fraction: float,\n    rng: np.random.Generator,\n) -> pd.Series:\n    \"\"\"Randomly flip labels.\"\"\"\n    shifted_y = y.copy()\n    n_samples = len(shifted_y)\n    classes = shifted_y.dropna().unique()\n    \n    if len(classes) < 2:\n        return shifted_y\n        \n    mask = rng.random(n_samples) < fraction\n    indices = np.flatnonzero(mask)\n    \n    if len(indices) == 0:\n        return shifted_y\n        \n    for idx in indices:\n        current_class = shifted_y.iloc[idx]\n        if pd.isna(current_class):\n            continue\n            \n        possible_classes = [c for c in classes if c != current_class]\n        if possible_classes:\n            new_class = rng.choice(possible_classes)\n            shifted_y.iloc[idx] = new_class\n            \n    return shifted_y\n\ndef _apply_class_prior_shift(\n    y: pd.Series,\n    rng: np.random.Generator,\n) -> pd.Series:\n    \"\"\"\n    Historical compatibility operation: relabel half of the majority class.\n    This is training label corruption; it does not preserve class-conditional\n    predictor distributions and is not a class-prior-shift construction.\n    \"\"\"\n    shifted_y = y.copy()\n    counts = shifted_y.value_counts()\n    if len(counts) < 2:\n        return shifted_y\n        \n    majority_class = counts.idxmax()\n    majority_indices = shifted_y[shifted_y == majority_class].index\n    \n    # Drop half of the majority class by setting them to NaN (or we can just leave as is since we need equal length array?)\n    # Wait, apply_perturbation returns x and y of the same length.\n    # To truly do class prior shift without dropping rows (which messes up x alignment), we can flip some majority class instances to minority class.\n    # This simulates a different prior without changing dataset size.\n    minority_classes = [c for c in counts.index if c != majority_class]\n    \n    n_to_flip = int(len(majority_indices) * 0.5)\n    flip_indices = rng.choice(majority_indices, size=n_to_flip, replace=False)\n    \n    for idx in flip_indices:\n        shifted_y.loc[idx] = rng.choice(minority_classes)\n        \n    return shifted_y\n\ndef _apply_structured_label_drift(\n    x: pd.DataFrame,\n    y: pd.Series,\n    fraction: float,\n    rng: np.random.Generator,\n) -> pd.Series:\n    \"\"\"\n    Structured Label Drift (replaces Concept Drift).\n    Flip labels based on the distance from the mean of the most variant feature.\n    \"\"\"\n    shifted_y = y.copy()\n    numeric_cols = x.select_dtypes(include=[\"number\"]).columns\n    classes = shifted_y.dropna().unique()\n    \n    if len(classes) < 2 or len(numeric_cols) == 0:\n        return _apply_label_noise(y, fraction, rng)\n        \n    # Find most variant feature (normalized)\n    variances = x[numeric_cols].apply(lambda col: np.var((col - np.mean(col)) / (np.std(col) + 1e-9)))\n    top_col = variances.idxmax()\n    \n    feature_vals = x[top_col]\n    mean_val = np.mean(feature_vals)\n    std_val = np.std(feature_vals) + 1e-9\n    \n    # Probability of flip increases with distance from mean\n    distances = np.abs(feature_vals - mean_val) / std_val\n    probs = 1 / (1 + np.exp(-distances))  # Sigmoid scaling\n    \n    # Normalize probabilities so average is `fraction`\n    probs = probs * (fraction / (np.mean(probs) + 1e-9))\n    probs = np.clip(probs, 0.0, 1.0)\n    \n    mask = rng.random(len(shifted_y)) < probs\n    indices = np.flatnonzero(mask)\n    \n    for idx in indices:\n        current_class = shifted_y.iloc[idx]\n        if pd.isna(current_class):\n            continue\n        possible_classes = [c for c in classes if c != current_class]\n        if possible_classes:\n            shifted_y.iloc[idx] = rng.choice(possible_classes)\n            \n    return shifted_y\n\ndef _apply_feature_removal(\n    x: pd.DataFrame,\n    fraction: float,\n    rng: np.random.Generator,\n) -> pd.DataFrame:\n    \"\"\"\n    Feature Removal Shift.\n    Drops the top `fraction` of features (simulated by dropping highest variance features).\n    \"\"\"\n    shifted = x.copy()\n    if not 0 <= fraction <= 1:\n        raise ValueError('Feature removal fraction must be in [0,1]')\n    n_drop = 0 if fraction == 0 else max(1, int(len(shifted.columns) * fraction))\n    \n    if n_drop >= len(shifted.columns):\n        n_drop = len(shifted.columns) - 1 # Keep at least one feature\n        \n    # We drop randomly to simulate sensor failure, but you could drop based on importance.\n    # To keep it simple and robust, we randomly select cols to drop.\n    cols_to_drop = rng.choice(shifted.columns, size=n_drop, replace=False)\n    shifted = shifted.drop(columns=cols_to_drop)\n    \n    return shifted\n\n\n\ndef apply_perturbation(\n    x: pd.DataFrame,\n    y: pd.Series,\n    shift_family: str,\n    severity: float | None = None,\n    random_state: int = 42,\n) -> tuple[pd.DataFrame, pd.Series]:\n    \"\"\"\n    Apply one of the 8 distinct shift families.\n    \"\"\"\n    rng = np.random.default_rng(random_state)\n    \n    if shift_family in [\"clean\", \"covariate_shift\", \"population_shift\"]:\n        # covariate and population are split-level shifts, so no in-place perturbation needed here\n        return x.copy(), y.copy()\n        \n    elif shift_family == \"gaussian_noise\":\n        if severity is None:\n            severity = 0.05\n        x_shifted = _apply_gaussian_noise(x, severity, rng)\n        return x_shifted, y.copy()\n        \n    elif shift_family == \"missing_values\":\n        if severity is None:\n            severity = 0.10\n        x_shifted = _apply_missing_values(x, severity, rng)\n        return x_shifted, y.copy()\n        \n    elif shift_family == \"label_noise\":\n        if severity is None:\n            severity = 0.10\n        y_shifted = _apply_label_noise(y, severity, rng)\n        return x.copy(), y_shifted\n\n    elif shift_family == \"class_prior_shift\":\n        y_shifted = _apply_class_prior_shift(y, rng)\n        return x.copy(), y_shifted\n        \n    elif shift_family == \"feature_removal\":\n        if severity is None:\n            severity = 0.20\n        x_shifted = _apply_feature_removal(x, severity, rng)\n        return x_shifted, y.copy()\n        \n    else:\n        raise ValueError(f\"Unknown shift family: {shift_family}\")\n",
+    "src/splitters.py": "\"\"\"Fold construction with explicit target and evaluation boundaries.\n\nStratified folds use ``y`` only to balance class counts. Covariate and\npopulation folds use the complete predictor matrix ``X`` to define an\nunsupervised, dataset-wide geometry before assigning folds. That transductive\nuse of predictor values is part of these stress-test definitions; labels never\nenter their PCA or clustering geometry. These conditions are not estimates of\ndeployment performance on an unseen population.\n\"\"\"\n\nfrom __future__ import annotations\n\nfrom collections.abc import Sequence\n\nimport numpy as np\nimport pandas as pd\nfrom sklearn.cluster import KMeans\nfrom sklearn.decomposition import PCA\nfrom sklearn.model_selection import KFold, StratifiedKFold\nfrom sklearn.preprocessing import StandardScaler\n\n\nclass SplitInfeasibleError(ValueError):\n    \"\"\"Raised when the requested split policy cannot be satisfied as stated.\"\"\"\n\n\ndef _validate_split_dimensions(n_rows: int, n_splits: int) -> None:\n    if n_splits < 2:\n        raise SplitInfeasibleError(\"n_splits must be at least 2\")\n    if n_rows < n_splits:\n        raise SplitInfeasibleError(\n            f\"Cannot create {n_splits} folds from {n_rows} rows\"\n        )\n\n\ndef assert_fold_integrity(\n    splits: Sequence[tuple[Sequence[int], Sequence[int]]],\n    n_rows: int,\n    groups: Sequence[object] | None = None,\n) -> None:\n    \"\"\"Validate row coverage, train/test disjointness, and optional group isolation.\"\"\"\n    if not splits:\n        raise SplitInfeasibleError(\"The split policy produced no folds\")\n    _validate_split_dimensions(n_rows, len(splits))\n\n    row_ids = np.arange(n_rows)\n    test_parts: list[np.ndarray] = []\n    group_values = None if groups is None else np.asarray(groups, dtype=object)\n    if group_values is not None and len(group_values) != n_rows:\n        raise SplitInfeasibleError(\"groups length does not match the number of rows\")\n\n    for fold_number, (train_indices, test_indices) in enumerate(splits, start=1):\n        train = np.asarray(train_indices, dtype=int)\n        test = np.asarray(test_indices, dtype=int)\n        if train.ndim != 1 or test.ndim != 1:\n            raise SplitInfeasibleError(f\"Fold {fold_number} indices must be one-dimensional\")\n        if train.size == 0 or test.size == 0:\n            raise SplitInfeasibleError(f\"Fold {fold_number} has an empty train or test partition\")\n        if np.unique(train).size != train.size or np.unique(test).size != test.size:\n            raise SplitInfeasibleError(f\"Fold {fold_number} contains duplicate row indices\")\n        if np.any(train < 0) or np.any(test < 0) or np.any(train >= n_rows) or np.any(test >= n_rows):\n            raise SplitInfeasibleError(f\"Fold {fold_number} contains an out-of-range row index\")\n        if np.intersect1d(train, test).size:\n            raise SplitInfeasibleError(f\"Fold {fold_number} has overlapping train and test rows\")\n        if np.union1d(train, test).size != n_rows:\n            raise SplitInfeasibleError(f\"Fold {fold_number} does not partition all rows\")\n        if group_values is not None:\n            train_groups = set(group_values[train].tolist())\n            test_groups = set(group_values[test].tolist())\n            if train_groups.intersection(test_groups):\n                raise SplitInfeasibleError(\n                    f\"Fold {fold_number} places the same group in train and test\"\n                )\n        test_parts.append(test)\n\n    all_test = np.concatenate(test_parts)\n    if np.unique(all_test).size != n_rows or not np.array_equal(np.sort(all_test), row_ids):\n        raise SplitInfeasibleError(\"Test folds must cover every row exactly once\")\n\n\ndef get_stratified_splits(\n    X: pd.DataFrame,\n    y: pd.Series,\n    n_splits: int,\n    seed: int,\n) -> list[tuple[np.ndarray, np.ndarray]]:\n    \"\"\"Create shuffled stratified folds, failing explicitly if class counts are too small.\"\"\"\n    _validate_split_dimensions(len(X), n_splits)\n    if len(y) != len(X):\n        raise SplitInfeasibleError(\"X and y lengths differ\")\n    counts = pd.Series(y).value_counts(dropna=False)\n    if counts.empty or int(counts.min()) < n_splits:\n        smallest = int(counts.min()) if not counts.empty else 0\n        raise SplitInfeasibleError(\n            f\"Stratified {n_splits}-fold CV requires at least {n_splits} rows per class; \"\n            f\"the smallest class has {smallest}. No random-fold fallback was applied.\"\n        )\n\n    splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)\n    splits = list(splitter.split(X, y))\n    assert_fold_integrity(splits, len(X))\n    return splits\n\n\ndef _scaled_numeric_predictors(X: pd.DataFrame) -> np.ndarray:\n    \"\"\"Return numeric predictor geometry, rejecting nonnumeric-only inputs.\"\"\"\n    numeric = X.select_dtypes(include=[\"number\"]).fillna(0)\n    if numeric.shape[1] == 0:\n        raise SplitInfeasibleError(\n            \"Feature-based partitioning requires at least one numeric predictor; \"\n            \"no alternate random split was substituted.\"\n        )\n    return StandardScaler().fit_transform(numeric)\n\n\ndef get_covariate_splits(\n    X: pd.DataFrame,\n    n_splits: int,\n    seed: int,\n) -> list[tuple[np.ndarray, np.ndarray]]:\n    \"\"\"Partition by contiguous bins of the first PC of predictor-only geometry.\n\n    PCA and scaling use all rows of ``X`` to define this stress-test partition.\n    The function accepts no target argument, so labels cannot affect its folds.\n    \"\"\"\n    _validate_split_dimensions(len(X), n_splits)\n    scaled = _scaled_numeric_predictors(X)\n    pc1 = PCA(n_components=1, random_state=seed).fit_transform(scaled).ravel()\n    sorted_indices = np.argsort(pc1, kind=\"mergesort\")\n    bins = np.array_split(sorted_indices, n_splits)\n    splits = [\n        (\n            np.concatenate([bins[j] for j in range(n_splits) if j != fold]),\n            bins[fold],\n        )\n        for fold in range(n_splits)\n    ]\n    assert_fold_integrity(splits, len(X))\n    return splits\n\n\ndef get_population_splits(\n    X: pd.DataFrame,\n    n_splits: int,\n    seed: int,\n) -> list[tuple[np.ndarray, np.ndarray]]:\n    \"\"\"Hold out one predictor-only K-means cluster per fold.\n\n    Clustering uses all rows of ``X`` to define this unsupervised stress-test\n    partition. Empty clusters are an explicit infeasibility; no random K-fold\n    replacement is allowed.\n    \"\"\"\n    _validate_split_dimensions(len(X), n_splits)\n    scaled = _scaled_numeric_predictors(X)\n    labels = KMeans(n_clusters=n_splits, random_state=seed, n_init=\"auto\").fit_predict(scaled)\n    cluster_sizes = np.bincount(labels, minlength=n_splits)\n    if np.any(cluster_sizes == 0):\n        raise SplitInfeasibleError(\n            f\"K-means produced an empty cluster for {n_splits} population folds\"\n        )\n\n    row_ids = np.arange(len(X))\n    splits = [\n        (row_ids[labels != cluster], row_ids[labels == cluster])\n        for cluster in range(n_splits)\n    ]\n    assert_fold_integrity(splits, len(X))\n    return splits\n\n\ndef get_splits(\n    X: pd.DataFrame,\n    y: pd.Series,\n    split_policy: str,\n    n_splits: int,\n    seed: int,\n) -> list[tuple[np.ndarray, np.ndarray]]:\n    \"\"\"Dispatch an explicit split policy using target labels only for stratification.\"\"\"\n    if split_policy == \"stratified\":\n        return get_stratified_splits(X, y, n_splits, seed)\n    if split_policy == \"covariate_shift\":\n        return get_covariate_splits(X, n_splits, seed)\n    if split_policy == \"population_shift\":\n        return get_population_splits(X, n_splits, seed)\n    raise ValueError(f\"Unknown split policy: {split_policy}\")\n"
+  },
+  "seed_scheme": "sha256_canonical_json_u32_v1",
+  "sensitivity": {
+    "alpha": 0.05,
+    "bootstrap_resamples": 2000,
+    "confidence_level": 0.95,
+    "contrasts": [
+      [
+        "historical_raw",
+        "Raw",
+        "AutoFE_Baseline"
+      ],
+      [
+        "fair_cap_control",
+        "Raw_Capped",
+        "AutoFE_Baseline"
+      ],
+      [
+        "fair_full_control",
+        "Raw_Full",
+        "AutoFE_Baseline"
+      ]
+    ],
+    "coverage_thresholds": [
+      0.5,
+      0.75,
+      1.0
+    ],
+    "cutoff_fractions": [
+      0.5,
+      0.75,
+      1.0
+    ],
+    "expected_protocol_version": null,
+    "expected_seed_scheme_version": null,
+    "metric": "roc_auc",
+    "metric_lower": 0.0,
+    "metric_upper": 1.0,
+    "min_datasets": 2,
+    "permutation_resamples": 5000,
+    "random_state": 20261003,
+    "sensitivity_config_version": "incomplete_run_logical_prefix_regimes_v2",
+    "stratum_fields": [
+      "split_policy",
+      "condition",
+      "model"
+    ],
+    "task_fields": [
+      "dataset",
+      "split_policy",
+      "seed",
+      "fold",
+      "condition",
+      "severity",
+      "model"
+    ]
+  },
+  "source_commit": "913285be23061f8ed857168dab232df25d11408a",
+  "source_hashes": {
+    ".gitignore": "7d57ef81fcd71f6c20ca3da76d7875cbc9edebf6c3dfd1251850556b84e4e80b",
+    "LICENSE": "4beb4c2a1c09dc35d6c58f1e3f481ac00836c4573fe1b12ec5e42f8d997d59e4",
+    "README.md": "4d3ac48123fa33b387f68905935b3e52557632266ed79c336fa0ed7bb8f55fd6",
+    "config/dataset_list.yaml": "e1bc2d8d96e2fb369bb68f6005c64605a1727956cf6bfe2094147b048af8994a",
+    "main.py": "57786fba0998f209613b225d815738129908fd054a36f6cbef94ac204895d71d",
+    "notebooks/sanity_checks.ipynb": "03f4279243a68baba1f09e5f14bc78e315b4a61dc6af1cd914b1dc3d4bff769a",
+    "notebooks/visualization.ipynb": "c7add6fe890f43845460b44fa61356659f368cfc3a3821c5f86b221e4043eec0",
+    "paper/README.md": "175a0aeb081fe5db7ea4aa4a3ca6531327b13eaaf6f7f7242695ce3a4a746ea6",
+    "paper/cover_letter.txt": "0e5b3768726910dc73f9bd0f9d764cbcb5fbf96e6eaa6edd4414c35841fa24c0",
+    "paper/figures/AutoFE_ShiftBench_Workflow.pdf": "5dc23f19a00090e38573ba348d00efd07109c7932ccf67c632b004254a50b038",
+    "paper/figures/Figure_10_Ablation_Study.pdf": "c7492852146ff412bfb85c155bcb3c6f8f289b931b574c35695cd8dbe0455ad6",
+    "paper/figures/Figure_2_Dataset_Diversity.pdf": "34c772fc7bd8cbc93d06b556b08fda761198891ad21cf6c26a32e1bd90244d07",
+    "paper/figures/Figure_3_Pipeline_Ranking.pdf": "caecefa0b77aaa4e20ff3d124b08935e67171231d9c19dcf8f5e25bcd608ee88",
+    "paper/figures/Figure_4_Model_Ranking.pdf": "7bc26f23b64ffc5fdc1428f14157b138c25d2c96d68f80425941719c2a047e8f",
+    "paper/figures/Figure_5_Robustness_Shift.pdf": "9b71750dd16cd41a665efa655eccff7a88b1a0b74d6760978606d68fe5376e3a",
+    "paper/figures/Figure_6_Runtime_Comparison.pdf": "c61f3b52880b4b7aa64c8988bce753f62cfa19994eb096df5bd1c8ff3ab25a03",
+    "paper/figures/Figure_7_Feature_Complexity.pdf": "387df8d3593dbb1e0195828e8fb51f3895eeeb44c48d7a243feadc4045a80251",
+    "paper/figures/Figure_8_CD_Diagram.pdf": "87ad802952635bddfa1a05c0f70e84b1bf9448ad63e119608c47fb0b08fb2360",
+    "paper/figures/Figure_9_Heatmap.pdf": "52ec08c537e95c02720bf1972c11addc1760b1824585c1544a983b1f2b9cdb18",
+    "paper/figures/README.md": "7151d7a9f9b5e7d32195c2d58c6ae3783afff05a52153e78ae1fdba7a0cecea2",
+    "paper/highlights.txt": "89e4fd21352f8c4aaa152aae7a8e2648cd6a1de784f3435f83e4a4733ddb8225",
+    "paper/manuscript.tex": "a216579392913dbdb1e496b75292c6e709f3724c28eb44bcd538e2962186483c",
+    "paper/references.bib": "dc09ce0fd1684687319cdc1f77e8b3c1439d054ffaa60278fa56bc379a5c27cc",
+    "provenance/critical_repair/baseline_contract.json": "0a80806b5e83cfddb94e52c3a47a465e3386a70737bedca5c8a4fcb6605251e6",
+    "provenance/critical_repair/coverage.json": "1c537704316d97b196077859df4cdd337f52ca3dca664513206af43d1479ef39",
+    "provenance/critical_repair/issue_register.json": "957f832f986ad40c8bf6ffa4c850954ddf45a748ada636557a694278243b0e06",
+    "provenance/critical_repair/record.md": "320a584f98863bfd5dd22c7edc7c7f36ce72eb6ba6f9c7f5d4308bdbb6205f43",
+    "provenance/reviewer1_problems_1_2.md": "7b2e740ca186960b4405554b8fb212d3a64891a15be6f5f4cfdd8ced7ec54f96",
+    "provenance/reviewer2_problems_6_8.md": "558c5d999ae15c2c6fd90f8bf403e50832404c90461a46f5505e97ec358b30c4",
+    "provenance/reviewer3_problems_9_10.md": "3dc81c128ef39702835f20f0304aba27f6621c90caebf366f62b6cce99787b64",
+    "reproduction/README.md": "5a610b0c04c6148e1df5ed1ff3baad2c67600f231a3a0d228277845ab6110d1c",
+    "reproduction/freeze_contract.py": "45a2ef7a75edfe38a4a4e4ac72d72ea1bfda8a06cb0e4fdfa4172725518193c4",
+    "reproduction/issue_register.py": "6da4ed8335f1f688a4c61acd9b40a6d05558dc204b1b828a6eef3826c4876552",
+    "reproduction/probe_original_helpers.py": "eeef4a962b6822ec0a63e1ae1babdf8ae87b565f222b5507ee29f3b86eb77ba1",
+    "requirements.txt": "011d27192d203b8bf4b8dc9333f8471579e6d5902f1275b73f1eca6e6bbd9ff8",
+    "setup_and_run.bat": "6e7b91181128df32ab082bc2870c11e3b76b6907424d77bb10114036a07f2574",
+    "src/analysis/dataset_stats.py": "af0739910fe8614ea70042ae832d6e6ed40643889c9b57e7dbdea4c0e7175345",
+    "src/analysis/ranking_analysis.py": "33667ba2102a5bbb6ee8f9ab04b883a19f1024e5919535c0457e1d72042acfbb",
+    "src/analysis/structural_analysis.py": "f9fce48405f487fccfef7479cf0cbeea120068c9a32c6102ddffc3449ce0af74",
+    "src/artifact_integrity.py": "8faffa3c36445b001da02e540b479d609890fbe05df9e4f7a483ba9b164160a6",
+    "src/check_progress.py": "f180c11d12fc891874a203a07821d87a228b51f34fa6f3681d617f79da03709f",
+    "src/checkpoint.py": "60e214ebecc4460805ac221e209129bb229055ec6eccc987cef18017e319c0af",
+    "src/coordinator.py": "5aeb9198934665c2831e9a947f909ff4bab12411c1b38c0de59ea46c185adbb5",
+    "src/create_workflow_diagram.py": "6c612ab3c45554d2882cfb666ff55fb2f35b46f802a18bf1e06810bd1e79ab0e",
+    "src/data_loader.py": "ec7f540a3abd6408b246586128b34a26db44471000bdfef4c889b05ea0b8f8a3",
+    "src/dataset_statistics.py": "1e715451dec5e91eccc6273806b52031cfc04390cac3b87c4d2c2ad0963fd10b",
+    "src/device_policy.py": "0361d0b51bf940be5146e2710ab8659542ebdcc78049e5c28e3668425b3d5c71",
+    "src/evaluation.py": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4",
+    "src/feature_engineering.py": "7d6a58ccc8ac641fe263dc0934fd12a119b9a8217b4a177de3002dff1339ee26",
+    "src/feature_selection.py": "f470ce0c7c9e9048d04ad4588d22cb47973f02e83201c726da3466c7985e11f7",
+    "src/fsva.py": "2fbc8fc140221369ec22f5beda3b76e8bbe9629c4234b4b50d25ee2fc68426c3",
+    "src/generate_tables.py": "ec6c79deb96bb97bb2d8357be3b696294e797aefb512ed98cb0ce48576d15638",
+    "src/historical_snapshot.py": "8826c412f53996f11da4dbbfb88318c52cc08863fa388207e8a50a5e2675f45f",
+    "src/model.py": "aa216094df9cbefc0f3a4cb1bec0000971502b629c3b97978e4a879cc85e85af",
+    "src/operator_registry.py": "2125debcd01f5c79a0befe51501c37bb5e8fd54ffb2b892e20b3dbfcdd7d65a8",
+    "src/pipeline_runner.py": "5863c290d048bb4b318b791f5bb5aa88447e8e237055afbdf767c717e13b2f68",
+    "src/plotting.py": "e43bc5d11a4a23b252471945dff885d884e4687e4b2aeec002387b6d4132edcc",
+    "src/plotting_q1.py": "ac6d2690b809b1fe3acbe77f6ba5525eab390e14d139906fbb4a6e18cc0bc351",
+    "src/prepared_inputs.py": "bd035174c876dce7ef31bfd18a6a5820149e24cf7bd865439a8b0ca65e106c9f",
+    "src/preprocessing.py": "6ef0e626481f086fc65b28f8dc90f7cdb74c008c1c33221dc1dca7450a252a8f",
+    "src/protocol.py": "1c33e3963897aaba5e9cca5c6d304d93b8c1c272b7c9f4d7c19dae7699306cde",
+    "src/provenance.py": "fdd150d32a4443e78176424c8388be19409f624e01863195ead4d7431b865ab5",
+    "src/provenance_cli.py": "5cad437f934f7c1a343ee452b9c1c3bcfce90ddefe58be4ef20cc3083b96d02e",
+    "src/provenance_evidence.py": "bc8cb3c85dab956ff6fa3db8e2321e02fea0a24407965d98d6ac47fa2e2ed2f4",
+    "src/reporting.py": "0b39a5fb729d5844667494e67543d1a9a03e4cdcdb4cb84358f8d857e97e9737",
+    "src/resource_limits.py": "63c9a03b1d33c11822adbc0874d6c207df686de837a091115319468d76930cfd",
+    "src/seeding.py": "1d35a29a4e08adaf2ccad77863a8bb8b6bbed6776dd614b79a0d5e1fe830ed54",
+    "src/sensitivity_analysis.py": "19ced492ab1e980f8db9f4bc93418cd76cc757950ee2c52712dfde04733d45f7",
+    "src/shap_explainer.py": "6a74ace48a8f099697c7a42e7ad7c283f8c4d1c38008efdd48a3df9da0316a38",
+    "src/shift_generator.py": "f8ad606f2ed9761f34132f3a8d0645d418c6659c9cf0f19b67dfd2379b8e6f1b",
+    "src/splitters.py": "f79158365577ecf520dd303a990fd23dcb282e20f4bd1486a67834ae7099ccf4",
+    "src/stats_analysis.py": "fbff43a5ee4f6f613ca072a3728806ed21c68fe1077f10d0e54879b8c202db30",
+    "src/task_manifest.py": "c4fad716597e02b7bc1b04465d578f77e1c7522c7758f3198e9d61d492087ace",
+    "tests/__init__.py": "9c432e020062b7839b4d0c4d7a12fbb56de73c911dd3feb4dfdd97d9430e42b3",
+    "tests/test_acquisition.py": "ae6922aba7d8444f99a077a7b3ea047d1978e00ef2059013bf1ea3677102a9ef",
+    "tests/test_artifact_integrity.py": "dddd93c18f74c45d7572f8a8edcea13d3811400cce8fa7b1aaf42ba74a7fc9ce",
+    "tests/test_artifact_ownership.py": "dca1a151a67e560f7b88479b2ca5871c1151419d2afc95b3341399bcac113673",
+    "tests/test_baselines_operators_fsva.py": "65ce3daee467709ab1bd4ce8d1caa2d5e424aedce174d295f54353947d509992",
+    "tests/test_coordinator.py": "606a24a728c4833a7842c7fc4eb4533be49f8d1441d17311406693219adc43f6",
+    "tests/test_critical_analysis.py": "4524d2a8b369c33994c14cd71c526bfe0c8dd02fbb5afe2c195891a1c7fc2bd8",
+    "tests/test_critical_metrics.py": "4a524741400240043bd61244f3b0669a9bebca93196edfed02eb503a79000270",
+    "tests/test_critical_recovery.py": "7a00fdf74476e9dfbf905e5bb5f857abe65c7738d1924984188d9173ecdfe671",
+    "tests/test_dataset_statistics.py": "fd5965b19e78832ce5bf4ffd819b022c866214994705c9d6c637837432e3466e",
+    "tests/test_dependency_dispatch.py": "e00939cdb66755e1aabe54673d79b7be26e34fb632cb844cc7fa4487ce2b9b67",
+    "tests/test_durable_publication.py": "c91991b4a3b37751f753da5fa0ffeecdf7226ed45f4ff336fca66ce6623f3df0",
+    "tests/test_feature_semantics.py": "2974af13d4ef81f86435777fd1887d711cd6b0799f59bbabc9977ef38f142eaf",
+    "tests/test_leakage_boundaries.py": "bfc4f729f8e9f75c1d9fa9834ad1273848863a6e1518d4c51116dab90456b3d0",
+    "tests/test_manifest_resources.py": "2b7f173156f4c9dbb1807161c0ed2a4f74958dda75873b6a327d5e9701bd45ca",
+    "tests/test_memory_safety.py": "92cb90f04b9d69c32f55f244c696be21a8140509c58cf113adac11fb3da606dd",
+    "tests/test_prefix_information.py": "b6a3dd0a9614827e98861153145b0ad0f2c9745b1f757e144ac9075ef3b40f70",
+    "tests/test_prepared_execution.py": "2f609922c4b4c1ecc3875dc1bc7c6772c6f25b4a15439ad50280847c26d7f647",
+    "tests/test_production_task_resume.py": "37283fefde49e3a7087a49ac5bcd366fe902077eaf0454ee3adcac67efca5464",
+    "tests/test_provenance.py": "63eaea332179a9423bf47190c445253c78380ed031bb779e8cef5de4e2f33fe7",
+    "tests/test_provenance_integrity.py": "4072bd50ffd0c6b61c4bc5e2486c77c045c25a2507e373e8ec4856b899501a25",
+    "tests/test_reporting_contract.py": "cf8203396e5395ac0944f5b55211a7bcec3866a4984f76748aafd4ab79f435a0",
+    "tests/test_runtime_helpers.py": "37e0c277ee31b12d5eac926923536c07bee28d7e270eff8183012f7f68bcd407",
+    "tests/test_seed_scheme.py": "7ace90460af605a214bcd51bc2e8f38bfb729a635f5e07da882ffcc27c7b846f",
+    "tests/test_sensitivity_analysis.py": "9991237806f89ede2d45b727d0179bb4ea2dc877fc269bf13bba177443024c91",
+    "tests/test_sensitivity_evidence_controls.py": "4b8c9de654a2562792e09060e3181f5d26fdf7f6e7a9652a5734f0b2ea9b0d68",
+    "tests/test_task_manifest.py": "ecc41be50d48cb5ba5e24d188881305d1a8075b058ef183084f1367b18cafdfd"
+  },
+  "unavailable_inputs": "No exact row/corruption/feature identities can be certified for absent raw datasets. Controlled fixtures record them separately."
+}

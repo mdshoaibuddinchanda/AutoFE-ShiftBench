@@ -240,3 +240,13 @@ Coverage inventory and PDF metadata/first-page samples:coverage.json. Methodolog
 P12 pip check exits1:Tableshift14missing dependencies plus numpy/ray pin conflicts; OpenCV numpy>=2; TabPFN LightGBM>=4.4. Unrelated packages remain untouched. No real acquisition, real-data pilot or full benchmark was run.
 
 Engineering-record writing initially failed on Windows cp1252 encoding. The committed record was restored exactly and the addition written explicitly asUTF8; no historical record was lost.
+
+## Corrected minimally optimized reference (before performance refactoring)
+
+Executed source commit:913285b. Machine-readable corrected_reference_contract.json SHA256:2715e3463557000910c74a07d729903686dcbcdc75fb12db1bd4bce67e7f533d. Grid8750precompute+1225000models, rootseeds and purpose derivation unchanged. This is the corrected oracle; pre-repair artifacts are regression evidence only.
+
+Command:P12 reproduction/benchmark_corrected.py --source-root . --output reports/performance/corrected_reference --production. Two repeats, identical480-row synthetic CSV,8numeric columns+4category levels; requested Raw/AutoFE_Baseline, historical minimal reference prepares all14. Complete selected train/test matrices, labels, selected expressions/scores/ties/history, diagnostics and analysis bundles retained locally under ignored reports. Diagnostic budgets128rows/32finite-difference rows/default magnitudes; analysis2000bootstrap/5000sign-flip draws retained. Separate1600x16candidate fixture; full diagnostic coverage on declared sampled rows.
+
+Reference seconds (repeat1/repeat2):cold11.288/10.692;warm preparation2.812/2.763;candidate0.258/0.286;diagnostics0.675/0.652;analysis0.243/0.173;legacyCliff delta0.149/0.151;persistence0.060/0.060. Actual supervised production5tasks(1precompute+4models),14.852s; completed resume0newattempts,2.050s. Cold/warm preparation includes distribution diagnostics and exact integrity checks. Repeat variability retained in reference_measurements.json.
+
+Candidate cProfile:413350calls/0.338s; expression evaluation0.111s, scoring0.107s, DataFrame indexing0.080s. This motivates preserving train-only scores while avoiding unselected held-out evaluation and matrix allocation. Measured native threadpools and sampled aggregate RSS/I/O/artifactbytes are retained in reference_measurements.json;20ms memory sampling is not an exact OS high-water mark. cProfile was separate from timed repeats. SciPy KS exact-to-asymptotic fallback warnings occurred in equal-control distribution probes and are retained; these did not fail execution. No empirical manuscript findings or real-data speedup are inferred.
