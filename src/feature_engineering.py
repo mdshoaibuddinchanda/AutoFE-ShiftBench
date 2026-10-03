@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+import heapq
 
 import numpy as np
 import pandas as pd
@@ -198,33 +199,59 @@ def expand_features_with_dfs(
     test_base = test_numeric[base_columns]
 
     expressions = _generate_expressions(base_columns, cfg.operator_set_id if cfg.enable_dfs else "none_v1", cfg.depth if cfg.enable_dfs else 0)
-    require_bytes((len(train_base)+len(test_base))*len(expressions)*8*3,purpose='candidate matrices and scoring workspace')
+    retained_count=len(expressions) if cfg.max_features is None else min(len(expressions),cfg.max_features)
+    streaming=cfg.selection_method in ('variance','random','none')
+    train_count=retained_count if streaming else len(expressions)
+    require_bytes((len(train_base)*train_count+len(test_base)*retained_count)*8*3+len(expressions)*2048+len(train_base)*8*3,purpose='exact candidate scoring, selected matrices and complete histories')
     train_values: dict[str, np.ndarray] = {}
     test_values: dict[str, np.ndarray] = {}
     validity: dict[str, dict[str, int]] = {}
     expression_by_id: dict[str, Expression] = {}
+    scores={}
+    best=[]
+    random_scores=np.random.default_rng(cfg.random_seed) if cfg.selection_method == 'random' else None
     for expression in expressions:
         fid = candidate_id(expression)
         train_value, train_status = _evaluate_expression(expression, train_base)
-        test_value, _test_status = _evaluate_expression(expression, test_base)
-        train_values[fid] = train_value
-        test_values[fid] = test_value
+        if streaming:
+            if cfg.selection_method == 'variance':
+                # Numeric bases are cleaned once; operators already publish finite
+                # protected values. Keep the same pandas variance kernel/order.
+                score=float(pd.Series(train_value).var(ddof=1))
+            elif cfg.selection_method == 'random':
+                score=float(random_scores.random())
+            else:
+                score=None
+            scores[fid]=score
+            quality=score if score is not None and np.isfinite(score) else -np.inf
+            key=(quality,-int(fid[5:],16),fid)
+            if len(best)<retained_count:
+                heapq.heappush(best,key)
+                train_values[fid]=train_value
+            elif key>best[0]:
+                removed=heapq.heapreplace(best,key)[2]
+                del train_values[removed]
+                train_values[fid]=train_value
+        else:
+            train_values[fid] = train_value
         validity[fid] = train_status
         expression_by_id[fid] = expression
 
-    train_matrix = pd.DataFrame(train_values, index=train_base.index)
-    test_matrix = pd.DataFrame(test_values, index=test_base.index)
+    candidate_ids=list(expression_by_id)
     discrete_base=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if pd.api.types.is_bool_dtype(x_train[col])}
-    train_matrix.attrs['discrete_features']=[fid for fid,expr in expression_by_id.items() if set(expression_columns(expr)).issubset(discrete_base)]
-    scores = _score_candidates(train_matrix, y_train, cfg)
-    ranked = sorted(train_matrix.columns, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))
+    discrete_ids=[fid for fid,expr in expression_by_id.items() if set(expression_columns(expr)).issubset(discrete_base)]
+    if not streaming:
+        train_matrix=pd.DataFrame(train_values,index=train_base.index)
+        train_matrix.attrs['discrete_features']=discrete_ids
+        scores = _score_candidates(train_matrix, y_train, cfg)
+    ranked = sorted(candidate_ids, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))
     selected = ranked if cfg.max_features is None else ranked[: cfg.max_features]
     selected = list(selected)
     selected_set = set(selected)
 
     rank_by_id = {fid: rank for rank, fid in enumerate(ranked, start=1)}
     history: list[dict[str, Any]] = []
-    for fid in train_matrix.columns:
+    for fid in candidate_ids:
         expr = expression_by_id[fid]
         selected_flag = fid in selected_set
         score = scores[fid]
@@ -270,8 +297,12 @@ def expand_features_with_dfs(
         })
     history.sort(key=lambda row: row["candidate_id"])
 
-    selected_train = train_matrix[selected].copy()
-    selected_test = test_matrix[selected].copy()
+    if streaming:
+        selected_train=pd.DataFrame({fid:train_values[fid] for fid in selected},index=train_base.index)
+        selected_train.attrs['discrete_features']=discrete_ids
+    else:
+        selected_train = train_matrix[selected].copy()
+    selected_test=pd.DataFrame({fid:_evaluate_expression(expression_by_id[fid],test_base)[0] for fid in selected},index=test_base.index)
     selected_meta = [_metadata_for_expression(expression_by_id[fid], fid, validity[fid]) for fid in selected]
     generated_selected = sum(bool(expression_operators(expression_by_id[fid])) for fid in selected)
     raw_selected = len(selected) - generated_selected
@@ -292,9 +323,9 @@ def expand_features_with_dfs(
         "requested_base_cap": cfg.max_base_features,
         "eligible_base_feature_count": len(base_columns) + len(excluded_base),
         "base_feature_count": len(base_columns),
-        "candidate_count": len(train_matrix.columns),
+        "candidate_count": len(candidate_ids),
         "num_original": len(base_columns),
-        "num_generated": sum(bool(expression_operators(expression_by_id[fid])) for fid in train_matrix.columns),
+        "num_generated": sum(bool(expression_operators(expression_by_id[fid])) for fid in candidate_ids),
         "num_selected": len(selected),
         "retained_raw_count": raw_selected,
         "retained_generated_count": generated_selected,

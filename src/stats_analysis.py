@@ -24,14 +24,13 @@ def cliffs_delta(x: np.ndarray, y: np.ndarray) -> float:
     if len(x) == 0 or len(y) == 0:
         return np.nan
         
-    m, n = len(x), len(y)
-    
-    # Efficient broadcasting for pairwise comparisons
-    x_matrix = np.tile(x, (n, 1)).T
-    y_matrix = np.tile(y, (m, 1))
-    
-    diff = np.sign(x_matrix - y_matrix)
-    return float(diff.mean())
+    # The original sign(x-y) is undefined for NaNs and equal signed infinities.
+    if np.isnan(x).any() or np.isnan(y).any() or any(np.isinf(x).any() and np.isinf(y).any() and np.any(x==v) and np.any(y==v) for v in (np.inf,-np.inf)):
+        return np.nan
+    ordered=np.sort(y)
+    wins=np.searchsorted(ordered,x,side='left')
+    losses=len(y)-np.searchsorted(ordered,x,side='right')
+    return float((sum(map(int,wins))-sum(map(int,losses)))/(len(x)*len(y)))
 
 
 def run_friedman_nemenyi(data: pd.DataFrame, value_col: str, group_col: str, block_col: str):

@@ -137,13 +137,16 @@ def _task_id(row: Mapping[str, Any], config: AnalysisConfig) -> str:
     return "task_" + hashlib.sha256(encoded).hexdigest()[:24]
 
 
-def _read_ledger(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _read_ledger(path: Path, *, return_fingerprint=False):
     records: list[dict[str, Any]] = []
     exclusions: list[dict[str, Any]] = []
     if not path.exists():
         raise FileNotFoundError(path)
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
+    digest=hashlib.sha256()
+    with path.open('rb') as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            digest.update(raw_line)
+            line=raw_line.decode('utf-8')
             if not line.strip():
                 continue
             try:
@@ -156,7 +159,7 @@ def _read_ledger(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]
                 continue
             value["source_line"] = line_number
             records.append(value)
-    return records, exclusions
+    return (records,exclusions,digest.hexdigest()) if return_fingerprint else (records, exclusions)
 
 
 def _validate_protocol(records: Iterable[Mapping[str, Any]], config: AnalysisConfig) -> None:
@@ -339,12 +342,17 @@ def analyze_ledger(
     config: AnalysisConfig | None = None,
     *,
     output_dir: str | Path | None = None,
+    _parsed_input: tuple[list[dict[str,Any]],list[dict[str,Any]],str] | None = None,
 ) -> AnalysisBundle:
     """Analyze a result ledger under the dataset-level comparison contract."""
     config = config or AnalysisConfig()
     path = Path(ledger_path)
-    fingerprint = _fingerprint(path)
-    records, parse_exclusions = _read_ledger(path)
+    if _parsed_input is None:
+        records,parse_exclusions,fingerprint=_read_ledger(path,return_fingerprint=True)
+    else:
+        records, parse_exclusions, fingerprint = _parsed_input
+        records=list(records)
+        parse_exclusions=list(parse_exclusions)
     run_ids={row.get("run_id") for row in records if row.get("pipeline") in {config.pipeline_a,config.pipeline_b}}
     if config.run_id is None and run_ids:
         if len(run_ids) != 1 or None in run_ids:

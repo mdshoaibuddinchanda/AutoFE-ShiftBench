@@ -731,15 +731,21 @@
     {
       "id": "E03",
       "title": "Selected pipeline precompute",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Selected pipeline precompute",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "E04",
@@ -796,41 +802,59 @@
     {
       "id": "E08",
       "title": "Select before held-out materialization",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Select before held-out materialization",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "E09",
       "title": "Stream exact candidate scoring",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Stream exact candidate scoring",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "E10",
       "title": "Batch NumPy and memoize expressions",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Batch NumPy and memoize expressions",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "E11",
@@ -1017,15 +1041,21 @@
     {
       "id": "R01",
       "title": "Shared ledger and analysis bundle",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Shared ledger and analysis bundle",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "R02",
@@ -1082,15 +1112,21 @@
     {
       "id": "R06",
       "title": "Equivalent legacy Cliff delta",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Equivalent legacy Cliff delta",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "tests/test_prepared_execution.py",
+        "reproduction/compare_corrected.py"
+      ],
+      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "limitations": [
+        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
+      ]
     },
     {
       "id": "R07",

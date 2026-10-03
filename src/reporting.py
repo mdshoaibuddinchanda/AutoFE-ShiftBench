@@ -3,7 +3,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import pandas as pd
-from src.dataset_statistics import AnalysisConfig,AnalysisInputError,analyze_ledger,_read_ledger,_validate_protocol,_validate_pipeline_semantics,_finite_metric
+from src.dataset_statistics import AnalysisConfig,AnalysisInputError,analyze_ledger,_read_ledger,_fingerprint,_validate_protocol,_validate_pipeline_semantics,_finite_metric
 
 REPORT_SCHEMA='dataset_unit_reports_v2'
 
@@ -12,9 +12,10 @@ def report_inputs(ledger,*,config=None,datasets=None,output_dir=None):
     config=config or AnalysisConfig()
     if datasets is not None:
         config=replace(config,datasets=tuple(sorted(datasets)))
-    bundle=analyze_ledger(ledger,config,output_dir=output_dir)
+    path=Path(ledger)
+    rows,exclusions,input_fingerprint=_read_ledger(path,return_fingerprint=True)
+    bundle=analyze_ledger(ledger,config,output_dir=output_dir,_parsed_input=(rows,exclusions,input_fingerprint))
     config=replace(config,run_id=bundle.config['run_id'])
-    rows,exclusions=_read_ledger(Path(ledger))
     selected=[row for row in rows if row.get('run_id') == config.run_id and (config.datasets is None or row.get('dataset') in config.datasets)]
     for pipeline in {row.get('pipeline') for row in selected}:
         declared=replace(config,pipeline_a=pipeline,pipeline_b=pipeline)

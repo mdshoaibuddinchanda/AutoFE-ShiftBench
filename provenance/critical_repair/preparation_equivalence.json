@@ -1,0 +1,54 @@
+{
+  "schema": "corrected_equivalence_v1",
+  "checks": [
+    {
+      "repeat": "repeat_0",
+      "artifact": "science.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "candidate_scale.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "analysis.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "diagnostics.json",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "science.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "candidate_scale.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "analysis.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "diagnostics.json",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "artifact": "production.jsonl",
+      "actual_model_rows": 4,
+      "status": "scientific_equivalence_verified"
+    }
+  ],
+  "same_data_and_configuration": true,
+  "norm_differences_within_prefrozen_tolerance": [],
+  "exact_fields": "all selected matrix values/dtypes/order/attrs, labels, candidate universes/scores/ties/history, seeds, sampled inputs, statuses, analysis tables/config and split indices",
+  "physical_artifacts": "Prepared descriptor inventory omits unrequested pipelines. Timing/RSS fields and content-addressed file hashes can differ; each execution verifies its actual artifacts. Required scientific dependency signatures and identities remain compared."
+}

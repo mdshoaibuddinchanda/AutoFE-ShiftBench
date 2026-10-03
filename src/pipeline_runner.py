@@ -291,7 +291,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                              dataset_name, split_policy, seed, fold, condition,
                              diagnostics_enabled: bool = False,
                              diagnostic_config: dict[str, Any] | None = None,
-                             data_identity: dict[str, Any] | None = None):
+                             data_identity: dict[str, Any] | None = None,
+                             selected_pipelines: list[str] | None = None):
     """Generate all configured raw controls and arithmetic variants for one unit.
 
     Returns:
@@ -300,8 +301,19 @@ def _run_pipeline_generation(x_train, x_test, y_train,
     """
     res_pipelines = {}
     res_meta = {}
+    requested=set(PIPELINE_CONFIGS if selected_pipelines is None else selected_pipelines)
+    if not requested or requested-set(PIPELINE_CONFIGS):
+        raise ValueError('Select a nonempty subset of declared pipeline identities')
+    common_dependencies={"train":frame_identity(x_train),"test":frame_identity(x_test),
+        "labels":array_identity(y_train),"data_identity":data_identity,
+        "discrete_features":x_train.attrs.get('discrete_features',[]),
+        "protocol":EVALUATION_PROTOCOL_VERSION,"seed_scheme":SEED_SCHEME_VERSION,
+        "preprocessing":PREPROCESSING_SEMANTICS_VERSION,"diagnostics_enabled":diagnostics_enabled,
+        "diagnostic_config":diagnostic_config if diagnostics_enabled else None}
 
     for p_name, cfg in PIPELINE_CONFIGS.items():
+        if p_name not in requested:
+            continue
         # Set seed on configs that need it
         selection_random_state = feature_selection_seed(
             dataset_name, split_policy, seed, fold, condition, p_name,
@@ -320,12 +332,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             display_identity=cfg.display_identity,
         )
 
-        dependency = fingerprint({"train": frame_identity(x_train), "test": frame_identity(x_test),
-            "labels": array_identity(y_train), "data_identity": data_identity,
-            "discrete_features":x_train.attrs.get('discrete_features',[]),
-            "pipeline_spec": asdict(cfg_copy), "protocol": EVALUATION_PROTOCOL_VERSION,
-            "seed_scheme": SEED_SCHEME_VERSION, "preprocessing": PREPROCESSING_SEMANTICS_VERSION,
-            "diagnostics_enabled":diagnostics_enabled,"diagnostic_config":diagnostic_config if diagnostics_enabled else None})
+        dependency = fingerprint({**common_dependencies,"pipeline_spec":asdict(cfg_copy)})
         train_cache, test_cache, meta_cache, history_path, fsva_path = _diagnostic_paths(
             dataset_name, p_name, seed, fold, condition, dependency
         )
@@ -477,7 +484,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
 def get_data_splits(data_path, dataset_name, seed, fold, condition,
                     shift_family, severity, diagnostics_enabled: bool = False,
-                    diagnostic_config: dict[str, Any] | None = None):
+                    diagnostic_config: dict[str, Any] | None = None,
+                    selected_pipelines: list[str] | None = None):
     """Load data and keep labels out of feature-based split geometry.
 
     Covariate/population fold definitions intentionally use all predictor rows
@@ -576,12 +584,13 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         diagnostics_enabled=diagnostics_enabled,
         diagnostic_config=diagnostic_config,
         data_identity=data_signature,
+        selected_pipelines=selected_pipelines,
     )
+    clean_train=processed_frame(preprocessor.transform(x_train),columns=preprocessor.get_feature_names_out())
     for pipeline_name, meta in res_meta.items():
         from src.operator_registry import expression_from_dict
         from src.feature_engineering import _evaluate_expression
         selected_exprs=[expression_from_dict(item['expression']) for item in meta['selected_feature_expressions']]
-        clean_train=processed_frame(preprocessor.transform(x_train),columns=preprocessor.get_feature_names_out())
         map_clean=lambda frame:pd.DataFrame({fid:_evaluate_expression(expr,frame)[0] for fid,expr in zip(meta['selected_feature_identities'],selected_exprs)},index=frame.index)
         distance_state=distance_sample_seed(dataset_name,split_policy,seed,fold,condition)
         meta['training_distribution_distance']=compute_distribution_distance(map_clean(clean_train),res_pipelines[pipeline_name][0],random_state=distance_state)
@@ -674,6 +683,7 @@ def precompute_unit(kwargs):
     try:
         allowed=('data_path','dataset_name','seed','fold','condition','shift_family','severity','diagnostics_enabled','diagnostic_config')
         kwargs_copy={key:kwargs[key] for key in allowed if key in kwargs}
+        kwargs_copy['selected_pipelines']=list(kwargs['prepared_pipelines']) if kwargs.get('prepared_pipelines') else None
         store = _manifest_for_task(kwargs)
         if store is not None:
             expected=store.task_payload(str(kwargs['run_id']),str(kwargs['scientific_task_id']))['data_identity']
@@ -738,6 +748,7 @@ def train_unit(kwargs):
                 kwargs["data_path"], dataset_name, seed, fold, condition,
                 kwargs["shift_family"], kwargs["severity"],
                 kwargs.get("diagnostics_enabled", False), kwargs.get("diagnostic_config"),
+                selected_pipelines=[pipeline_name],
             )
         pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean = prepared
 
