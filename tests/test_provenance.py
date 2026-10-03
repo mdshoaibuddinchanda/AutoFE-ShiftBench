@@ -44,6 +44,8 @@ class ProvenanceTests(unittest.TestCase):
         ledger.write_text(json.dumps({"run_id": run_id, "scientific_task_id": records[0]["scientific_task_id"], **payload}) + "\n", encoding="utf-8")
         output = root / "reports" / "provenance"
         build_provenance_package(output_dir=output, repo_root=root, dataset_list_path=root / "config" / "dataset_list.yaml", manifest_db=db, ledger_path=ledger, run_id=run_id)
+        inventory = json.loads((output / "artifact_inventory.json").read_text(encoding="utf-8"))
+        self.assertEqual(inventory["cache_inventory"]["status"], "unavailable")
         result = verify_provenance(repo_root=root, dataset_list_path=root / "config" / "dataset_list.yaml", manifest_db=db, ledger_path=ledger, run_id=run_id, package_dir=output)
         self.assertEqual(result["overall_status"], "valid")
         names = {check["name"] for check in result["checks"]}

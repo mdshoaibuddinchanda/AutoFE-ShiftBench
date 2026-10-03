@@ -207,6 +207,23 @@ def _artifact(path: Path, root: Path, role: str, *, required: bool = False, expe
     return item
 
 
+def _cache_inventory(cache_root: Path, root: Path, *, max_files: int = 10_000) -> dict[str, Any]:
+    """Capture cache identity without copying cache bytes into the package."""
+    if not cache_root.exists():
+        return {"status": "unavailable", "path": relative_path(cache_root, root), "reason": "cache_root_missing", "entries": []}
+    files = sorted(path for path in cache_root.rglob("*") if path.is_file())
+    entries = [_artifact(path, root, "cache_artifact") for path in files[:max_files]]
+    return {
+        "status": "verified" if len(files) <= max_files else "truncated_unverified",
+        "path": relative_path(cache_root, root),
+        "file_count": len(files),
+        "total_bytes": sum(path.stat().st_size for path in files),
+        "listed_file_count": len(entries),
+        "max_files": max_files,
+        "entries": entries,
+    }
+
+
 def _manifest_summary(manifest_db: Path, run_id: str) -> dict[str, Any]:
     snapshot = ManifestStore(manifest_db).snapshot(run_id)
     task_ids = [row["scientific_task_id"] for row in snapshot["tasks"]]
@@ -272,9 +289,11 @@ def build_provenance_package(
     for dataset in registry["datasets"]:
         path = root / dataset["path"]
         artifacts.append(_artifact(path, root, "dataset_bytes", required=False, expected_sha256=dataset.get("sha256")))
-    artifact_inventory = {"schema_version": "artifact_inventory_v1", "artifacts": artifacts}
-    nodes = [{"id": "datasets", "role": "dataset_bytes"}, {"id": "manifest", "role": "task_manifest"}, {"id": "results", "role": "authoritative_results"}, {"id": "analysis", "role": "analysis_outputs"}]
-    edges = [{"from": "datasets", "to": "manifest", "relationship": "configured_inputs"}, {"from": "datasets", "to": "results", "relationship": "split_corruption_features_model"}, {"from": "manifest", "to": "results", "relationship": "task_identity_and_durability"}, {"from": "results", "to": "analysis", "relationship": "authoritative_snapshot"}]
+    cache_inventory = _cache_inventory(root / "data" / "cache", root)
+    artifacts.extend(cache_inventory.pop("entries", []))
+    artifact_inventory = {"schema_version": "artifact_inventory_v1", "cache_inventory": cache_inventory, "artifacts": artifacts}
+    nodes = [{"id": "datasets", "role": "dataset_bytes"}, {"id": "cache", "role": "split_corruption_feature_cache"}, {"id": "manifest", "role": "task_manifest"}, {"id": "results", "role": "authoritative_results"}, {"id": "analysis", "role": "analysis_outputs"}]
+    edges = [{"from": "datasets", "to": "cache", "relationship": "split_corruption_preprocessing_features"}, {"from": "cache", "to": "results", "relationship": "fitted_features_and_diagnostics"}, {"from": "datasets", "to": "manifest", "relationship": "configured_inputs"}, {"from": "manifest", "to": "results", "relationship": "task_identity_and_durability"}, {"from": "results", "to": "analysis", "relationship": "authoritative_snapshot"}]
     lineage = {"schema_version": LINEAGE_SCHEMA_VERSION, "nodes": nodes, "edges": edges, "compatibility": {"protocol_version": EVALUATION_PROTOCOL_VERSION, "seed_scheme_version": SEED_SCHEME_VERSION}}
     package = {
         "schema_version": PROVENANCE_SCHEMA_VERSION,
@@ -374,6 +393,9 @@ def verify_provenance(
         inventory_path = Path(package_dir) / "artifact_inventory.json"
         if inventory_path.exists():
             inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            cache_status = inventory.get("cache_inventory", {}).get("status")
+            if cache_status:
+                checks.append({"name": "cache_inventory", "status": cache_status})
             for item in inventory.get("artifacts", []):
                 path = root / item["path"]
                 if item.get("status") == "missing":
