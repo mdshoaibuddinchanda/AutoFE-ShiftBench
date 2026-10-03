@@ -38,7 +38,7 @@ class ProvenanceTests(unittest.TestCase):
         run_id = "provenance_test"
         store.create_run(run_id, {"protocol_version": EVALUATION_PROTOCOL_VERSION, "seed_scheme_version": SEED_SCHEME_VERSION}, records)
         attempt = store.claim_task(run_id, records[0]["scientific_task_id"], worker_id="test")
-        payload = {"status": "success", "roc_auc": 0.75}
+        payload = {"run_id":run_id,"scientific_task_id":records[0]["scientific_task_id"],"attempt_id":attempt,"status": "success", "roc_auc": 0.75}
         store.commit_result(run_id, records[0]["scientific_task_id"], attempt, payload)
         ledger = root / "results.jsonl"
         ledger.write_text(json.dumps({"run_id": run_id, "scientific_task_id": records[0]["scientific_task_id"], **payload}) + "\n", encoding="utf-8")
@@ -47,7 +47,10 @@ class ProvenanceTests(unittest.TestCase):
         inventory = json.loads((output / "artifact_inventory.json").read_text(encoding="utf-8"))
         self.assertEqual(inventory["cache_inventory"]["status"], "unavailable")
         result = verify_provenance(repo_root=root, dataset_list_path=root / "config" / "dataset_list.yaml", manifest_db=db, ledger_path=ledger, run_id=run_id, package_dir=output)
-        self.assertEqual(result["overall_status"], "valid")
+        # Missing configured data and unrecorded feature lineage cannot certify readiness.
+        self.assertEqual(result["overall_status"], "incomplete")
+        self.assertEqual(result["package_integrity"], "valid")
+        self.assertEqual(result["benchmark_readiness"], "not_certified")
         names = {check["name"] for check in result["checks"]}
         self.assertIn("protocol_compatibility", names)
         self.assertIn("seed_scheme_compatibility", names)
@@ -58,8 +61,8 @@ class ProvenanceTests(unittest.TestCase):
 
         (root / "data" / "raw" / "present.csv").write_text("feature,target_label\n0,0\n1,0\n", encoding="utf-8")
         tampered = verify_provenance(repo_root=root, dataset_list_path=root / "config" / "dataset_list.yaml", manifest_db=db, ledger_path=ledger, run_id=run_id, package_dir=output)
-        self.assertEqual(tampered["overall_status"], "attention_required")
-        self.assertTrue(any(check["status"] == "conflict" for check in tampered["checks"]))
+        self.assertEqual(tampered["overall_status"], "invalid")
+        self.assertTrue(any(check["status"] == "invalid" for check in tampered["checks"]))
 
 
 if __name__ == "__main__":

@@ -51,8 +51,10 @@ def main() -> None:
         package_dir=args.package_dir,
     )
     print(json.dumps(result, sort_keys=True))
-    if result["overall_status"] == "attention_required":
+    if result["overall_status"] == "invalid":
         raise SystemExit(2)
+    if result["overall_status"] in {"incomplete","unverified"}:
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

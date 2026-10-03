@@ -125,3 +125,32 @@ Affected publication/recovery/manifest/production suite: 17 passed, 13 warnings,
 late-takeover controls: all 7 publication tests passed, 2.86 s. These tests cover
 commit/export boundaries; coordinator/writer process-failure supervision and
 bounded queue integration remain B15/B17 work.
+
+## B05 / C03 / C04 / M04 / M05: provenance authority
+
+Original checks reproduced valid certification for a changed metric and empty
+ledger when no package was supplied. Required components could disappear or an
+inventory could be emptied while remaining valid. Original targeted lineage,
+untracked-source and external-path controls also failed (5/5).
+
+Verification now compares every exported model payload with its authoritative
+result, reports missing rows and invalid durable hashes/states, checks executed
+dataset bytes, and uses read-only SQLite. Package components and their digests
+are anchored in the authoritative manifest, so editing both a package component
+and its self-declared checksum does not certify it. Missing required components
+are invalid. Statuses are valid/incomplete/unverified/invalid, with package
+integrity and benchmark readiness separate. CLI exit codes: invalid=2;
+incomplete/unverified=3. Empty or incompletely linked evidence is never ready.
+
+Lineage contains real task/result/data IDs and recorded artifact dependencies,
+with unavailable input links marked incomplete. Production artifact completion
+follows in B16/C04; merely constructing a graph is not proof of full lineage.
+Code identity hashes tracked and untracked contents. External paths have unique
+portable identifiers and require an explicit location mapping to verify.
+
+The prior test's expectation that a package with missing data and unrecorded
+input lineage was globally valid was corrected: its package integrity remains
+valid while readiness is incomplete. This is an intentional stricter contract,
+not suppression of a regression. Current affected tests: 23 passed (provenance
+integrity, prior provenance, task manifest), 24.91 s. Follow-up provenance checks
+after dataset/durable-state controls: results recorded below.

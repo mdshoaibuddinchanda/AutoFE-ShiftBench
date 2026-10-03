@@ -294,6 +294,11 @@ class ManifestStore:
                     PRIMARY KEY (run_id, scientific_task_id)
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_attempt_id ON attempts(run_id, attempt_id);
+                CREATE TABLE IF NOT EXISTS evidence_anchors (
+                    run_id TEXT NOT NULL, anchor_id TEXT NOT NULL,
+                    payload_json TEXT NOT NULL, created_at TEXT NOT NULL,
+                    PRIMARY KEY (run_id, anchor_id)
+                );
                 """
             )
 
@@ -337,6 +342,23 @@ class ManifestStore:
     def set_run_status(self, run_id: str, status: str) -> None:
         with self._connect() as connection:
             connection.execute("UPDATE runs SET status = ?, updated_at = ? WHERE run_id = ?", (status, _now(), run_id))
+
+    def record_evidence_anchor(self, run_id: str, evidence: Mapping[str, Any]) -> str:
+        encoded=_canonical(dict(evidence))
+        anchor_id="evidence_"+hashlib.sha256(encoded.encode()).hexdigest()
+        with self._connect() as connection:
+            if connection.execute("SELECT 1 FROM runs WHERE run_id=?",(run_id,)).fetchone() is None:
+                raise ManifestError("Evidence anchor references unknown run")
+            connection.execute("INSERT OR IGNORE INTO evidence_anchors VALUES (?,?,?,?)",(run_id,anchor_id,encoded,_now()))
+        return anchor_id
+
+    def evidence_anchor(self,run_id: str,anchor_id: str) -> dict[str,Any] | None:
+        with self._connect() as connection:
+            try:
+                row=connection.execute("SELECT payload_json FROM evidence_anchors WHERE run_id=? AND anchor_id=?",(run_id,anchor_id)).fetchone()
+            except sqlite3.OperationalError:
+                return None
+        return None if row is None else json.loads(row["payload_json"])
 
     def run_config(self, run_id: str) -> dict[str, Any]:
         with self._connect() as connection:

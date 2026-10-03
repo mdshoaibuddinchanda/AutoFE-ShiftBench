@@ -78,15 +78,21 @@
     {
       "id": "B05",
       "title": "Provenance validation",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "provenance.py",
-      "original_reproducer": null,
+      "evidence_level": "original negative controls reproduced; repaired integrity/lifetime regressions verified",
+      "path": "active packaging and verification",
+      "supporting_locations": "src/provenance.py; src/provenance_evidence.py; ManifestStore.evidence_anchor; provenance_cli",
+      "original_reproducer": "tests/test_provenance_integrity.py original all 11 controls failed; direct payload/empty/lineage/source/path 5/5 failed",
       "required_correction": "Provenance validation",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "manifest-anchored provenance v2 with explicit valid/incomplete/unverified/invalid and readiness separation; read-only verify",
+      "tests": [
+        "tests/test_provenance_integrity.py",
+        "tests/test_provenance.py",
+        "tests/test_task_manifest.py: 23 passed, 24.91s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ]
     },
     {
       "id": "B06",
@@ -292,29 +298,35 @@
     {
       "id": "C03",
       "title": "Read-only verification",
-      "evidence_level": "read-only store and sensitivity verified; provenance caller pending B05",
-      "path": "active sensitivity and provenance inspection",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
-      "original_reproducer": null,
+      "evidence_level": "original negative controls reproduced; repaired integrity/lifetime regressions verified",
+      "path": "active packaging and verification",
+      "supporting_locations": "src/provenance.py; src/provenance_evidence.py; ManifestStore.evidence_anchor; provenance_cli",
+      "original_reproducer": "tests/test_provenance_integrity.py original all 11 controls failed; direct payload/empty/lineage/source/path 5/5 failed",
       "required_correction": "Read-only verification",
-      "compatibility_impact": "inspection must not create files",
+      "compatibility_impact": "manifest-anchored provenance v2 with explicit valid/incomplete/unverified/invalid and readiness separation; read-only verify",
       "tests": [
-        "tests/test_manifest_resources.py"
+        "tests/test_provenance_integrity.py",
+        "tests/test_provenance.py",
+        "tests/test_task_manifest.py: 23 passed, 24.91s"
       ],
-      "status": "partially_corrected",
-      "limitations": []
+      "status": "corrected_verified",
+      "limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ]
     },
     {
       "id": "C04",
       "title": "Actual artifact lineage",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "actual task/data/result graph regression verified; production artifact links pending B16",
+      "path": "active lineage",
+      "supporting_locations": "src/provenance_evidence.py actual_lineage",
       "original_reproducer": null,
       "required_correction": "Actual artifact lineage",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
+      "compatibility_impact": "real task IDs and declared dependencies; unsupported links explicit incomplete",
+      "tests": [
+        "test_lineage_contains_actual_tasks_not_generic_nodes"
+      ],
+      "status": "partially_corrected",
       "limitations": []
     },
     {
@@ -976,28 +988,40 @@
     {
       "id": "M04",
       "title": "Code fingerprint covers untracked contents",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
-      "original_reproducer": null,
+      "evidence_level": "original negative controls reproduced; repaired integrity/lifetime regressions verified",
+      "path": "active packaging and verification",
+      "supporting_locations": "src/provenance.py; src/provenance_evidence.py; ManifestStore.evidence_anchor; provenance_cli",
+      "original_reproducer": "tests/test_provenance_integrity.py original all 11 controls failed; direct payload/empty/lineage/source/path 5/5 failed",
       "required_correction": "Code fingerprint covers untracked contents",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "manifest-anchored provenance v2 with explicit valid/incomplete/unverified/invalid and readiness separation; read-only verify",
+      "tests": [
+        "tests/test_provenance_integrity.py",
+        "tests/test_provenance.py",
+        "tests/test_task_manifest.py: 23 passed, 24.91s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ]
     },
     {
       "id": "M05",
       "title": "External artifact paths are unambiguous",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
-      "original_reproducer": null,
+      "evidence_level": "original negative controls reproduced; repaired integrity/lifetime regressions verified",
+      "path": "active packaging and verification",
+      "supporting_locations": "src/provenance.py; src/provenance_evidence.py; ManifestStore.evidence_anchor; provenance_cli",
+      "original_reproducer": "tests/test_provenance_integrity.py original all 11 controls failed; direct payload/empty/lineage/source/path 5/5 failed",
       "required_correction": "External artifact paths are unambiguous",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "manifest-anchored provenance v2 with explicit valid/incomplete/unverified/invalid and readiness separation; read-only verify",
+      "tests": [
+        "tests/test_provenance_integrity.py",
+        "tests/test_provenance.py",
+        "tests/test_task_manifest.py: 23 passed, 24.91s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ]
     }
   ]
 }
