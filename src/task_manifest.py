@@ -25,6 +25,7 @@ from typing import Any, Callable, Iterable, Mapping
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION
 from src.artifact_integrity import artifact_lock, atomic_bytes, dataset_identity, file_sha256
+from src.numerical_validation import NUMERICAL_VALIDATION_VERSION
 
 
 MANIFEST_SCHEMA_VERSION = "task_manifest_logical_history_v2"
@@ -158,6 +159,7 @@ def build_task_records(
     include_precompute: bool = True,
     precompute_metadata: Mapping[str,Any] | None = None,
     planned_infeasible: Mapping[tuple[str, int, int, str], str] | None = None,
+    numerical_validation_version: str = NUMERICAL_VALIDATION_VERSION,
 ) -> list[dict[str, Any]]:
     """Build a complete deterministic manifest for a bounded or full grid."""
     datasets = [str(value) for value in datasets]
@@ -218,6 +220,7 @@ def build_task_records(
                                 "operator_set_id": metadata.get("operator_set_id"),
                                 "cap_policy_version": metadata.get("cap_policy_version"),
                                 "model": model,
+                                "numerical_validation_version": numerical_validation_version,
                             }
                             task_id = scientific_task_id(task_identity)
                             records.append({
@@ -695,9 +698,13 @@ class ManifestStore:
         # Include SQLite rollback-journal/page overhead, not just JSON bytes.
         with disk_write_reservation(self.db_path, max(1024**2, len(encoded.encode('utf-8')) * 8)), self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            task = connection.execute("SELECT state, active_attempt_id FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
+            task = connection.execute("SELECT state, active_attempt_id,stage FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if task is None:
                 raise ManifestError(f"Unknown task: {task_id}")
+            config_row = connection.execute('SELECT config_json FROM runs WHERE run_id=?', (run_id,)).fetchone()
+            expected_validation = json.loads(config_row['config_json']).get('numerical_validation_version')
+            if task['stage'] == 'model' and expected_validation and payload.get('numerical_validation_version') != expected_validation:
+                raise ManifestConflictError('Result numerical validation contract is incompatible')
             existing = connection.execute("SELECT payload_hash, attempt_id FROM durable_results WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if existing is not None:
                 if existing["payload_hash"] != payload_hash or existing["attempt_id"] != attempt_id:

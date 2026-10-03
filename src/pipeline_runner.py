@@ -69,6 +69,7 @@ from src.resource_limits import ResourceLimitError
 from src.preprocessing import _build_preprocessor, _to_dense_array,processed_frame
 from src.prepared_inputs import publish_unit,load_pipeline,artifact
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
+from src.numerical_validation import NUMERICAL_VALIDATION_VERSION
 from src.provenance import collect_code_identity, collect_environment_identity
 from src.seeding import (
     SEED_SCHEME_VERSION,
@@ -643,6 +644,9 @@ def _claim_manifest_task(task: dict[str, Any], *, worker_id: str) -> str | None:
     store = _manifest_for_task(task)
     if store is None or not task.get("scientific_task_id") or not task.get("run_id"):
         return None
+    recorded = store.task_payload(str(task['run_id']), str(task['scientific_task_id']))
+    if recorded['stage'] == 'model' and recorded.get('numerical_validation_version') != NUMERICAL_VALIDATION_VERSION:
+        raise ManifestConflictError('Stale numerical validation contract; preserve old run and use a new identity')
     attempt_id = task.get("attempt_id")
     if attempt_id:
         return str(attempt_id)
@@ -888,7 +892,8 @@ def train_unit(kwargs):
         gc.collect()
 
     except Exception as exc:
-        failure='resource_limit' if isinstance(exc,ResourceLimitError) else ('unsupported_gpu' if isinstance(exc,UnsupportedDeviceError) else 'worker_exception')
+        from src.evaluation import MetricInputError
+        failure='resource_limit' if isinstance(exc,ResourceLimitError) else ('unsupported_gpu' if isinstance(exc,UnsupportedDeviceError) else ('metric_failure' if isinstance(exc,MetricInputError) else 'worker_exception'))
         _record_manifest_failure(kwargs, attempt_id, failure_class=failure, exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase2_error.log", "a") as f:
             f.write(f"Train error {kwargs}: {traceback.format_exc()}\n")
@@ -1010,6 +1015,11 @@ def main() -> None:
     parser.add_argument("--manifest-db", type=Path, default=None)
     parser.add_argument("--manifest-path", type=Path, default=None)
     parser.add_argument("--run-id", type=str, default=None)
+    parser.add_argument('--eligibility', type=Path, default=None, help='Verified split eligibility bundle; requires a pinned SHA-256')
+    parser.add_argument('--eligibility-sha256', type=str, default=None)
+    parser.add_argument('--results-path', type=Path, default=None)
+    parser.add_argument('--log-file', type=Path, default=Path('reports/terminal.log'))
+    parser.add_argument('--dense-budget-gib', type=float, default=1, help='Exact allocation ceiling, also limited by available memory')
     parser.add_argument("--max-workers", type=int, default=None)
     parser.add_argument('--worker-max-tasks',type=int,default=8)
     parser.add_argument('--worker-rss-growth-mib',type=int,default=64)
@@ -1030,6 +1040,10 @@ def main() -> None:
         parser.error('cache-max-gib must be finite and positive')
     if not math.isfinite(args.min_free_gib) or args.min_free_gib < 0:
         parser.error('min-free-gib must be finite and nonnegative')
+    if not math.isfinite(args.dense_budget_gib) or args.dense_budget_gib <= 0:
+        parser.error('dense-budget-gib must be finite and positive')
+    if bool(args.eligibility) != bool(args.eligibility_sha256):
+        parser.error('eligibility and eligibility-sha256 must be provided together')
     for name in ('max_datasets','max_seeds','max_folds','max_conditions','fsva_max_rows','max_workers'):
         value=getattr(args,name)
         if value is not None and value < 1:
@@ -1050,8 +1064,8 @@ def main() -> None:
     init_db()
     if not args.dry_run_manifest:
         detect_hardware()
-    logger = setup_logger("reports/terminal.log")
-    results_path = results_ledger_path()
+    logger = setup_logger(args.log_file)
+    results_path = args.results_path or results_ledger_path()
 
     # ---- Load experiment grid ----
     datasets = load_dataset_names("config/dataset_list.yaml")
@@ -1128,15 +1142,25 @@ def main() -> None:
         cache_policy=args.cache_policy,
         cache_max_bytes=int(args.cache_max_gib * 1024**3),
         min_free_bytes=int(args.min_free_gib * 1024**3),
+        dense_budget_bytes=int(args.dense_budget_gib * 1024**3),
     )
     data_paths = {dataset: Path(f"data/raw/{dataset}.csv") for dataset in datasets}
     for path in data_paths.values():
         if path.is_file():
             load_csv_dataset(path)  # Reject oversized/manual inputs before freezing any tasks.
     data_identities = {name: dataset_identity(path) for name,path in data_paths.items()}
+    planned_infeasible = {}; eligibility_summary = None
+    if args.eligibility:
+        from src.eligibility import load_verified_eligibility
+        planned_infeasible, eligibility_summary = load_verified_eligibility(args.eligibility, args.eligibility_sha256,
+            datasets=datasets, data_identities=data_identities, seeds=seeds, folds=folds, conditions=families)
+    elif len(datasets) == 25 and len(seeds) == 5 and len(folds) == 5 and len(families) == 14:
+        parser.error('Complete benchmark requires verified eligibility and eligibility-sha256 before preparation')
     manifest_config = {
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
+        "numerical_validation_version": NUMERICAL_VALIDATION_VERSION,
+        "eligibility": eligibility_summary,
         "code_identity": collect_code_identity(Path.cwd()),
         "environment_identity": collect_environment_identity(Path.cwd()),
         "durability_protocol": "sqlite_result_outbox_v2",
@@ -1168,6 +1192,7 @@ def main() -> None:
         data_paths=data_paths,
         data_identities=data_identities,
         precompute_metadata={"diagnostics_enabled":args.enable_fsva_diagnostics,"max_rows":args.fsva_max_rows,"schema":FSVA_SCHEMA_VERSION,"magnitudes":list(DEFAULT_PERTURBATION_MAGNITUDES)},
+        planned_infeasible=planned_infeasible,
     )
     manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
     expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)

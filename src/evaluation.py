@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 import numpy as np
 import pandas as pd
+from src.numerical_validation import NUMERICAL_VALIDATION_VERSION, validate_probability_mass
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -34,6 +35,7 @@ def compute_classification_metrics(
     classes: np.ndarray | None = None,
     *,
     probability_classes: np.ndarray | None = None,
+    numerical_validation_version: str = NUMERICAL_VALIDATION_VERSION,
 ) -> dict:
     """
     Compute 10 classification metrics for the benchmark.
@@ -57,6 +59,7 @@ def compute_classification_metrics(
     metrics = {name: np.nan for name in names}
     statuses = {name: "undefined_empty_target" for name in names}
     metrics.update({"metric_semantics_version": METRIC_SEMANTICS_VERSION,
+        "numerical_validation_version": numerical_validation_version,
         "metric_status": statuses, "f1_averaging": "binary" if binary else "macro",
         "brier_normalization": "positive_class_mean_squared_error" if binary else "mean_over_samples_and_declared_classes"})
     if not len(y_true):
@@ -83,11 +86,10 @@ def compute_classification_metrics(
         raise MetricInputError("probability class coordinates are incompatible")
     if not np.isfinite(probabilities).all() or np.any(probabilities < 0) or np.any(probabilities > 1):
         raise MetricInputError("probabilities must be finite and within [0,1]")
-    # Validate the represented probabilities with accurate accumulation. A
-    # float32 reduction can round a valid row to 1 + eps (> the unchanged
-    # 1e-7 tolerance). Preserve the input dtype and every metric calculation.
-    if not np.allclose(probabilities.sum(axis=1, dtype=np.float64), 1.0, rtol=0, atol=1e-7):
-        raise MetricInputError("probability rows must sum to one")
+    try:
+        metrics['probability_validation'] = validate_probability_mass(probabilities, numerical_validation_version)
+    except ValueError as exc:
+        raise MetricInputError(str(exc)) from exc
     aligned = np.zeros((len(y_true),len(labels)), dtype=probabilities.dtype)
     positions = {label: i for i,label in enumerate(labels.tolist())}
     for i,label in enumerate(columns.tolist()):

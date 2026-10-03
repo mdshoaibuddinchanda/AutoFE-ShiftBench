@@ -246,6 +246,20 @@ def verify(*,repo_root=".",dataset_list_path="config/dataset_list.yaml",manifest
         try:
             reader=ManifestStore(_resolve(manifest_db,root),read_only=True)
             snapshot=reader.snapshot(run_id)
+            validation_version = json.loads(snapshot['run']['config_json']).get('numerical_validation_version')
+            if validation_version:
+                from src.numerical_validation import NUMERICAL_VALIDATION_VERSION, LEGACY_VALIDATION_VERSION
+                check('numerical_validation_contract', 'valid' if validation_version in
+                      (NUMERICAL_VALIDATION_VERSION, LEGACY_VALIDATION_VERSION) else 'invalid', observed=validation_version)
+                model_versions = {json.loads(t['payload_json']).get('numerical_validation_version')
+                                  for t in snapshot['tasks'] if t['stage'] == 'model'}
+                check('task_numerical_validation_compatibility', 'valid' if model_versions == {validation_version} else 'invalid')
+                model_ids = {t['scientific_task_id'] for t in snapshot['tasks'] if t['stage'] == 'model'}
+                result_versions = {json.loads(r['payload_json']).get('numerical_validation_version')
+                                   for r in snapshot['durable_results']
+                                   if r['scientific_task_id'] in model_ids}
+                check('result_numerical_validation_compatibility', 'valid' if
+                      not result_versions or result_versions == {validation_version} else 'invalid')
             check("manifest_snapshot","valid",snapshot_sha256=snapshot_digest(snapshot))
             for name,actual,expected in (("protocol_compatibility",snapshot["run"]["protocol_version"],EVALUATION_PROTOCOL_VERSION),("seed_scheme_compatibility",snapshot["run"]["seed_scheme_version"],SEED_SCHEME_VERSION)):
                 check(name,"valid" if actual == expected else "invalid",observed=actual,expected=expected)

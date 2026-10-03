@@ -77,4 +77,6 @@ def test_probability_mass_tolerance_remains_1e_7():
     probabilities = np.array([[.5, .5000002], [.25, .75]], dtype=np.float32)
     assert abs(float(probabilities[0].sum(dtype=np.float64)) - 1) > 1e-7
     with pytest.raises(ValueError, match='sum to one'):
-        compute_classification_metrics(np.array([0, 1]), np.array([0, 1]), probabilities, np.array([0, 1]))
+        from src.numerical_validation import LEGACY_VALIDATION_VERSION
+        compute_classification_metrics(np.array([0, 1]), np.array([0, 1]), probabilities, np.array([0, 1]),
+            numerical_validation_version=LEGACY_VALIDATION_VERSION)

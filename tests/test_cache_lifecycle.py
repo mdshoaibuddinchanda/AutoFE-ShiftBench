@@ -136,6 +136,21 @@ def test_tampered_receipt_is_not_accepted_as_missing_input_evidence(tmp_path, mo
     with pytest.raises(CacheCheckFailed): snapshot_eviction_evidence(store.snapshot('r'), tmp_path)
 
 
+def test_incompatible_numerical_result_cannot_authorize_cleanup(tmp_path,monkeypatch):
+    from src.numerical_validation import NUMERICAL_VALIDATION_VERSION
+    store,records,_ = fixture(tmp_path,monkeypatch)
+    unit,prepared = prepare_and_commit(store,records)
+    # A legacy/unversioned synthetic result must not be relabeled as compatible.
+    with store._connect() as connection:
+        row = connection.execute("SELECT config_json FROM runs WHERE run_id='r'").fetchone()
+        config = {**json.loads(row[0]),'numerical_validation_version':NUMERICAL_VALIDATION_VERSION}
+        connection.execute("UPDATE runs SET config_json=? WHERE run_id='r'",(json.dumps(config),))
+    with pytest.raises(CacheCheckFailed,match='Numerical validation'):
+        evict_unit(store,'r',unit,'results.jsonl',cache_root())
+    assert all(path.exists() for path in matrices(prepared))
+    assert store.cache_eviction('r',unit) is None
+
+
 def test_real_rolling_batches_resume_without_regeneration(tmp_path, monkeypatch):
     store, records, config = fixture(tmp_path, monkeypatch,
         conditions=[('clean', 0), ('gaussian_noise', .05)], pipelines=['Raw', 'AutoFE_Baseline'])

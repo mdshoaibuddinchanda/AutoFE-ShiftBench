@@ -103,6 +103,7 @@ def verify_registered_workers(root):
 
 def completed_unit_rows(store, run_id, unit_id, *, require_exports=True):
     rows = store.unit_snapshot(run_id, unit_id)
+    validation_version = store.run_config(run_id).get('numerical_validation_version')
     models = [row for row in rows if row['stage'] == 'model']
     parents = [row for row in rows if row['scientific_task_id'] == unit_id and row['stage'] == 'precompute']
     if len(parents) != 1 or not models:
@@ -117,6 +118,9 @@ def completed_unit_rows(store, run_id, unit_id, *, require_exports=True):
                (('run_id', run_id), ('scientific_task_id', row['scientific_task_id']), ('attempt_id', row['result_attempt_id']))):
             raise CacheCheckFailed('Result ownership mismatch')
         if row['stage'] == 'model':
+            if validation_version and (task.get('numerical_validation_version') != validation_version
+                    or result.get('numerical_validation_version') != validation_version):
+                raise CacheCheckFailed('Numerical validation compatibility unverified')
             if result.get('status') != 'success' or not isinstance(result.get('metric_status'), dict):
                 raise CacheCheckFailed('Missing successful metric evidence')
             from src.evaluation import METRIC_RANGES, METRIC_SEMANTICS_VERSION
