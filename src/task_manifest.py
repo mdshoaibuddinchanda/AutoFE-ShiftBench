@@ -21,10 +21,11 @@ from typing import Any, Callable, Iterable, Mapping
 
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION
+from src.artifact_integrity import dataset_identity
 
 
 MANIFEST_SCHEMA_VERSION = "task_manifest_v1"
-TASK_IDENTITY_VERSION = "scientific_task_identity_v1"
+TASK_IDENTITY_VERSION = "scientific_task_identity_data_v2"
 ATTEMPT_SCHEMA_VERSION = "attempt_history_v1"
 TASK_STATES = ("pending", "running", "completed", "failed", "timeout", "skipped")
 TERMINAL_STATES = {"completed", "failed", "timeout", "skipped"}
@@ -121,6 +122,7 @@ def build_task_records(
     pipeline_identity: Callable[[str], str] | None = None,
     pipeline_metadata: Callable[[str], Mapping[str, Any]] | None = None,
     data_paths: Mapping[str, str | Path] | None = None,
+    data_identities: Mapping[str, Mapping[str, Any]] | None = None,
     protocol_version: str = EVALUATION_PROTOCOL_VERSION,
     seed_scheme_version: str = SEED_SCHEME_VERSION,
     include_precompute: bool = True,
@@ -136,6 +138,7 @@ def build_task_records(
     precompute_ids: dict[tuple[Any, ...], str] = {}
     for dataset in datasets:
         available = data_paths is None or (dataset in data_paths and Path(data_paths[dataset]).exists())
+        data_signature = dict(data_identities[dataset]) if data_identities is not None else (dataset_identity(data_paths[dataset]) if data_paths is not None and available else {"availability": "unverified" if data_paths is None else "unavailable", "fingerprint": None})
         dataset_reason = None if available else "dataset_unavailable"
         for seed in seeds:
             for fold in folds:
@@ -143,6 +146,7 @@ def build_task_records(
                     base = {
                         "dataset": dataset,
                         "data_path": None if data_paths is None else str(data_paths.get(dataset)),
+                        "data_identity": data_signature,
                         "protocol_version": protocol_version,
                         "seed_scheme_version": seed_scheme_version,
                         "split_policy": shift_family if shift_family in {"covariate_shift", "population_shift"} else "stratified",

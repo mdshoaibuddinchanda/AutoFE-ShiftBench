@@ -64,3 +64,17 @@ API references verified against installed sklearn 1.5.2:
 - https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.log_loss.html
 - https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.brier_score_loss.html
 - https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.roc_auc_score.html
+
+## B02: data and cache compatibility
+
+Original regression: 3 failed, 1 passed. Same-path changed CSVs retained task
+IDs; changed matrices reused features; corrupt train matrices were accepted.
+Dataset identity now hashes exact CSV bytes plus parsed schema/target/rows.
+Run and task identities include it; root-seed inputs do not include it and are
+unchanged. Cache dependencies include exact matrices, labels, pipeline spec,
+protocol and preprocessing semantics. Publication records file hashes, frame
+identities and estimator dimensions; readers reject incomplete or corrupt
+artifacts. Different dependencies use separate directories, preserving older
+valid caches. Split caches are hashed and atomically published under OS locks.
+Full precompute/diagnostic ownership remains B16; this change alone does not
+claim concurrent history publication is resolved.

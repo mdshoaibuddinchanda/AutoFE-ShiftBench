@@ -24,15 +24,22 @@
     {
       "id": "B02",
       "title": "Dataset/task/cache compatibility",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "task_manifest.py,pipeline_runner.py",
-      "original_reproducer": null,
+      "evidence_level": "original 3 failing regressions; corrected compatible cache reuse and affected tests",
+      "path": "active manifest/split/feature caches",
+      "supporting_locations": "src/artifact_integrity.py; src/task_manifest.py build_task_records; src/pipeline_runner.py cache paths/generation/get_data_splits",
+      "original_reproducer": "tests/test_artifact_integrity.py: 3 failed, 1 passed",
       "required_correction": "Dataset/task/cache compatibility",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "data identity and verified_feature_cache_v2; old caches remain untouched; root seeds unchanged",
+      "tests": [
+        "tests/test_artifact_integrity.py",
+        "tests/test_task_manifest.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Concurrent history/diagnostic ownership handled separately in B16; real data absent"
+      ]
     },
     {
       "id": "B03",

@@ -21,6 +21,7 @@ import sys
 import time
 import traceback
 import warnings
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="joblib")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 from src.checkpoint import init_db, has_run, log_run
+from src.artifact_integrity import (CACHE_SCHEMA_VERSION, PREPROCESSING_SEMANTICS_VERSION,
+    array_identity, artifact_lock, atomic_json, atomic_pickle, dataset_identity,
+    file_sha256, fingerprint, frame_identity, validate_feature_cache)
 from src.data_loader import load_csv_dataset, load_dataset_names
 from src.evaluation import (
     compute_classification_metrics,
@@ -197,9 +201,10 @@ def _cache_dir_for_dataset(dataset_name: str) -> Path:
     return d
 
 
-def _split_cache_path(dataset_name: str, seed: int, split_policy: str) -> Path:
+def _split_cache_path(dataset_name: str, seed: int, split_policy: str, dependency: str = "") -> Path:
     """Return a split cache path keyed by dataset, replicate, and split policy."""
-    return _cache_dir_for_dataset(dataset_name) / f"splits_s{seed}_{split_policy}.pkl"
+    suffix = "__"+dependency if dependency else ""
+    return _cache_dir_for_dataset(dataset_name) / f"splits_s{seed}_{split_policy}{suffix}.pkl"
 
 
 def split_predictors_and_target(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, str]:
@@ -222,7 +227,7 @@ def split_policy_for_condition(shift_family: str) -> str:
 
 
 def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
-                          seed: int, fold: int, condition: str):
+                          seed: int, fold: int, condition: str, dependency: str = ""):
     """Return (train_pkl, test_pkl, meta_json) with human-readable names.
 
     Example:
@@ -231,6 +236,9 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
         data/cache/{protocol}/{seed_scheme}/adult/AutoFE_MI_s42_f1_gaussian_noise_0.05_meta.json
     """
     d = _cache_dir_for_dataset(dataset_name)
+    if dependency:
+        d = d / dependency
+        d.mkdir(parents=True,exist_ok=True)
     cfg = PIPELINE_CONFIGS[pipeline_name]
     token = pipeline_identity_token(pipeline_name)
     base = f"{token}_s{seed}_f{fold}_{condition}"
@@ -261,9 +269,9 @@ def pipeline_identity_token(pipeline_name: str) -> str:
     ).replace(" ", "_")
 
 
-def _diagnostic_paths(dataset_name: str, pipeline_name: str, seed: int, fold: int, condition: str):
+def _diagnostic_paths(dataset_name: str, pipeline_name: str, seed: int, fold: int, condition: str, dependency: str = ""):
     train_cache, test_cache, meta_cache = _pipeline_cache_paths(
-        dataset_name, pipeline_name, seed, fold, condition,
+        dataset_name, pipeline_name, seed, fold, condition, dependency,
     )
     stem = meta_cache.with_suffix("")
     return train_cache, test_cache, meta_cache, stem.with_name(stem.name + "_history.jsonl"), stem.with_name(stem.name + "_fsva.json")
@@ -276,7 +284,8 @@ def _diagnostic_paths(dataset_name: str, pipeline_name: str, seed: int, fold: in
 def _run_pipeline_generation(x_train, x_test, y_train,
                              dataset_name, split_policy, seed, fold, condition,
                              diagnostics_enabled: bool = False,
-                             diagnostic_config: dict[str, Any] | None = None):
+                             diagnostic_config: dict[str, Any] | None = None,
+                             data_identity: dict[str, Any] | None = None):
     """Generate all configured raw controls and arithmetic variants for one unit.
 
     Returns:
@@ -305,18 +314,20 @@ def _run_pipeline_generation(x_train, x_test, y_train,
             display_identity=cfg.display_identity,
         )
 
+        dependency = fingerprint({"train": frame_identity(x_train), "test": frame_identity(x_test),
+            "labels": array_identity(y_train), "data_identity": data_identity,
+            "pipeline_spec": asdict(cfg_copy), "protocol": EVALUATION_PROTOCOL_VERSION,
+            "seed_scheme": SEED_SCHEME_VERSION, "preprocessing": PREPROCESSING_SEMANTICS_VERSION})
         train_cache, test_cache, meta_cache, history_path, fsva_path = _diagnostic_paths(
-            dataset_name, p_name, seed, fold, condition
+            dataset_name, p_name, seed, fold, condition, dependency
         )
 
-        cache_compatible = train_cache.exists() and test_cache.exists() and meta_cache.exists()
+        verified_cache = validate_feature_cache(train_cache,test_cache,meta_cache,dependency)
+        cache_compatible = verified_cache is not None
         if diagnostics_enabled:
             cache_compatible = cache_compatible and history_path.exists() and fsva_path.exists()
         if cache_compatible:
-            x_train_fe = pd.read_pickle(train_cache)
-            x_test_fe = pd.read_pickle(test_cache)
-            with open(meta_cache) as f:
-                meta = json.load(f)
+            x_train_fe,x_test_fe,meta = verified_cache
             if diagnostics_enabled:
                 with history_path.open(encoding="utf-8") as history_file:
                     meta["selection_history"] = [json.loads(line) for line in history_file if line.strip()]
@@ -338,10 +349,14 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                 "feature_metadata": dfs_meta.get("feature_metadata", []),
                 "dfs_cache_hit": False,
             }
-            x_train_fe.to_pickle(train_cache)
-            x_test_fe.to_pickle(test_cache)
-            with open(meta_cache, "w") as f:
-                json.dump({key: value for key, value in meta.items() if key != "selection_history"}, f)
+            with artifact_lock(meta_cache.with_suffix(".lock")):
+                atomic_pickle(train_cache,x_train_fe)
+                atomic_pickle(test_cache,x_test_fe)
+                meta.update({"cache_schema": CACHE_SCHEMA_VERSION, "dependency_signature": dependency,
+                    "data_identity": data_identity, "preprocessing_semantics": PREPROCESSING_SEMANTICS_VERSION,
+                    "artifacts": {role: {"path": str(path), "sha256": file_sha256(path), "identity": frame_identity(frame)}
+                        for role,path,frame in (("train",train_cache,x_train_fe),("test",test_cache,x_test_fe))}})
+                atomic_json(meta_cache,{key:value for key,value in meta.items() if key != "selection_history"})
 
         meta["pipeline_identity"] = pipeline_identity_token(p_name)
         meta["operator_registry_version"] = OPERATOR_REGISTRY_VERSION
@@ -454,18 +469,26 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     transformations still fit only on the corrupted training partition.
     """
     df = load_csv_dataset(data_path)
+    data_signature = dataset_identity(data_path,frame=df)
     X, y, _target_col = split_predictors_and_target(df)
 
     split_policy = split_policy_for_condition(shift_family)
 
-    split_cache = _split_cache_path(dataset_name, seed, split_policy)
-    if split_cache.exists():
-        splits = pd.read_pickle(split_cache)
-    else:
-        derived_split_seed = split_seed(dataset_name, split_policy, seed, n_splits=5)
-        splits = get_splits(X, y, split_policy, n_splits=5, seed=derived_split_seed)
-        split_cache.parent.mkdir(parents=True, exist_ok=True)
-        pd.to_pickle(splits, split_cache)
+    split_dependency = fingerprint({"data": data_signature, "split_policy": split_policy,
+        "split_seed": split_seed(dataset_name,split_policy,seed,n_splits=5), "protocol": EVALUATION_PROTOCOL_VERSION})
+    split_cache = _split_cache_path(dataset_name, seed, split_policy, split_dependency)
+    split_meta = split_cache.with_suffix(".json")
+    with artifact_lock(split_cache.with_suffix(".lock")):
+        try:
+            metadata = json.loads(split_meta.read_text(encoding="utf-8"))
+            if metadata["dependency_signature"] != split_dependency or metadata["sha256"] != file_sha256(split_cache):
+                raise ValueError("Incompatible split cache")
+            splits = pd.read_pickle(split_cache)
+        except (OSError,ValueError,KeyError,EOFError):
+            derived_split_seed = split_seed(dataset_name, split_policy, seed, n_splits=5)
+            splits = get_splits(X, y, split_policy, n_splits=5, seed=derived_split_seed)
+            atomic_pickle(split_cache,splits)
+            atomic_json(split_meta,{"dependency_signature": split_dependency, "sha256": file_sha256(split_cache), "data_identity": data_signature})
 
     assert_fold_integrity(splits, len(X))
     if fold < 1 or fold > len(splits):
@@ -523,6 +546,7 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         dataset_name, split_policy, seed, fold, condition,
         diagnostics_enabled=diagnostics_enabled,
         diagnostic_config=diagnostic_config,
+        data_identity=data_signature,
     )
     for pipeline_name, meta in res_meta.items():
         meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
@@ -1068,11 +1092,13 @@ def main() -> None:
         stale_after_seconds=args.stale_after_seconds,
     )
     data_paths = {dataset: Path(f"data/raw/{dataset}.csv") for dataset in datasets}
+    data_identities = {name: dataset_identity(path) for name,path in data_paths.items()}
     manifest_config = {
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
         "code_identity": collect_code_identity(Path.cwd()),
         "datasets": datasets,
+        "dataset_identities": data_identities,
         "seeds": seeds,
         "folds": folds,
         "conditions": [{"shift_family": fam, "severity": sev} for fam, sev in families],
@@ -1093,6 +1119,7 @@ def main() -> None:
             "cap_policy_version": CAP_POLICY_VERSION if PIPELINE_CONFIGS[name].max_features is not None else "none_v1",
         },
         data_paths=data_paths,
+        data_identities=data_identities,
     )
     manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
     expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)
