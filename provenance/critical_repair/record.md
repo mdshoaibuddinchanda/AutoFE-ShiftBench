@@ -78,3 +78,15 @@ artifacts. Different dependencies use separate directories, preserving older
 valid caches. Split caches are hashed and atomically published under OS locks.
 Full precompute/diagnostic ownership remains B16; this change alone does not
 claim concurrent history publication is resolved.
+
+Affected B02 suite: artifact integrity, task manifest, leakage boundaries,
+production resume: 24 passed, 2 subtests, 13 warnings, 13.10 s.
+
+## B03: retryable dependencies
+
+Original first precompute failure permanently skipped its model. The new
+regression demonstrated that state directly. Failure propagation now occurs
+only after a terminal outcome and the store refuses propagation from pending
+or running dependencies. A successful retry leaves models executable; failed
+attempts remain recorded. Terminal propagation is idempotent. Affected recovery
+and manifest tests: 12 passed, 13 warnings, 2.76 s. No scientific inputs change.

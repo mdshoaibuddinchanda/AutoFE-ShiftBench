@@ -44,14 +44,17 @@
     {
       "id": "B03",
       "title": "Precompute retry dependencies",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py,task_manifest.py",
-      "original_reproducer": null,
+      "evidence_level": "reproduced and regression verified",
+      "path": "active precompute failure handler",
+      "supporting_locations": "pipeline_runner._record_manifest_failure; ManifestStore.propagate_dependency_failure",
+      "original_reproducer": "test_retryable_precompute_does_not_skip_models originally skipped instead of pending",
       "required_correction": "Precompute retry dependencies",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
+      "compatibility_impact": "execution state repair only; seeds/task scientific inputs unchanged",
+      "tests": [
+        "tests/test_critical_recovery.py",
+        "tests/test_task_manifest.py: 12 passed, 2.76s"
+      ],
+      "status": "corrected_verified",
       "limitations": []
     },
     {

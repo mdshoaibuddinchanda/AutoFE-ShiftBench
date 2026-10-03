@@ -603,12 +603,12 @@ def _record_manifest_failure(task: dict[str, Any], attempt_id: str | None, *, fa
     if store is None or not attempt_id or not task.get("scientific_task_id") or not task.get("run_id"):
         return
     try:
-        store.record_failure(
+        next_state = store.record_failure(
             str(task["run_id"]), str(task["scientific_task_id"]), str(attempt_id),
             failure_class=failure_class, exception=exception,
             timeout_seconds=task.get("task_timeout_seconds"), retry=retry,
         )
-        if failure_class == "precompute_failure":
+        if failure_class == "precompute_failure" and next_state in {"failed", "timeout"}:
             store.propagate_dependency_failure(str(task["run_id"]), str(task["scientific_task_id"]))
     except ManifestConflictError:
         # A newer retry may already own the task.  Preserve that authoritative

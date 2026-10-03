@@ -419,6 +419,9 @@ class ManifestStore:
     def propagate_dependency_failure(self, run_id: str, dependency_task_id: str, *, reason: str = "dependency_failure") -> int:
         changed = 0
         with self._connect() as connection:
+            dependency = connection.execute("SELECT state FROM tasks WHERE run_id=? AND scientific_task_id=?",(run_id,dependency_task_id)).fetchone()
+            if dependency is None or dependency["state"] not in {"failed","timeout","skipped"}:
+                return 0
             rows = connection.execute("SELECT scientific_task_id, payload_json FROM tasks WHERE run_id = ? AND state = 'pending'", (run_id,)).fetchall()
             for row in rows:
                 payload = json.loads(row["payload_json"])
