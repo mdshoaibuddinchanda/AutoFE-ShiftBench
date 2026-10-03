@@ -919,7 +919,10 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
     Path(results_path).parent.mkdir(parents=True,exist_ok=True)
     if store is not None:
         store.export_durable_results(str(run_id),results_path)
-    with open(results_path, "a", encoding="utf-8", newline="\n") as f:
+    with open(results_path, "ab") as f:
+        rolling = store is not None and store.run_config(str(run_id)).get('execution', {}).get('cache_policy') == 'rolling'
+        if rolling:
+            store.index_ledger_exports(str(run_id), results_path)
         if ready_event is not None:ready_event.set()
         while True:
             res = queue.get()
@@ -932,9 +935,17 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
                 if not store.commit_result(str(run_id),str(res["scientific_task_id"]),str(res["attempt_id"]),res,result_ref=str(results_path)):
                     continue
             with artifact_lock(Path(results_path).with_suffix(Path(results_path).suffix+".lock")):
-                f.write(json.dumps(res, allow_nan=False) + "\n")
+                encoded = (json.dumps(res, allow_nan=False) + "\n").encode('utf-8')
+                f.seek(0, os.SEEK_END)
+                offset = f.tell()
+                f.write(encoded)
                 f.flush()
                 os.fsync(f.fileno())
+                if rolling:
+                    from src.task_manifest import _canonical
+                    import hashlib
+                    store.note_ledger_export(str(run_id), res['scientific_task_id'], res['attempt_id'],
+                        hashlib.sha256(_canonical(res).encode()).hexdigest(), results_path, offset, len(encoded))
             if store is None: log_run(
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
@@ -999,12 +1010,23 @@ def main() -> None:
     parser.add_argument("--max-workers", type=int, default=None)
     parser.add_argument('--worker-max-tasks',type=int,default=8)
     parser.add_argument('--worker-rss-growth-mib',type=int,default=64)
+    parser.add_argument('--cache-policy', choices=('rolling', 'retain'), default='rolling',
+                        help='Rolling: finish and verify one preparation unit, release workers, then evict only its large matrices')
+    parser.add_argument('--cache-max-gib', type=float, default=100,
+                        help='Stop new batches at this disposable-matrix cache size; retained evidence is governed by the free-disk reserve')
+    parser.add_argument('--min-free-gib', type=float, default=50,
+                        help='Stop new dispatch below this free disk reserve')
     parser.add_argument("--task-timeout-seconds", type=float, default=None)
     parser.add_argument("--run-wall-time-seconds", type=float, default=None)
     parser.add_argument("--max-attempts", type=int, default=1)
     parser.add_argument("--stop-after-tasks", type=int, default=None)
     parser.add_argument("--stale-after-seconds", type=float, default=3600.0, help="Recover running attempts older than this on resume")
     args = parser.parse_args()
+    import math
+    if not math.isfinite(args.cache_max_gib) or args.cache_max_gib <= 0:
+        parser.error('cache-max-gib must be finite and positive')
+    if not math.isfinite(args.min_free_gib) or args.min_free_gib < 0:
+        parser.error('min-free-gib must be finite and nonnegative')
     for name in ('max_datasets','max_seeds','max_folds','max_conditions','fsva_max_rows','max_workers'):
         value=getattr(args,name)
         if value is not None and value < 1:
@@ -1100,8 +1122,14 @@ def main() -> None:
         worker_rss_growth_bytes=args.worker_rss_growth_mib*1024**2,
         stop_after_tasks=args.stop_after_tasks,
         stale_after_seconds=args.stale_after_seconds,
+        cache_policy=args.cache_policy,
+        cache_max_bytes=int(args.cache_max_gib * 1024**3),
+        min_free_bytes=int(args.min_free_gib * 1024**3),
     )
     data_paths = {dataset: Path(f"data/raw/{dataset}.csv") for dataset in datasets}
+    for path in data_paths.values():
+        if path.is_file():
+            load_csv_dataset(path)  # Reject oversized/manual inputs before freezing any tasks.
     data_identities = {name: dataset_identity(path) for name,path in data_paths.items()}
     manifest_config = {
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
@@ -1109,7 +1137,7 @@ def main() -> None:
         "code_identity": collect_code_identity(Path.cwd()),
         "environment_identity": collect_environment_identity(Path.cwd()),
         "durability_protocol": "sqlite_result_outbox_v2",
-        "scheduler_version":"dependency_ready_reusable_supervised_attempts_v2",
+        "scheduler_version":"dependency_ready_verified_rolling_v3",
         "stop_limit_unit":"model_attempt_launches_including_retries",
         "run_deadline_policy":"hard during work; bounded cleanup/export follows",
         "datasets": datasets,

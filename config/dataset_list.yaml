@@ -1,4 +1,4 @@
-# AutoFE-ShiftBench: 25 OpenML benchmark datasets
+# AutoFE-ShiftBench: 25 benchmark datasets from OpenML and UCI
 # Organized by approximate row count (ascending)
 # All datasets are capped at 100,000 rows during download.
 
@@ -25,7 +25,10 @@ datasets:
   - PhishingWebsites
   - default-of-credit-card-clients
   - magic-telescope
-  - dry-bean-dataset
+  - name: dry-bean-dataset
+    provider: UCI
+    data_id: 602
+    version: 1
   - adult
   - bank-marketing
   - electricity

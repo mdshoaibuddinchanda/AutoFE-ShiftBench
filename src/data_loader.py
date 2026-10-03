@@ -26,7 +26,7 @@ OPENML_NAME_CANDIDATES: dict[str, list[str | int]] = {
     "aps_failure": [41138, "aps_failure", "aps-failure"],
     "electricity": ["electricity"],
     "covertype": ["covertype", "Covertype"],
-    "dry-bean-dataset": [42585, "dry-bean-dataset", "Dry_Bean_Dataset"],
+    "dry-bean-dataset": ["dry-bean-dataset", "Dry_Bean_Dataset"],
     "crop-recommendation": [43491, "crop-recommendation", "Crop_Recommendation"],
     "breast-cancer-wisconsin": ["breast-cancer-wisconsin", "breast_cancer", "wdbc"],
     "heart-disease": [43398, "heart-disease", "heart-statlog", 53],
@@ -109,6 +109,49 @@ def _fetch_openml_with_fallbacks(dataset_name: str, *, data_id=None, version=1):
         f"Tried names: {candidates} with versions {list(versions_to_try)}. "
         f"Last error: {last_error}"
     )
+
+
+def _fetch_uci_dry_bean(*, data_id, version):
+    """Load the original single-target UCI dataset; OpenML 42585 is Penguins."""
+    if int(data_id) != 602 or int(version) != 1:
+        raise ValueError('Only the declared UCI Dry Bean snapshot (602, version 1) is supported')
+    import io
+    import zipfile
+    from types import SimpleNamespace
+    import requests
+    from scipy.io import arff
+    from src.artifact_integrity import file_sha256
+    url = 'https://archive.ics.uci.edu/static/public/602/dry+bean+dataset.zip'
+    response = requests.get(url, timeout=60)
+    response.raise_for_status()
+    content = response.content
+    import hashlib
+    checksum = hashlib.sha256(content).hexdigest()
+    source_path = Path('data/source_download_cache') / ('uci_602_' + checksum + '.zip')
+    with artifact_lock(source_path.with_suffix('.lock')):
+        if source_path.exists():
+            if file_sha256(source_path) != checksum:
+                raise ValueError('Retained UCI source archive has incompatible bytes')
+        else:
+            atomic_bytes(source_path, content)
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        names = [name for name in archive.namelist() if name.endswith('Dry_Bean_Dataset.arff')]
+        if len(names) != 1:
+            raise ValueError('UCI archive does not contain one unambiguous Dry Bean ARFF')
+        text = archive.read(names[0]).decode('utf-8-sig')
+        records, _ = arff.loadarff(io.StringIO(text))
+    frame = pd.DataFrame(records)
+    if frame.shape != (13611, 17) or 'Class' not in frame:
+        raise ValueError('UCI Dry Bean rows, feature schema, or target changed')
+    target = frame['Class'].map(lambda value: value.decode('utf-8') if isinstance(value, bytes) else str(value))
+    details = {'id': '602', 'version': '1', 'name': 'Dry_Bean_Dataset', 'provider': 'UCI',
+               'url': url, 'original_data_url': 'https://archive.ics.uci.edu/dataset/602/dry+',
+               'default_target_attribute': 'Class', 'source_archive_sha256': checksum,
+               'source_archive_path': str(source_path), 'source_format': 'ARFF',
+               'parser': 'scipy.io.arff.loadarff; UTF-8 target decoding',
+               'version_definition': 'original single-target source snapshot identified by retained archive SHA-256'}
+    return SimpleNamespace(data=frame.drop(columns=['Class']), target=target, details=details,
+                           target_names=['Class']), 'uci:602:Dry_Bean_Dataset'
 
 
 def compute_meta_features(
@@ -256,6 +299,10 @@ def compute_meta_features(
         meta["intrinsic_dimension"] = None
         meta['metafeature_status']['intrinsic_dimension']={'status':'error','reason':str(e)}
     
+    for field, value in list(meta.items()):
+        if isinstance(value, (float, np.floating)) and not np.isfinite(value):
+            meta[field] = None
+            meta['metafeature_status'][field] = {'status': 'nonfinite_unavailable', 'observed_value': str(value)}
     return meta
 
 
@@ -264,12 +311,12 @@ def download_openml_dataset(
     output_dir: str | Path,
     max_rows: int = DEFAULT_MAX_ROWS,
     random_state: int = 42,
-    *, data_id: int | None = None, version: int = 1,
+    *, data_id: int | None = None, version: int = 1, source_provider: str = 'OpenML',
 ) -> Path:
-    """Download one dataset from OpenML, downsample if needed, save as CSV and JSON metadata."""
+    """Download one declared source, retain the row policy, and save CSV/metadata."""
     print(f"Fetching {dataset_name}...")
-    if max_rows < 1:
-        raise ValueError('max_rows must be positive')
+    if not isinstance(max_rows, int) or not 1 <= max_rows <= DEFAULT_MAX_ROWS:
+        raise ValueError('max_rows must be between 1 and the hard limit of 100000')
     output_path = Path(output_dir) / f"{dataset_name}.csv"
     meta_path = Path(output_dir) / f"{dataset_name}_meta.json"
     if output_path.exists():
@@ -278,6 +325,8 @@ def download_openml_dataset(
             source=previous.get('source_provenance',{})
             saved=previous.get('dataset_identity')
             row_selection=previous.get('row_selection',{})
+            if source.get('provider') != source_provider:
+                raise ValueError('Existing dataset has a different source provider; preserve it at a versioned path')
             if not source.get('data_id') or not source.get('version') or not source.get('original_source_frame_fingerprint') or not saved or not previous.get('target_column') or row_selection.get('policy') != 'pandas_sample_without_replacement_if_over_cap_v1':
                 raise ValueError('Existing dataset has incomplete source/target/row identity; preserved without certification')
             if data_id is not None and str(source.get('data_id')) != str(data_id):
@@ -288,8 +337,16 @@ def download_openml_dataset(
                 raise ValueError('Existing dataset bytes do not match recorded provenance')
         else:
             raise ValueError('Existing dataset lacks source metadata; preserved without reacquisition')
+        load_csv_dataset(output_path)
         return output_path
-    dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name,data_id=data_id,version=version)
+    if source_provider == 'UCI':
+        if dataset_name != 'dry-bean-dataset':
+            raise ValueError('Only the explicitly declared UCI Dry Bean source is supported')
+        dataset, _resolved_name = _fetch_uci_dry_bean(data_id=data_id, version=version)
+    elif source_provider == 'OpenML':
+        dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name,data_id=data_id,version=version)
+    else:
+        raise ValueError('Unsupported declared dataset provider: ' + source_provider)
     print(f"Fetched {dataset_name}. Processing X/y...")
 
     x = dataset.data
@@ -354,11 +411,11 @@ def download_openml_dataset(
     
     capped_counts=combined[target_column].value_counts(dropna=False).to_dict()
     missing_classes=set(map(str,original_counts))-set(map(str,capped_counts))
-    meta_features.update(source_provenance={'provider':'OpenML','data_id':str(details['id']),'version':str(details['version']),
+    meta_features.update(source_provenance={'provider':source_provider,'data_id':str(details['id']),'version':str(details['version']),
         'resolved_request':_resolved_name,'details':details,'target_names':list(getattr(dataset,'target_names',[]) or []),
         'original_source_frame_fingerprint':fingerprint({'columns':list(features.columns),'dtypes':list(map(str,features.dtypes)),
             'hashes':pd.util.hash_pandas_object(features,index=True).astype(str).tolist(),'target_hashes':pd.util.hash_pandas_object(pd.Series(y),index=True).astype(str).tolist()}),
-        'raw_download_bytes_status':'provider details/checksum retained; sklearn does not expose raw response bytes'},
+        'raw_download_bytes_status':('source archive retained with SHA-256' if source_provider == 'UCI' else 'provider details/checksum retained; sklearn does not expose raw response bytes')},
         row_selection={'policy':'pandas_sample_without_replacement_if_over_cap_v1','max_rows':max_rows,'random_state':random_state,
             'source_rows':source_rows,'selected_source_positions':selected_rows.tolist()},target_column=target_column,
         split_feasibility={'n_splits':5,'status':'infeasible_capped_population' if missing_classes or min(capped_counts.values(),default=0) < 5 else 'class_counts_feasible',
@@ -393,7 +450,8 @@ def download_datasets_from_list(
     for item in declared:
         name=item['name'] if isinstance(item,dict) else item
         if name not in dataset_names:continue
-        request={'name':name,'data_id':item.get('data_id') if isinstance(item,dict) else None,'version':int(item.get('version',1)) if isinstance(item,dict) else 1}
+        request={'name':name,'data_id':item.get('data_id') if isinstance(item,dict) else None,'version':int(item.get('version',1)) if isinstance(item,dict) else 1,
+                 'provider':item.get('provider','OpenML') if isinstance(item,dict) else 'OpenML'}
         if name in requests and requests[name]!=request:
             raise ValueError('Conflicting exact acquisition requests for '+name)
         requests[name]=request
@@ -410,6 +468,7 @@ def download_datasets_from_list(
                 random_state=random_state,
                 data_id=requests.get(dataset_name,{}).get('data_id'),
                 version=int(requests.get(dataset_name,{}).get('version',1)),
+                source_provider=requests.get(dataset_name,{}).get('provider','OpenML'),
             )
             print(f"  -> Saved to {saved_paths[dataset_name]}")
         except Exception as e:
@@ -425,7 +484,11 @@ def load_csv_dataset(file_path: str | Path) -> pd.DataFrame:
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found: {path}")
-    return pd.read_csv(path)
+    # Bound the read too: an oversized/manual CSV must never enter preparation.
+    frame = pd.read_csv(path, nrows=DEFAULT_MAX_ROWS + 1)
+    if len(frame) > DEFAULT_MAX_ROWS:
+        raise ValueError('Dataset exceeds the 100000-row hard limit; reacquire a declared random sample at a versioned path')
+    return frame
 
 if __name__ == "__main__":
     import argparse

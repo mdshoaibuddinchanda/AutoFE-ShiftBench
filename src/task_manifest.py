@@ -68,6 +68,9 @@ class ExecutionConfig:
     stop_after_tasks: int | None = None
     stale_after_seconds: float = 3600.0
     graceful_stop: bool = True
+    cache_policy: str = 'retain'
+    cache_max_bytes: int = 100 * 1024**3
+    min_free_bytes: int = 50 * 1024**3
 
     def __post_init__(self) -> None:
         if self.max_workers < 1 or self.max_attempts < 1:
@@ -84,6 +87,10 @@ class ExecutionConfig:
             raise ValueError("stop_after_tasks must be positive")
         if self.stale_after_seconds <= 0:
             raise ValueError("stale_after_seconds must be positive")
+        if self.cache_policy not in ('retain', 'rolling'):
+            raise ValueError('cache_policy must be retain or rolling')
+        if self.cache_max_bytes < 1 or self.min_free_bytes < 0:
+            raise ValueError('Cache capacity must be positive and free-space reserve nonnegative')
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -341,8 +348,31 @@ class ManifestStore:
                     payload_json TEXT NOT NULL, result_ref TEXT, durable_at TEXT NOT NULL,
                     PRIMARY KEY(run_id,scientific_task_id,attempt_id)
                 );
+                CREATE TABLE IF NOT EXISTS task_dependencies (
+                    run_id TEXT NOT NULL, scientific_task_id TEXT NOT NULL,
+                    dependency_id TEXT NOT NULL,
+                    PRIMARY KEY(run_id, dependency_id, scientific_task_id)
+                );
+                CREATE TABLE IF NOT EXISTS ledger_exports (
+                    run_id TEXT NOT NULL, scientific_task_id TEXT NOT NULL,
+                    attempt_id TEXT NOT NULL, payload_hash TEXT NOT NULL,
+                    ledger_path TEXT NOT NULL, byte_offset INTEGER NOT NULL,
+                    byte_length INTEGER NOT NULL,
+                    PRIMARY KEY(run_id, scientific_task_id)
+                );
+                CREATE TABLE IF NOT EXISTS cache_evictions (
+                    run_id TEXT NOT NULL, unit_id TEXT NOT NULL,
+                    state TEXT NOT NULL, receipt_json TEXT NOT NULL,
+                    receipt_path TEXT NOT NULL, receipt_sha256 TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(run_id, unit_id)
+                );
                 """
             )
+            # One-time migration of legacy manifests; workers never initialize.
+            connection.execute("""INSERT OR IGNORE INTO task_dependencies
+                SELECT t.run_id,t.scientific_task_id,j.value FROM tasks t,
+                json_each(t.payload_json,'$.depends_on') j""")
 
     def _event(self,connection,run_id,task_id,state,attempt_id=None,reason=None):
         cursor=connection.execute("INSERT INTO task_events (run_id,scientific_task_id,state,attempt_id,outcome_reason,recorded_at) VALUES (?,?,?,?,?,?)",(run_id,task_id,state,attempt_id,reason,_now()))
@@ -378,6 +408,8 @@ class ManifestStore:
                     (run_id, task_id, record.get("task_kind", "model"), record.get("stage", "model"), _canonical(record), state, record.get("planned_skip_reason"), record.get("planned_skip_reason"), record.get("checkpoint_identity"), now, now),
                 )
                 self._event(connection,run_id,task_id,state,reason=record.get("planned_skip_reason"))
+                connection.executemany('INSERT OR IGNORE INTO task_dependencies VALUES (?,?,?)',
+                    [(run_id, task_id, str(dep)) for dep in record.get('depends_on', [])])
         target = Path(manifest_path or self.manifest_path) if (manifest_path or self.manifest_path) else None
         if target is not None and not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -425,18 +457,77 @@ class ManifestStore:
             raise ManifestError(f"Unknown task: {task_id}")
         return json.loads(task["payload_json"])
 
-    def ready_tasks(self,run_id: str,*,limit=64):
+    def ready_tasks(self,run_id: str,*,limit=64,unit_id=None):
         """Bounded indexed query; a missing dependency is not ready."""
         with self._connect() as connection:
             for stage in ('model','precompute'):
-                rows=connection.execute("""SELECT t.payload_json,t.attempt_count FROM tasks t
+                scope = '' if unit_id is None else " AND t.scientific_task_id IN (SELECT ? UNION ALL SELECT scientific_task_id FROM task_dependencies WHERE run_id=? AND dependency_id=?)"
+                parameters = [run_id, stage] + ([] if unit_id is None else [unit_id, run_id, unit_id]) + [limit]
+                table = 'tasks t' if unit_id is None else 'tasks t INDEXED BY sqlite_autoindex_tasks_1'
+                rows=connection.execute("""SELECT t.payload_json,t.attempt_count FROM """ + table + """
                     WHERE t.run_id=? AND t.state='pending' AND t.stage=? AND NOT EXISTS
                     (SELECT 1 FROM json_each(t.payload_json,'$.depends_on') dep LEFT JOIN tasks parent
                      ON parent.run_id=t.run_id AND parent.scientific_task_id=dep.value
-                     WHERE parent.state IS NULL OR parent.state != 'completed') LIMIT ?""",(run_id,stage,limit)).fetchall()
+                     WHERE parent.state IS NULL OR parent.state != 'completed')""" + scope + ' LIMIT ?',parameters).fetchall()
                 if rows:
                     return [{**json.loads(row['payload_json']),'attempt_count':row['attempt_count']} for row in rows]
         return []
+
+    def preparation_units(self, run_id):
+        with self._connect() as connection:
+            return [dict(row) for row in connection.execute("SELECT scientific_task_id,state,payload_json FROM tasks WHERE run_id=? AND stage='precompute' ORDER BY rowid", (run_id,))]
+
+    def unit_snapshot(self, run_id, unit_id):
+        with self._connect() as connection:
+            connection.execute('BEGIN')
+            rows = connection.execute("""SELECT t.*,r.attempt_id AS result_attempt_id,
+                r.payload_hash,r.payload_json AS result_json,a.state AS result_attempt_state,
+                e.ledger_path,e.byte_offset,e.byte_length,e.payload_hash AS export_hash
+                FROM tasks t INDEXED BY sqlite_autoindex_tasks_1 LEFT JOIN durable_results r ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id
+                LEFT JOIN attempts a ON a.run_id=r.run_id AND a.attempt_id=r.attempt_id
+                LEFT JOIN ledger_exports e ON e.run_id=t.run_id AND e.scientific_task_id=t.scientific_task_id
+                WHERE t.run_id=? AND t.scientific_task_id IN
+                (SELECT ? UNION ALL SELECT scientific_task_id FROM task_dependencies WHERE run_id=? AND dependency_id=?)""",
+                (run_id, unit_id, run_id, unit_id)).fetchall()
+            return [dict(row) for row in rows]
+
+    def note_ledger_export(self, run_id, task_id, attempt_id, payload_hash, ledger, offset, length):
+        with self._connect() as connection:
+            row = connection.execute('SELECT attempt_id,payload_hash FROM durable_results WHERE run_id=? AND scientific_task_id=?', (run_id, task_id)).fetchone()
+            if row is None or row['attempt_id'] != attempt_id or row['payload_hash'] != payload_hash:
+                raise ManifestConflictError('Export does not match the authoritative result')
+            connection.execute('INSERT OR REPLACE INTO ledger_exports VALUES (?,?,?,?,?,?,?)',
+                (run_id, task_id, attempt_id, payload_hash, str(Path(ledger).resolve()), offset, length))
+
+    def index_ledger_exports(self, run_id, ledger):
+        """Called once by the ready writer after its startup export, never per batch."""
+        import hashlib
+        with self._connect() as connection, Path(ledger).open('rb') as source:
+            connection.execute('DELETE FROM ledger_exports WHERE run_id=?', (run_id,))
+            while True:
+                offset = source.tell()
+                line = source.readline()
+                if not line: break
+                if not line.strip(): continue
+                payload = json.loads(line)
+                if payload.get('run_id') != run_id: continue
+                task_id = payload['scientific_task_id']
+                digest = hashlib.sha256(_canonical(payload).encode()).hexdigest()
+                row = connection.execute('SELECT attempt_id,payload_hash FROM durable_results WHERE run_id=? AND scientific_task_id=?', (run_id, task_id)).fetchone()
+                if row is None or row['attempt_id'] != payload['attempt_id'] or row['payload_hash'] != digest:
+                    raise ManifestConflictError('Export index cannot certify conflicting results')
+                connection.execute('INSERT INTO ledger_exports VALUES (?,?,?,?,?,?,?)',
+                    (run_id, task_id, row['attempt_id'], digest, str(Path(ledger).resolve()), offset, len(line)))
+
+    def cache_eviction(self, run_id, unit_id):
+        with self._connect() as connection:
+            row = connection.execute('SELECT * FROM cache_evictions WHERE run_id=? AND unit_id=?', (run_id, unit_id)).fetchone()
+            return None if row is None else dict(row)
+
+    def record_cache_eviction(self, run_id, unit_id, state, receipt, path):
+        with self._connect() as connection:
+            connection.execute('INSERT OR REPLACE INTO cache_evictions VALUES (?,?,?,?,?,?,?)',
+                (run_id, unit_id, state, _canonical(receipt), str(Path(path).resolve()), file_sha256(path), _now()))
 
     def durable_payload(self,run_id,task_id):
         with self._connect() as connection:
@@ -498,7 +589,11 @@ class ManifestStore:
             except sqlite3.OperationalError:
                 events=[]
                 superseded=[]
-        return {
+            try:
+                evictions = [dict(row) for row in connection.execute('SELECT * FROM cache_evictions WHERE run_id=? ORDER BY unit_id', (run_id,))]
+            except sqlite3.OperationalError:
+                evictions = []
+        value = {
             "captured_at": captured_at,
             "run": dict(run),
             "tasks": [dict(row) for row in tasks],
@@ -507,6 +602,9 @@ class ManifestStore:
             "task_events":[dict(row) for row in events],
             "superseded_results":[dict(row) for row in superseded],
         }
+        if evictions:
+            value['cache_evictions'] = evictions
+        return value
 
     def claim_task(self, run_id: str, task_id: str, *, worker_id: str = "unknown", timeout_seconds: float | None = None) -> str | None:
         now = _now()

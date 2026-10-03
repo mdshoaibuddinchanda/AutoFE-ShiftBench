@@ -20,7 +20,7 @@ The Windows launcher forwards runner arguments through P12. It does not install 
 
 For an explicitly selected local-data pilot, remove `--dry-run-manifest` and set `--stop-after-tasks`, `--task-timeout-seconds` and `--run-wall-time-seconds`. Inspect `python -m src.pipeline_runner --help` in P12 for supported controls. `python main.py` delegates to this same runner without acquisition. No full benchmark is claimed by this repair record.
 
-Acquisition is a separate explicit selection:
+Acquisition is a separate explicit selection. Benchmark CSVs have a hard **100,000-row maximum**. Larger source populations use the existing uniform pandas sample without replacement with seed 42; smaller sources keep all rows. Oversized manually supplied CSVs are rejected without editing them. Provider downloads may contain the original population before the local sample is selected:
 
 ```powershell
 conda run -n P12 python -m src.data_loader --datasets haberman
@@ -34,7 +34,23 @@ The SQLite manifest owns task membership, transactional claims, attempts and res
 
 Healthy CPU workers handle up to eight tasks and retire after 64 MiB of retained RSS growth; both limits are configurable. GPU workers retire after each task. CPU models use verified read-only selected numeric inputs. Native BLAS/OpenMP limits remain those of the corrected reference: reducing them changed Logistic Regression probabilities in the production comparison. Estimator `n_jobs=1` alone does not limit all native threads.
 
-Split, feature, history and diagnostic publication uses locks, hashes and atomic replacement. Model workers load their requested prepared pipeline and never regenerate diagnostics. A missing required artifact reopens its precompute dependency for one bounded exact repair; prior result evidence remains archived. Caches needed for resume and evidence referenced by committed results are retained. File counts alone are not completion proof.
+Split, feature, history and diagnostic publication uses locks, hashes and atomic replacement. Model workers load their requested prepared pipeline and never regenerate diagnostics. A missing required artifact reopens its precompute dependency for one bounded exact repair; prior result evidence remains archived. File counts alone are not completion proof.
+
+### Rolling cache for a 500 GB drive
+
+The production CLI defaults to `--cache-policy rolling`. It prepares one dataset/seed/fold/condition unit, executes all its declared pipeline/model tasks with the configured worker count, and closes those worker processes before admitting the next unit. Task deadlines, stop requests, failed models, missing results or failed checks retain the unfinished unit's inputs.
+
+Eviction requires completed task and attempt ownership, successful defined metrics (or explicitly undefined metrics), matching scientific identities, authoritative SQLite result hashes, fsynced JSONL export acknowledgements, a read-back comparison of every exported result, verified preparation/input hashes, retained diagnostic evidence, and confirmed worker/descendant exit. Windows exclusively opens every disposable file with no sharing, verifies its bytes through the handle, and sets deletion disposition only after all checks pass. A sharing violation or mapped view blocks cleanup; partial deletion intent is recorded for recovery. No directory tree is recursively removed.
+
+Only selected train/test DataFrame pickles and their derived float32 numeric arrays are removed. Raw datasets, fitted preprocessing, splits, descriptors, metadata, selection histories, diagnostics, results, progress, tables and figures are retained. Receipts under the manifest directory's `cache_lifecycle/` folder distinguish verified historical input hashes from currently available input files. Completed resume does not regenerate intentionally evicted matrices; a new run can rebuild them only with exact scientific hash agreement. The current runner does not save fitted classifier model binaries.
+
+```powershell
+.\setup_and_run.bat --cache-policy rolling --cache-max-gib 100 --min-free-gib 50 --max-workers 2 --enable-fsva-diagnostics
+```
+
+This command runs the configured benchmark; it is not a cache-only command. `--cache-max-gib` bounds admission of new units using the disposable matrix footprint; retained evidence is governed by the free-space reserve. Disk checks stop dispatch and preserve partial artifacts, rather than reducing data or silently evicting unfinished work. A unit in progress and atomic temporary writes can exceed the admission threshold. `--cache-policy retain` preserves every input. Concurrent production coordinators sharing a cache namespace are rejected by an OS lease. Worker PID and creation-time registrations are persisted before commands are dispatched; surviving workers from a crashed coordinator block another run until they exit.
+
+The storage probe's stopped cache-only run and its files remain preserved. The 100,000-row KDDCup99 sample still has a one-row class and cannot satisfy stratified five-fold CV; rolling storage does not alter that scientific limitation.
 
 ```powershell
 conda run -n P12 python -m src.check_progress

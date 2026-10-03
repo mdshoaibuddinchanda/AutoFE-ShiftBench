@@ -14,7 +14,7 @@ from src.task_manifest import ManifestError,ManifestStore
 
 def snapshot_digest(snapshot):
     from src.provenance import canonical_sha256
-    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events","superseded_results") if key in snapshot})
+    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events","superseded_results","cache_evictions") if key in snapshot})
 
 
 def _resolve(path,root):
@@ -54,6 +54,12 @@ def actual_lineage(snapshot,inventory,root,*,_hash_file=None):
     nodes,edges={},[]
     unknown=[]
     hashes=_FileHashes() if _hash_file is None else _hash_file
+    from src.cache_lifecycle import snapshot_eviction_evidence
+    try:
+        evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
+    except (OSError, ValueError, RuntimeError, KeyError) as error:
+        evicted = {}
+        unknown.append({'reason': 'cache_eviction_evidence_invalid', 'detail': str(error)})
     if snapshot is not None:
         results={r["scientific_task_id"]:r for r in snapshot["durable_results"]}
         task_ids={r["scientific_task_id"] for r in snapshot["tasks"]}
@@ -94,9 +100,13 @@ def actual_lineage(snapshot,inventory,root,*,_hash_file=None):
                         valid=hashes(_resolve(artifact['path'],root)) == artifact['sha256']
                     except (OSError,KeyError):
                         valid=False
-                    if not valid:
+                    proof = evicted.get((_resolve(artifact.get('path',''),root).resolve(), artifact.get('sha256')))
+                    intentionally_evicted = not _resolve(artifact.get('path',''), root).exists() and proof is not None
+                    if intentionally_evicted:
+                        nodes[aid].update(availability='intentionally_evicted', historical_verification=proof)
+                    if not valid and not intentionally_evicted:
                         unknown.append({'task_id':task_id,'artifact':artifact.get('path'),'reason':'executed_artifact_missing_or_hash_mismatch'})
-                    edges.append({"from":aid,"to":task_id,"relationship":"verified_executed_input" if valid else 'recorded_input_unverified'})
+                    edges.append({"from":aid,"to":task_id,"relationship":"verified_executed_input" if valid else ('verified_input_before_eviction' if intentionally_evicted else 'recorded_input_unverified')})
                     artifact_ids[artifact.get('role')]=aid
                     pipeline_artifacts.setdefault(artifact.get('pipeline'),{})[artifact.get('role')]=aid
                 common=pipeline_artifacts.get(None,{})
@@ -177,6 +187,8 @@ def build_package(*,output_dir,repo_root=".",dataset_list_path="config/dataset_l
     for dataset in registry["datasets"]:
         inventory.append(p._artifact(root/dataset["path"],root,"dataset_bytes",required=False,expected_sha256=dataset.get("sha256"),hash_file=hashes))
     scoped={}
+    from src.cache_lifecycle import snapshot_eviction_evidence
+    evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
     if snapshot:
         for row in snapshot["durable_results"]:
             payload=json.loads(row["payload_json"])
@@ -186,6 +198,11 @@ def build_package(*,output_dir,repo_root=".",dataset_list_path="config/dataset_l
                     key=(path.resolve(),item.get('role','dependency_artifact'),item.get('sha256'),item.get('dependency_signature'))
                     if key in scoped:continue
                     entry=p._artifact(path,root,item.get("role","dependency_artifact"),required=True,expected_sha256=item.get("sha256"),hash_file=hashes)
+                    proof = evicted.get((path.resolve(), item.get('sha256')))
+                    if not path.exists() and proof:
+                        entry.update(status='intentionally_evicted', sha256=item['sha256'],
+                            expected_sha256=item['sha256'], identity_kind='verified_eviction_receipt',
+                            historical_verification=proof)
                     entry["dependency_signature"]=item.get("dependency_signature")
                     scoped[key]=entry
     inventory.extend(scoped.values())
@@ -338,6 +355,12 @@ def verify(*,repo_root=".",dataset_list_path="config/dataset_list.yaml",manifest
             inventory=components.get("artifact_inventory.json",{})
             if not inventory.get("artifacts"):
                 check("required_artifact_inventory","invalid")
+            from src.cache_lifecycle import snapshot_eviction_evidence
+            try:
+                package_evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
+            except (OSError, ValueError, RuntimeError, KeyError) as error:
+                package_evicted = {}
+                check('cache_eviction_receipts', 'invalid', detail=str(error))
             for item in inventory.get("artifacts",[]):
                 if item.get("identity_kind") == "scientific_snapshot":
                     check("manifest_inventory_identity","valid" if snapshot is not None and item.get("snapshot_sha256") == snapshot_digest(snapshot) else "incomplete")
@@ -346,6 +369,14 @@ def verify(*,repo_root=".",dataset_list_path="config/dataset_list.yaml",manifest
                     check("external_artifact:"+item["path"],"unverified",reason="explicit_location_mapping_required")
                     continue
                 path=root/item["path"]
+                if item.get('identity_kind') == 'verified_eviction_receipt' and not path.exists():
+                    try:
+                        proof = package_evicted.get((path.resolve(), item.get('sha256')))
+                        check('artifact:'+item['path'], 'valid' if proof and proof == item.get('historical_verification') else 'invalid',
+                              availability='intentionally_evicted', verification='hashes verified before deletion; receipt and retained evidence verified now')
+                    except (OSError, ValueError, RuntimeError, KeyError) as error:
+                        check('artifact:'+item['path'], 'invalid', detail=str(error))
+                    continue
                 if not path.is_file():
                     check("artifact:"+item["path"],"incomplete" if item.get("required") else "unverified")
                 elif not item.get("sha256") or hashes(path) != item["sha256"] or item.get('expected_sha256',item['sha256']) != item['sha256']:

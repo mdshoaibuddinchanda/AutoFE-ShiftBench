@@ -33,11 +33,29 @@ def file_sha256(path, *, check_cancel=None) -> str:
 
 def array_identity(values) -> dict:
     values = np.asarray(values)
+    encoding = None
     if values.dtype.hasobject:
-        content = fingerprint(values.tolist())
+        material = values.tolist()
+        try:
+            content = fingerprint(material)
+        except ValueError:
+            # Mixed categorical/numeric CSV frames can contain nonfinite floats.
+            # Preserve successful historical JSON identities; use tagged scalar
+            # bytes only for the previously unsupported nonfinite object case.
+            def encode(item):
+                if isinstance(item, list):
+                    return [encode(value) for value in item]
+                if isinstance(item, float) and not np.isfinite(item):
+                    return {'float64_bits': np.asarray(item, dtype='<f8').tobytes().hex()}
+                return {'json_value': item}
+            encoding = 'object_nonfinite_float64_bits_v1'
+            content = fingerprint({'encoding': encoding, 'values': encode(material)})
     else:
         content = hashlib.sha256(np.ascontiguousarray(values).tobytes()).hexdigest()
-    return {"dtype": str(values.dtype), "shape": list(values.shape), "sha256": content}
+    identity = {"dtype": str(values.dtype), "shape": list(values.shape), "sha256": content}
+    if encoding is not None:
+        identity['encoding'] = encoding
+    return identity
 
 
 def frame_identity(frame: pd.DataFrame) -> dict:

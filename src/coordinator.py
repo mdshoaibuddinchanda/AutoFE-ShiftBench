@@ -8,7 +8,7 @@ import psutil
 from collections import deque
 from src.task_manifest import ManifestStore
 
-SCHEDULER_VERSION='dependency_ready_reusable_supervised_attempts_v2'
+SCHEDULER_VERSION='dependency_ready_verified_rolling_v3'
 
 
 def task_entry(task,queue):
@@ -35,7 +35,8 @@ def worker_service(commands,control,results,entry,max_tasks,rss_growth):
         if baseline is None:baseline=rss
         recycle=index+1>=max_tasks or rss-baseline>rss_growth or task.get('model') in ('xgboost','catboost')
         control.put({'scientific_task_id':task['scientific_task_id'],'attempt_id':task['attempt_id'],
-            'pid':os.getpid(),'rss_bytes':rss,'baseline_rss_bytes':baseline,'tasks_executed':index+1,'recycle':recycle})
+            'pid':os.getpid(),'rss_bytes':rss,'baseline_rss_bytes':baseline,'tasks_executed':index+1,'recycle':recycle,
+            'descendants':[{'pid':child.pid,'create_time':child.create_time()} for child in psutil.Process().children(recursive=True)]})
         if recycle:return
 
 
@@ -48,8 +49,35 @@ def final_status(counts,*,stopped=False,writer_failed=False):
 
 
 def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,entry=task_entry,writer_target=None):
+    from src.artifact_integrity import artifact_lock
+    from src.protocol import cache_root
+    # All production coordinators, including retain mode, take this lease.
+    # A second benchmark cannot open or regenerate shared cache files during
+    # another run's deletion barrier. OS ownership dies with the coordinator.
+    with artifact_lock(cache_root() / '.coordinator.lock', timeout_seconds=1):
+        from src.cache_lifecycle import verify_registered_workers
+        verify_registered_workers(cache_root())
+        return _execute_manifest(store, run_id, ledger, config,
+            stop_requested=stop_requested, entry=entry, writer_target=writer_target)
+
+
+def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_target):
     from src.pipeline_runner import writer_process,_record_manifest_failure
     from src.prepared_inputs import verify_unit
+    from src.protocol import cache_root
+    from src.cache_lifecycle import (CacheCheckFailed, CacheNotReady, cache_bytes, capacity_problem,
+        completed_unit_rows, evict_unit, verify_eviction, register_worker, POLICY_VERSION)
+    rolling = config.cache_policy == 'rolling'
+    root = cache_root().resolve()
+    cache_stop_reason = None
+    evictions = []
+    units = store.preparation_units(run_id) if rolling else []
+    unit_cursor = 0
+    current_unit = None
+    unit_processes = {}
+    measured_cache = cache_bytes(root) if rolling else None
+    last_capacity_check = time.monotonic()
+    export_wait_started = None
     repair_descriptors={}
     import json
     started=time.monotonic()
@@ -62,6 +90,10 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             check_cancel()
             descriptor=json.loads(row['payload_json']).get('prepared_descriptor')
             if descriptor is None: continue # controlled/legacy evidence remains explicitly unverified
+            receipt = store.cache_eviction(run_id, row['scientific_task_id'])
+            if receipt and receipt['state'] in ('intent', 'completed'):
+                verify_eviction(store, run_id, row['scientific_task_id'], allow_intent=True)
+                continue # Intentional eviction is not corruption or an exact-repair attempt.
             try:
                 verify_unit(descriptor,check_cancel=check_cancel)
             except (OSError,ValueError,KeyError) as error:
@@ -100,8 +132,30 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
     def dispose(process):
         if process.is_alive():process.terminate()
         process.join(5)
+        if process.is_alive():
+            process.kill()
+            process.join(5)
+        if process.is_alive():
+            raise CacheCheckFailed('Worker did not exit; no cleanup permitted')
         workers.pop(process.pid,None)
         process.close()
+
+    def release_idle_workers():
+        for worker in list(workers.values()):
+            process = worker['process']
+            if not worker['idle']:
+                raise CacheCheckFailed('Active worker at deletion barrier')
+            if process.is_alive():
+                for child in psutil.Process(process.pid).children(recursive=True):
+                    owner = register_worker(root, child, run_id=run_id, unit_id=current_unit)
+                    unit_processes[(child.pid, owner['create_time'])] = owner
+                worker['commands'].put(None)
+                process.join(10)
+            if process.is_alive():
+                # Do not use termination as proof that a healthy unit is safe.
+                raise CacheCheckFailed('Worker failed graceful release; cache retained')
+            workers.pop(process.pid, None)
+            process.close()
     dispatched=0
     stopped=False
     writer_failed=False
@@ -118,6 +172,16 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             if not writer_ready.is_set():
                 time.sleep(.02)
                 continue # no model deadlines start while initial export is recovering
+            if rolling:
+                now_check = time.monotonic()
+                if now_check - last_capacity_check >= 10:
+                    measured_cache = cache_bytes(root)
+                    last_capacity_check = now_check
+                problem = capacity_problem(root, config, measured_bytes=None)
+                if problem:
+                    cache_stop_reason = problem
+                    stopped = True
+                    break
             while True:
                 try:message=control.get_nowait()
                 except queue_module.Empty:break
@@ -125,6 +189,9 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                 if tid in active and active[tid][0].pid==message['pid'] and active[tid][1]['attempt_id']==message['attempt_id']:
                     acknowledged[tid]=message
                     resource_samples.append(message)
+                    for child in message.get('descendants', []):
+                        unit_processes[(child['pid'], child['create_time'])] = child
+                        register_worker(root, child, run_id=run_id, unit_id=current_unit)
             states=store.task_states(run_id,active)
             for task_id,(process,task,launched,exited_at) in list(active.items()):
                 state={'state':states[task_id]}
@@ -157,12 +224,60 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             budget_reached=config.stop_after_tasks is not None and dispatched >= config.stop_after_tasks
             for worker in list(workers.values()):
                 if worker['idle'] and not worker['process'].is_alive():dispose(worker['process'])
+            if rolling and not active:
+                if current_unit is not None:
+                    snapshot = store.unit_snapshot(run_id, current_unit)
+                    if any(row['state'] in ('failed', 'timeout', 'skipped') for row in snapshot):
+                        cache_stop_reason = 'Unit has failed, timed-out, or skipped work; cache retained'
+                        stopped = True
+                        break
+                    if all(row['state'] == 'completed' for row in snapshot):
+                        try:
+                            completed_unit_rows(store, run_id, current_unit)
+                        except CacheNotReady:
+                            if export_wait_started is None: export_wait_started = time.monotonic()
+                            if time.monotonic() - export_wait_started > 30:
+                                raise CacheCheckFailed('Writer did not confirm saved results within 30 seconds; cache retained')
+                            time.sleep(.02)
+                            continue
+                        export_wait_started = None
+                        release_idle_workers()
+                        evictions.append(evict_unit(store, run_id, current_unit, ledger, root,
+                            exited_processes=list(unit_processes.values())))
+                        current_unit = None
+                        unit_processes.clear()
+                        measured_cache = cache_bytes(root)
+                if current_unit is None and not budget_reached:
+                    while unit_cursor < len(units):
+                        candidate = units[unit_cursor]['scientific_task_id']
+                        unit_cursor += 1
+                        task = store.get_task(run_id, candidate)
+                        if task['planned_skip_reason']:
+                            continue
+                        receipt = store.cache_eviction(run_id, candidate)
+                        if receipt and receipt['state'] == 'completed':
+                            verify_eviction(store, run_id, candidate)
+                            continue
+                        snapshot = store.unit_snapshot(run_id, candidate)
+                        if any(row['state'] in ('failed', 'timeout', 'skipped') for row in snapshot):
+                            cache_stop_reason = 'Unfinished/failed unit needs recovery; no cache deleted'
+                            stopped = True
+                            break
+                        problem = capacity_problem(root, config, measured_bytes=measured_cache)
+                        if problem:
+                            cache_stop_reason = problem
+                            stopped = True
+                            break
+                        current_unit = candidate
+                        break
+                    if stopped: break
+                    if current_unit is None: break
             if budget_reached and not active:
                 stopped=True
                 break
             if not budget_reached and len(active) < config.max_workers and psutil.virtual_memory().percent < 85:
                 gpu_active=any(task['stage']=='model' and task.get('model') in ('xgboost','catboost') for _,task,_,_ in active.values())
-                for record in store.ready_tasks(run_id,limit=max(64,config.max_workers*2)):
+                for record in store.ready_tasks(run_id,limit=max(64,config.max_workers*2),unit_id=current_unit if rolling else None):
                     if len(active) >= config.max_workers: break
                     if record['scientific_task_id'] in active: continue
                     if record['stage'] == 'model' and config.stop_after_tasks is not None and dispatched >= config.stop_after_tasks: break
@@ -191,6 +306,10 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                             process.start()
                             idle={'process':process,'commands':commands,'idle':True}
                             workers[process.pid]=idle
+                            owner = register_worker(root, psutil.Process(process.pid), run_id=run_id, unit_id=current_unit)
+                            if rolling:
+                                created = owner['create_time']
+                                unit_processes[(process.pid, created)] = {'pid': process.pid, 'create_time': created}
                             spawned+=1
                         process=idle['process']
                         idle['idle']=False
@@ -204,12 +323,20 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                     gpu_active=gpu_active or gpu
             if not active:
                 counts=store.state_counts(run_id)
-                if not counts['pending'] or not store.ready_tasks(run_id,limit=1): break
+                if not counts['pending'] or not store.ready_tasks(run_id,limit=1,unit_id=current_unit if rolling else None):
+                    if rolling and current_unit is not None:
+                        # A newly completed unit must pass its barrier on the next loop.
+                        if all(row['state'] == 'completed' for row in store.unit_snapshot(run_id, current_unit)):
+                            continue
+                    break
                 if psutil.virtual_memory().percent >= 85:
                     # Resource backpressure cannot become an unbounded wait.
                     stopped=True
                     break
             time.sleep(.02)
+    except CacheCheckFailed as error:
+        cache_stop_reason = str(error)
+        stopped = True
     except BaseException:
         writer_failed=True
         raise
@@ -242,4 +369,5 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
         'model_attempts_dispatched_this_invocation':dispatched,'stop_limit_unit':'model attempt launches including retries',
         'workers_spawned':spawned,'workers_recycled':recycled,'worker_resource_samples':list(resource_samples),
         'run_deadline_policy':'hard during precompute/model; bounded cleanup/export follows',
-        'cache_retention_policy':'retain all resumable inputs and committed diagnostic evidence; no automatic eviction'}
+        'cache_retention_policy':POLICY_VERSION if rolling else 'retain all resumable inputs and committed diagnostic evidence; no automatic eviction',
+        'cache_evictions':evictions, 'cache_stop_reason':cache_stop_reason}

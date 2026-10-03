@@ -86,6 +86,10 @@ def publish_unit(path,prepared,*,input_artifacts=()):
                     regenerated=_model_arrays(path,unit['metadata'])
                     if regenerated!=unit['model_inputs']:
                         raise ValueError('Regenerated model arrays differ from the immutable descriptor')
+                # A later run can regenerate evicted matrices while its runtime
+                # timings differ. Restore the frozen metadata only after every
+                # regenerated scientific artifact matches the original hashes.
+                restore_metadata_after_exact_repair(previous)
                 return previous
         pipelines,train_y,test_y,encoder,metadata,_=prepared
         metadata=json.loads(json.dumps({name:{**{key:value for key,value in meta.items() if key != 'selection_history'},'dfs_cache_hit':False} for name,meta in metadata.items()},sort_keys=True))
@@ -135,7 +139,8 @@ def _load_pipeline(descriptor,pipeline,*,model_numeric=False,opened_arrays=None)
                     if str(array.dtype)!=spec['dtype'] or list(array.shape)!=spec['shape'] or bool(array.flags.f_contiguous and not array.flags.c_contiguous)!=spec['fortran_order']:
                         raise ValueError('Prepared numeric matrix dtype/order/shape mismatch')
             except BaseException:
-                for array in validated:array._mmap.close()
+                # The public load_pipeline owner closes every opened mapping,
+                # including failures after the second array or later diagnostics.
                 raise
         else:
             validated=validate_feature_cache(artifacts['train']['path'],artifacts['test']['path'],meta['metadata_path'],meta['dependency_signature'])
