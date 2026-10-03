@@ -116,9 +116,9 @@ def compute_meta_features(
     target: pd.Series,
     random_state: int = 42,
     dataset_identity: str = "unspecified",
-) -> dict[str, float]:
+) -> dict[str, object]:
     """Compute meta-features for dataset analysis."""
-    meta = {}
+    meta = {'metafeature_semantics_version':'dataset_metafeature_availability_v2','metafeature_status':{}}
     
     n_samples = len(features)
     n_features = features.shape[1]
@@ -226,9 +226,12 @@ def compute_meta_features(
         ami_scores = mutual_info_classif(f_numeric, t_encoded, discrete_features=discrete, random_state=mi_seed)
         meta['mi_semantics_version']='declared_discrete_provenance_v2'
         meta["average_mutual_information"] = float(np.mean(ami_scores))
+        if not np.isfinite(meta['average_mutual_information']):raise ValueError('Nonfinite mutual-information metafeature')
+        meta['metafeature_status']['average_mutual_information']={'status':'valid','sample_rows':sample_size,'selection_seed':sample_seed,'estimator_seed':mi_seed}
     except Exception as e:
         print(f"Skipping AMI: {e}")
-        meta["average_mutual_information"] = 0.0
+        meta["average_mutual_information"] = None
+        meta['metafeature_status']['average_mutual_information']={'status':'error','reason':str(e)}
 
     # Intrinsic Dimension (PCA 95% variance)
     try:
@@ -244,11 +247,14 @@ def compute_meta_features(
             pca = PCA(n_components=0.95, random_state=pca_seed)
             pca.fit(scaled_data)
             meta["intrinsic_dimension"] = float(pca.n_components_)
+            meta['metafeature_status']['intrinsic_dimension']={'status':'valid','definition':'PCA95percent_numeric_variance','estimator_seed':pca_seed}
         else:
             meta["intrinsic_dimension"] = 1.0
+            meta['metafeature_status']['intrinsic_dimension']={'status':'convention_single_or_no_numeric','definition':'historical_one_coordinate_convention'}
     except Exception as e:
         print(f"Skipping Intrinsic Dimension: {e}")
-        meta["intrinsic_dimension"] = 1.0
+        meta["intrinsic_dimension"] = None
+        meta['metafeature_status']['intrinsic_dimension']={'status':'error','reason':str(e)}
     
     return meta
 

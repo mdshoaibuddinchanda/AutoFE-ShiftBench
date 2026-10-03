@@ -85,3 +85,17 @@ def test_conflicting_duplicate_requests_rejected_before_acquisition(tmp_path,mon
     config=tmp_path/'datasets.yaml';config.write_text('datasets:\n - {name: a, data_id: 1}\n - {name: a, data_id: 2}\n')
     monkeypatch.setattr(loader,'download_openml_dataset',lambda *a,**k:pytest.fail('ambiguous request fetched'))
     with pytest.raises(ValueError,match='Conflicting exact'):loader.download_datasets_from_list(config,tmp_path,selected_datasets=['a'])
+
+
+def test_failed_metafeatures_are_missing_with_error_status(monkeypatch):
+    import sklearn.feature_selection
+    import sklearn.decomposition
+    def fail(*args,**kwargs):raise RuntimeError('injected metafeature failure')
+    monkeypatch.setattr(sklearn.feature_selection,'mutual_info_classif',fail)
+    monkeypatch.setattr(sklearn.decomposition,'PCA',fail)
+    frame=pd.DataFrame({'x':np.arange(10),'z':np.arange(10)**2})
+    meta=loader.compute_meta_features(frame,pd.Series(np.arange(10)%2))
+    for field in ('average_mutual_information','intrinsic_dimension'):
+        assert meta[field] is None
+        assert meta['metafeature_status'][field]['status']=='error'
+    assert meta['metafeature_semantics_version']=='dataset_metafeature_availability_v2'

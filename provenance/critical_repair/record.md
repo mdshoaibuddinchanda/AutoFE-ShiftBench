@@ -276,3 +276,7 @@ Exact sign enumeration now vectorizes binary codes in identical itertools produc
 ## Acquisition identity follow-up
 
 The corrected-reference source913285b still accepted an existing CSV with an empty metadata object. Controlled retained-source reproduction returned the path without source certification. Existing acquisition now requires recorded source ID/version/frame fingerprint, target, saved data fingerprint, exact row-selection policy/cap/seed. Conflicting same-name exact requests are rejected before acquisition. Existing bytes remain preserved, including unverified inputs. Seven acquisition controls pass within the32-test acquisition/sensitivity/provenance subset (18.99s). No real download was performed. Reproducer:acquisition_gap_reproducer.json.
+
+## Additional metafeature availability defect (M06)
+
+Final source inspection found acquisition metafeature exceptions returning measured-looking MI0.0 and PCA dimension1.0. Injected failures reproduced the defect:1regression failed before repair. Errors now yield missing values with explicit status/reason under dataset_metafeature_availability_v2; successful values,2000-row metadata sample, existing sampling seeds and PCA95percent settings are unchanged. The historical one-coordinate convention is explicitly labeled.11acquisition/runtime controls pass2.28s. Historical metadata is preserved; verification of dataset bytes does not certify old metafeature values. This correction affects metadata availability, not model tasks or performance equivalence.
