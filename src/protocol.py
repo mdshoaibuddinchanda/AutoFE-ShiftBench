@@ -1,6 +1,7 @@
 """Version identifiers for incompatible benchmark protocols and outputs."""
 
 from pathlib import Path
+import os
 
 from src.seeding import SEED_SCHEME_VERSION
 
@@ -13,7 +14,7 @@ EVALUATION_PROTOCOL_VERSION = "predictor_only_geometry_v3_integrity_metrics_fsva
 
 def cache_root() -> Path:
     """Return the cache namespace for the active evaluation protocol."""
-    return Path("data/cache") / EVALUATION_PROTOCOL_VERSION / SEED_SCHEME_VERSION
+    return Path(os.environ.get("AUTOFE_CACHE_BASE", "data/cache")) / EVALUATION_PROTOCOL_VERSION / SEED_SCHEME_VERSION
 
 
 def results_ledger_path() -> Path:

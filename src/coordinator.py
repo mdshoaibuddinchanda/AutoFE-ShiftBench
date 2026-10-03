@@ -57,8 +57,18 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
     with artifact_lock(cache_root() / '.coordinator.lock', timeout_seconds=1):
         from src.cache_lifecycle import verify_registered_workers
         verify_registered_workers(cache_root())
-        return _execute_manifest(store, run_id, ledger, config,
-            stop_requested=stop_requested, entry=entry, writer_target=writer_target)
+        import os
+        settings = {'AUTOFE_MIN_FREE_BYTES': str(config.min_free_bytes),
+                    'AUTOFE_DISK_WRITE_LOCK': str((cache_root() / '.disk-write.lock').resolve())}
+        previous = {key: os.environ.get(key) for key in settings}
+        os.environ.update(settings)
+        try:
+            return _execute_manifest(store, run_id, ledger, config,
+                stop_requested=stop_requested, entry=entry, writer_target=writer_target)
+        finally:
+            for key, value in previous.items():
+                if value is None: os.environ.pop(key, None)
+                else: os.environ[key] = value
 
 
 def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_target):
@@ -141,6 +151,8 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
         process.close()
 
     def release_idle_workers():
+        release_started=time.monotonic()
+        released_count=len(workers)
         for worker in list(workers.values()):
             process = worker['process']
             if not worker['idle']:
@@ -156,9 +168,12 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                 raise CacheCheckFailed('Worker failed graceful release; cache retained')
             workers.pop(process.pid, None)
             process.close()
+        from src.performance import event
+        event('worker_release',time.monotonic()-release_started,run_id=run_id,unit_id=current_unit,workers=released_count)
     dispatched=0
     stopped=False
     writer_failed=False
+    graceful_requested=False
     try:
         writer.start()
         while True:
@@ -166,9 +181,14 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
             if not writer.is_alive():
                 writer_failed=True
                 break
-            if stop_requested() or (deadline is not None and now >= deadline):
+            if deadline is not None and now >= deadline:
                 stopped=True
                 break # hard run deadline/signal; attempts stay explicitly recoverable
+            if stop_requested():
+                if not config.graceful_stop:
+                    stopped=True
+                    break
+                graceful_requested=True
             if not writer_ready.is_set():
                 time.sleep(.02)
                 continue # no model deadlines start while initial export is recovering
@@ -224,6 +244,9 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
             budget_reached=config.stop_after_tasks is not None and dispatched >= config.stop_after_tasks
             for worker in list(workers.values()):
                 if worker['idle'] and not worker['process'].is_alive():dispose(worker['process'])
+            if graceful_requested and not active:
+                stopped=True
+                break # retain unfinished unit; acknowledged results survive resume
             if rolling and not active:
                 if current_unit is not None:
                     snapshot = store.unit_snapshot(run_id, current_unit)
@@ -275,7 +298,7 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
             if budget_reached and not active:
                 stopped=True
                 break
-            if not budget_reached and len(active) < config.max_workers and psutil.virtual_memory().percent < 85:
+            if not budget_reached and not graceful_requested and len(active) < config.max_workers and psutil.virtual_memory().percent < 85:
                 gpu_active=any(task['stage']=='model' and task.get('model') in ('xgboost','catboost') for _,task,_,_ in active.values())
                 for record in store.ready_tasks(run_id,limit=max(64,config.max_workers*2),unit_id=current_unit if rolling else None):
                     if len(active) >= config.max_workers: break
@@ -289,7 +312,7 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                     from src.fsva import DEFAULT_PERTURBATION_MAGNITUDES
                     task={**record,'dataset_name':record['dataset'],'data_path':Path(record['data_path']),
                         'repair_descriptor':repair_descriptors.get(record['scientific_task_id']),
-                        'dense_budget_bytes':min(1024**3,int(psutil.virtual_memory().available*.4/config.max_workers)),
+                        'dense_budget_bytes':min(config.dense_budget_bytes,int(psutil.virtual_memory().available*.4/config.max_workers)),
                         'manifest_db':str(store.db_path),'run_id':run_id,'attempt_id':attempt,
                         'task_timeout_seconds':config.task_timeout_seconds,'retry':record['attempt_count']+1 < config.max_attempts,
                         'diagnostics_enabled':run_config.get('diagnostics_enabled',False),
@@ -303,7 +326,10 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                         if idle is None:
                             commands=manager.Queue(maxsize=1)
                             process=context.Process(target=worker_service,args=(commands,control,queue,entry,config.worker_max_tasks,config.worker_rss_growth_bytes))
+                            spawn_started=time.monotonic()
                             process.start()
+                            from src.performance import event
+                            event('worker_spawn_call',time.monotonic()-spawn_started,run_id=run_id,unit_id=current_unit,worker_pid=process.pid)
                             idle={'process':process,'commands':commands,'idle':True}
                             workers[process.pid]=idle
                             owner = register_worker(root, psutil.Process(process.pid), run_id=run_id, unit_id=current_unit)
@@ -363,11 +389,16 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
         manager.shutdown()
         # SQLite commits survive a failed export or writer. Reconstruct independently.
         store.export_durable_results(run_id,ledger)
-        status=final_status(store.state_counts(run_id),stopped=stopped,writer_failed=writer_failed)
+        final_counts=store.state_counts(run_id)
+        with store._connect() as connection:
+            planned=connection.execute("SELECT COUNT(*) FROM tasks WHERE run_id=? AND state='skipped' AND planned_skip_reason IS NOT NULL",(run_id,)).fetchone()[0]
+        effective_counts={**final_counts,'skipped':final_counts['skipped']-planned}
+        status=final_status(effective_counts,stopped=stopped,writer_failed=writer_failed)
         store.set_run_status(run_id,status)
     return {'status':status,'state_counts':store.state_counts(run_id),'attempt_counts':store.attempt_counts(run_id),
         'model_attempts_dispatched_this_invocation':dispatched,'stop_limit_unit':'model attempt launches including retries',
         'workers_spawned':spawned,'workers_recycled':recycled,'worker_resource_samples':list(resource_samples),
         'run_deadline_policy':'hard during precompute/model; bounded cleanup/export follows',
         'cache_retention_policy':POLICY_VERSION if rolling else 'retain all resumable inputs and committed diagnostic evidence; no automatic eviction',
-        'cache_evictions':evictions, 'cache_stop_reason':cache_stop_reason}
+        'cache_evictions':evictions, 'cache_stop_reason':cache_stop_reason,
+        'planned_skipped_tasks':planned, 'graceful_stop_drained':graceful_requested}

@@ -325,10 +325,10 @@ def download_openml_dataset(
             source=previous.get('source_provenance',{})
             saved=previous.get('dataset_identity')
             row_selection=previous.get('row_selection',{})
-            if source.get('provider') != source_provider:
-                raise ValueError('Existing dataset has a different source provider; preserve it at a versioned path')
             if not source.get('data_id') or not source.get('version') or not source.get('original_source_frame_fingerprint') or not saved or not previous.get('target_column') or row_selection.get('policy') != 'pandas_sample_without_replacement_if_over_cap_v1':
                 raise ValueError('Existing dataset has incomplete source/target/row identity; preserved without certification')
+            if source.get('provider') != source_provider:
+                raise ValueError('Existing dataset has a different source provider; preserve it at a versioned path')
             if data_id is not None and str(source.get('data_id')) != str(data_id):
                 raise ValueError('Existing dataset has a different source identity; choose a new version path')
             if ((data_id is None and int(source['version']) != version) or row_selection.get('max_rows') != max_rows or row_selection.get('random_state') != random_state):

@@ -71,6 +71,7 @@ class ExecutionConfig:
     cache_policy: str = 'retain'
     cache_max_bytes: int = 100 * 1024**3
     min_free_bytes: int = 50 * 1024**3
+    dense_budget_bytes: int = 1024**3
 
     def __post_init__(self) -> None:
         if self.max_workers < 1 or self.max_attempts < 1:
@@ -91,6 +92,8 @@ class ExecutionConfig:
             raise ValueError('cache_policy must be retain or rolling')
         if self.cache_max_bytes < 1 or self.min_free_bytes < 0:
             raise ValueError('Cache capacity must be positive and free-space reserve nonnegative')
+        if self.dense_budget_bytes < 1:
+            raise ValueError('dense_budget_bytes must be positive')
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -154,6 +157,7 @@ def build_task_records(
     seed_scheme_version: str = SEED_SCHEME_VERSION,
     include_precompute: bool = True,
     precompute_metadata: Mapping[str,Any] | None = None,
+    planned_infeasible: Mapping[tuple[str, int, int, str], str] | None = None,
 ) -> list[dict[str, Any]]:
     """Build a complete deterministic manifest for a bounded or full grid."""
     datasets = [str(value) for value in datasets]
@@ -171,6 +175,7 @@ def build_task_records(
         for seed in seeds:
             for fold in folds:
                 for shift_family, severity, condition in conditions:
+                    unit_reason = dataset_reason or (planned_infeasible or {}).get((dataset, seed, fold, condition))
                     base = {
                         "dataset": dataset,
                         "data_path": None if data_paths is None else str(data_paths.get(dataset)),
@@ -197,8 +202,8 @@ def build_task_records(
                             "stage": "precompute",
                             "pipeline": "__all__",
                             "model": "__all__",
-                            "initial_state": "skipped" if dataset_reason else "pending",
-                            "planned_skip_reason": dataset_reason,
+                            "initial_state": "skipped" if unit_reason else "pending",
+                            "planned_skip_reason": unit_reason,
                             "depends_on": [],
                         })
                     for pipeline in pipelines:
@@ -220,8 +225,8 @@ def build_task_records(
                                 "scientific_task_id": task_id,
                                 "task_kind": "model",
                                 "stage": "model",
-                                "initial_state": "skipped" if dataset_reason else "pending",
-                                "planned_skip_reason": dataset_reason,
+                                "initial_state": "skipped" if unit_reason else "pending",
+                                "planned_skip_reason": unit_reason,
                                 "depends_on": [pre_id] if include_precompute else [],
                             })
     ids = [record["scientific_task_id"] for record in records]
@@ -635,7 +640,7 @@ class ManifestStore:
         connection.execute("UPDATE attempts SET state = ?, finished_at = ?, elapsed_seconds = ?, outcome = ?, exception_type = ?, exception_message = ?, traceback = ?, result_ref = ? WHERE run_id = ? AND attempt_id = ?", (state, _now(), elapsed, outcome, exception_type, exception_message, traceback_text, result_ref, run_id, attempt_id))
 
     def record_failure(self, run_id: str, task_id: str, attempt_id: str, *, failure_class: str, exception: BaseException | None = None, timeout_seconds: float | None = None, retry: bool = False, result_ref: str | None = None) -> str:
-        if failure_class not in RETRYABLE_FAILURES and failure_class not in {"user_requested_stop", "dependency_failure", "infeasible"}:
+        if failure_class not in RETRYABLE_FAILURES and failure_class not in {"user_requested_stop", "dependency_failure", "infeasible", "resource_limit", "unsupported_gpu"}:
             failure_class = "worker_exception"
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -686,7 +691,9 @@ class ManifestStore:
         payload = dict(result)
         encoded = _canonical(payload)
         payload_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-        with self._connect() as connection:
+        from src.resource_limits import disk_write_reservation
+        # Include SQLite rollback-journal/page overhead, not just JSON bytes.
+        with disk_write_reservation(self.db_path, max(1024**2, len(encoded.encode('utf-8')) * 8)), self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             task = connection.execute("SELECT state, active_attempt_id FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if task is None:
@@ -721,6 +728,12 @@ class ManifestStore:
                     connection.execute('PRAGMA temp_store=FILE')
                     connection.execute('CREATE TEMP TABLE export_seen (scientific_task_id TEXT PRIMARY KEY)')
                     connection.execute('BEGIN')
+                    def write_line(encoded):
+                        from src.resource_limits import disk_write_reservation
+                        line = encoded + '\n'
+                        with disk_write_reservation(path, len(line.encode('utf-8'))):
+                            output.write(line)
+                            output.flush()
                     def canonical_payload(row):
                         value=json.loads(row['payload_json'])
                         value.setdefault('run_id',run_id)
@@ -751,9 +764,9 @@ class ManifestStore:
                                     if not inserted:
                                         duplicates+=1
                                         continue
-                                output.write(encoded+'\n')
+                                write_line(encoded)
                     for row in connection.execute("SELECT r.* FROM durable_results r JOIN tasks t ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id LEFT JOIN export_seen s ON r.scientific_task_id=s.scientific_task_id WHERE r.run_id=? AND t.stage='model' AND s.scientific_task_id IS NULL ORDER BY r.scientific_task_id",(run_id,)):
-                        output.write(canonical_payload(row)+'\n')
+                        write_line(canonical_payload(row))
                         missing+=1
                     if missing or malformed or duplicates:
                         output.flush()

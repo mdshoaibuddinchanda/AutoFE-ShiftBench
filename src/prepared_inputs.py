@@ -27,15 +27,17 @@ def _publish_array(path,values):
             except (OSError,ValueError):pass
             finally:
                 if previous is not None:previous._mmap.close()
-        descriptor,name=tempfile.mkstemp(prefix=path.name+'.tmp_',dir=path.parent)
-        temporary=Path(name)
-        try:
-            with os.fdopen(descriptor,'wb') as output:
-                np.save(output,values,allow_pickle=False)
-                output.flush();os.fsync(output.fileno())
-            os.replace(temporary,path)
-        finally:
-            if temporary.exists():temporary.unlink()
+        from src.resource_limits import disk_write_reservation
+        with disk_write_reservation(path, values.nbytes + 4096):
+            descriptor,name=tempfile.mkstemp(prefix=path.name+'.tmp_',dir=path.parent)
+            temporary=Path(name)
+            try:
+                with os.fdopen(descriptor,'wb') as output:
+                    np.save(output,values,allow_pickle=False)
+                    output.flush();os.fsync(output.fileno())
+                os.replace(temporary,path)
+            finally:
+                if temporary.exists():temporary.unlink()
 
 
 def _model_arrays(path,metadata):

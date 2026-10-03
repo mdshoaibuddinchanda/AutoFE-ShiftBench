@@ -720,7 +720,8 @@ def precompute_unit(kwargs):
         gc.collect()
         return kwargs_copy["dataset_name"]
     except Exception as exc:
-        _record_manifest_failure(kwargs, attempt_id, failure_class="precompute_failure", exception=exc, retry=kwargs.get("retry", False))
+        failure = 'resource_limit' if isinstance(exc,ResourceLimitError) else 'precompute_failure'
+        _record_manifest_failure(kwargs, attempt_id, failure_class=failure, exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase1_error.log", "a") as f:
             f.write(f"Precompute error on {kwargs}: {traceback.format_exc()}\n")
         return None
@@ -938,9 +939,11 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
                 encoded = (json.dumps(res, allow_nan=False) + "\n").encode('utf-8')
                 f.seek(0, os.SEEK_END)
                 offset = f.tell()
-                f.write(encoded)
-                f.flush()
-                os.fsync(f.fileno())
+                from src.resource_limits import disk_write_reservation
+                with disk_write_reservation(results_path, len(encoded)):
+                    f.write(encoded)
+                    f.flush()
+                    os.fsync(f.fileno())
                 if rolling:
                     from src.task_manifest import _canonical
                     import hashlib

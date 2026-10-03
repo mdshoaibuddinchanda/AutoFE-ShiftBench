@@ -245,7 +245,7 @@ def _coverage_rows(snapshot: Mapping[str, Any], ledger_rows: Mapping[str, list[d
         eligibility_status="eligible"
         if planned_skip:
             classification = "planned_skip"
-            known_design_skip=planned_skip in {"planned_design_infeasible","split_policy_infeasible","declared_task_infeasible"}
+            known_design_skip=planned_skip in {"planned_design_infeasible","split_policy_infeasible","declared_task_infeasible"} or str(planned_skip).startswith('scientific_infeasibility:')
             eligible = False
             eligibility_status="planned_infeasible" if known_design_skip else "unknown"
         elif state == "completed" and metric_value is not None:

@@ -126,6 +126,12 @@ def artifact_lock(path, *, timeout_seconds=60.0):
 
 
 def atomic_bytes(path, payload: bytes):
+    from src.resource_limits import disk_write_reservation
+    with disk_write_reservation(path, len(payload)):
+        _atomic_bytes(path, payload)
+
+
+def _atomic_bytes(path, payload: bytes):
     path = Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
     descriptor,name = tempfile.mkstemp(prefix=".publish_",dir=path.parent)

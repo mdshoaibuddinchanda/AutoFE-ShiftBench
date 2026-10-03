@@ -1,0 +1,257 @@
+{
+  "scope": "Relevant production, scientific, accounting, recovery and reader sources; ancillary paths explicitly distinguished",
+  "files": [
+    {
+      "path": "src/analysis/dataset_stats.py",
+      "sha256": "af0739910fe8614ea70042ae832d6e6ed40643889c9b57e7dbdea4c0e7175345",
+      "lines": 60,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/analysis/ranking_analysis.py",
+      "sha256": "33667ba2102a5bbb6ee8f9ab04b883a19f1024e5919535c0457e1d72042acfbb",
+      "lines": 131,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/analysis/structural_analysis.py",
+      "sha256": "f9fce48405f487fccfef7479cf0cbeea120068c9a32c6102ddffc3449ce0af74",
+      "lines": 149,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/artifact_integrity.py",
+      "sha256": "f05f5540b737ca2aaa763f6af61271abfe62c7a8c9b84bbd2302ffe862692d8d",
+      "lines": 176,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/cache_lifecycle.py",
+      "sha256": "c4a9d5b973c39c6495779fbcf0bcd28477f353c6124ae17bcd486a2bbabed15d",
+      "lines": 377,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/check_progress.py",
+      "sha256": "f180c11d12fc891874a203a07821d87a228b51f34fa6f3681d617f79da03709f",
+      "lines": 112,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/checkpoint.py",
+      "sha256": "60e214ebecc4460805ac221e209129bb229055ec6eccc987cef18017e319c0af",
+      "lines": 88,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/coordinator.py",
+      "sha256": "97c8f3a86acc2c5b31a52270b0e9bc58040daa468d7a7b84780f36e624b3bbf7",
+      "lines": 404,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/create_workflow_diagram.py",
+      "sha256": "6c612ab3c45554d2882cfb666ff55fb2f35b46f802a18bf1e06810bd1e79ab0e",
+      "lines": 208,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/data_loader.py",
+      "sha256": "024c2c9bb76c3569c54291b7ab799c0aa1655e39e1bfd26ba710e7e824752c8c",
+      "lines": 500,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/dataset_statistics.py",
+      "sha256": "87a607e61dfc492cd126b1c6d16aed93fd6306b88c2d451699fc30a64a98bdd3",
+      "lines": 550,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/device_policy.py",
+      "sha256": "0361d0b51bf940be5146e2710ab8659542ebdcc78049e5c28e3668425b3d5c71",
+      "lines": 31,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/evaluation.py",
+      "sha256": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4",
+      "lines": 169,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/feature_engineering.py",
+      "sha256": "9464c75bf2dd6f26d1d47cb3a219b56727291055fb4f8d234c88082b0a80c238",
+      "lines": 387,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/feature_selection.py",
+      "sha256": "f470ce0c7c9e9048d04ad4588d22cb47973f02e83201c726da3466c7985e11f7",
+      "lines": 300,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/fsva.py",
+      "sha256": "bdc302f7d4f9af0882e1429972a5a0953579a3d420c3d68ca9fc43132df7a277",
+      "lines": 355,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/generate_tables.py",
+      "sha256": "ec6c79deb96bb97bb2d8357be3b696294e797aefb512ed98cb0ce48576d15638",
+      "lines": 304,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/historical_snapshot.py",
+      "sha256": "8826c412f53996f11da4dbbfb88318c52cc08863fa388207e8a50a5e2675f45f",
+      "lines": 64,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/model.py",
+      "sha256": "d4bec8eea8f34a517ae91ba42f5a2a030c48bf5b3aea02176139c516641e8520",
+      "lines": 122,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/model_prediction.py",
+      "sha256": "f4ef3c5cd61c8cbc2ac4612add2fce68d33c23f77b5651412fac627b3e078e80",
+      "lines": 18,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/operator_registry.py",
+      "sha256": "2125debcd01f5c79a0befe51501c37bb5e8fd54ffb2b892e20b3dbfcdd7d65a8",
+      "lines": 167,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/performance.py",
+      "sha256": "58bf6d3c780d4eb46cd04ae5991fea2d93b3454a49633e19e6893d10a8589012",
+      "lines": 13,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/pipeline_runner.py",
+      "sha256": "81b01bb238e15c3a4f95a4bcca2ad22b537cb5b63648cd381cfc92331d436885",
+      "lines": 1219,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/plotting.py",
+      "sha256": "e43bc5d11a4a23b252471945dff885d884e4687e4b2aeec002387b6d4132edcc",
+      "lines": 68,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/plotting_q1.py",
+      "sha256": "ac6d2690b809b1fe3acbe77f6ba5525eab390e14d139906fbb4a6e18cc0bc351",
+      "lines": 321,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/prepared_inputs.py",
+      "sha256": "6f3093f44cd7f9d1ec9ac0d96486bfe920f17cc885134026c6f5672000590f2b",
+      "lines": 198,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/preprocessing.py",
+      "sha256": "6ef0e626481f086fc65b28f8dc90f7cdb74c008c1c33221dc1dca7450a252a8f",
+      "lines": 269,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/protocol.py",
+      "sha256": "514edb3349d59c2fcb2025f0b8d18e1d589ea1a1f6f95f62efcfefebe16bb134",
+      "lines": 24,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/provenance.py",
+      "sha256": "6b259ef7b8ceacc2935be8d46f391aaf91eb79dfe2d8a8fb22c7711b39506e71",
+      "lines": 263,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/provenance_cli.py",
+      "sha256": "5cad437f934f7c1a343ee452b9c1c3bcfce90ddefe58be4ef20cc3083b96d02e",
+      "lines": 61,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/provenance_evidence.py",
+      "sha256": "daaa7567f681acb9d637d1133214d11635126ea431ff03166d5cac2458859154",
+      "lines": 404,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/reporting.py",
+      "sha256": "5bb1618e04a8289fbb8af8a803ad3f56e054cf1363c3da9b29824585902fb6e3",
+      "lines": 47,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/resource_limits.py",
+      "sha256": "590236e3635bb983007cbcbaf26dfdf3a00d3f75159791961d30232f6a3aa16a",
+      "lines": 46,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/seeding.py",
+      "sha256": "1d35a29a4e08adaf2ccad77863a8bb8b6bbed6776dd614b79a0d5e1fe830ed54",
+      "lines": 161,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/sensitivity_analysis.py",
+      "sha256": "3e23239e656f5209dad211e59899c420daf89f4abbdb0452d96d80e4ef1fb1c7",
+      "lines": 727,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/shap_explainer.py",
+      "sha256": "6a74ace48a8f099697c7a42e7ad7c283f8c4d1c38008efdd48a3df9da0316a38",
+      "lines": 84,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/shift_generator.py",
+      "sha256": "91c8fb6e6bc52c6a68a41132cba86d9464ef1049aca9bde448540c8b5bb121c0",
+      "lines": 234,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/splitters.py",
+      "sha256": "f79158365577ecf520dd303a990fd23dcb282e20f4bd1486a67834ae7099ccf4",
+      "lines": 185,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "src/stats_analysis.py",
+      "sha256": "f112137fb03b221ae3418b2f91b5741701448a1d6dae7c9914952339c53c1556",
+      "lines": 134,
+      "coverage": "indexed; ancillary or legacy path; compilation and suite coverage only"
+    },
+    {
+      "path": "src/task_manifest.py",
+      "sha256": "1acdc49aa887b18b781078cabffc89d576fd1fe210564efeb6ecd3f8814fcd8e",
+      "lines": 913,
+      "coverage": "production/preflight dependency read in chunks"
+    },
+    {
+      "path": "notebooks/sanity_checks.ipynb",
+      "sha256": "03f4279243a68baba1f09e5f14bc78e315b4a61dc6af1cd914b1dc3d4bff769a",
+      "coverage": "all notebook code cells read; not executed",
+      "code_cells": 1
+    },
+    {
+      "path": "notebooks/visualization.ipynb",
+      "sha256": "7176c2981ac48a279c08977273fbe0be942cc09fa36971780b0cfc90e94d6c74",
+      "coverage": "all notebook code cells read; not executed",
+      "code_cells": 3
+    }
+  ]
+}

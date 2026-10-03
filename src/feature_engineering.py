@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 import heapq
+import os
+import time
 
 import numpy as np
 import pandas as pd
@@ -241,9 +243,15 @@ def expand_features_with_dfs(
     scores={}
     best=[]
     random_scores=np.random.default_rng(cfg.random_seed) if cfg.selection_method == 'random' else None
+    profiling=bool(os.environ.get('AUTOFE_PROFILE_DIR'))
+    eval_seconds=score_seconds=0.
     for expression in expressions:
         fid = candidate_id(expression)
+        if profiling: stamp=time.perf_counter()
         train_value, train_status = _evaluate_expression(expression, train_base) if _workspace is None else _workspace.evaluate(expression,0)
+        if profiling:
+            eval_seconds+=time.perf_counter()-stamp
+            stamp=time.perf_counter()
         if streaming:
             if cfg.selection_method == 'variance':
                 # Numeric bases are cleaned once; operators already publish finite
@@ -267,6 +275,7 @@ def expand_features_with_dfs(
             train_values[fid] = train_value
         validity[fid] = train_status
         expression_by_id[fid] = expression
+        if profiling: score_seconds+=time.perf_counter()-stamp
 
     candidate_ids=list(expression_by_id)
     discrete_base=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if pd.api.types.is_bool_dtype(x_train[col])}
@@ -275,10 +284,16 @@ def expand_features_with_dfs(
         train_matrix=pd.DataFrame(train_values,index=train_base.index)
         train_matrix.attrs['discrete_features']=discrete_ids
         scores = _score_candidates(train_matrix, y_train, cfg)
+    if profiling: selection_start=time.perf_counter()
     ranked = sorted(candidate_ids, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))
     selected = ranked if cfg.max_features is None else ranked[: cfg.max_features]
     selected = list(selected)
     selected_set = set(selected)
+    if profiling:
+        from src.performance import event
+        event('candidate_values',eval_seconds,pipeline=cfg.display_identity,candidates=len(expressions))
+        event('stream_scoring_and_heap',score_seconds,pipeline=cfg.display_identity,candidates=len(expressions))
+        event('selection_ranking',time.perf_counter()-selection_start,pipeline=cfg.display_identity,candidates=len(expressions))
 
     rank_by_id = {fid: rank for rank, fid in enumerate(ranked, start=1)}
     history: list[dict[str, Any]] = []
