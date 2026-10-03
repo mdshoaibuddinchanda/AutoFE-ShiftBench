@@ -83,7 +83,10 @@ def compute_classification_metrics(
         raise MetricInputError("probability class coordinates are incompatible")
     if not np.isfinite(probabilities).all() or np.any(probabilities < 0) or np.any(probabilities > 1):
         raise MetricInputError("probabilities must be finite and within [0,1]")
-    if not np.allclose(probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-7):
+    # Validate the represented probabilities with accurate accumulation. A
+    # float32 reduction can round a valid row to 1 + eps (> the unchanged
+    # 1e-7 tolerance). Preserve the input dtype and every metric calculation.
+    if not np.allclose(probabilities.sum(axis=1, dtype=np.float64), 1.0, rtol=0, atol=1e-7):
         raise MetricInputError("probability rows must sum to one")
     aligned = np.zeros((len(y_true),len(labels)), dtype=probabilities.dtype)
     positions = {label: i for i,label in enumerate(labels.tolist())}

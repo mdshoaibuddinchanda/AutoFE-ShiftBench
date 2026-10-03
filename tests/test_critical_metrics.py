@@ -50,3 +50,31 @@ def test_macro_f1_has_a_distinct_identity():
     result = compute_classification_metrics(np.array([0,0,0,1]), np.array([0,0,0,0]), np.array([[.8,.2]]*4), np.array([0,1]))
     assert result["f1"] == 0
     assert result["f1_macro"] == pytest.approx(3/7)
+
+
+def test_float32_probability_mass_uses_accurate_sum_without_mutation():
+    # Actual Dry Bean/XGBoost row from the bounded real-data preflight.
+    row = np.array([1.4195753692547441e-06, 2.67126279140939e-06,
+        3.968446890212363e-06, 0.00016821626923047006,
+        9.655785788709181e-07, 0.9997901320457458,
+        3.266586645622738e-05], dtype=np.float32)
+    assert abs(float(row.sum()) - 1) > 1e-7
+    assert abs(float(row.sum(dtype=np.float64)) - 1) < 1e-7
+    probabilities = np.array([np.roll(row, i) for i in range(7)])
+    before = probabilities.copy()
+    classes = np.arange(7)
+    predicted = probabilities.argmax(axis=1)
+    result = compute_classification_metrics(classes, predicted, probabilities, classes)
+    from sklearn.metrics import log_loss, roc_auc_score
+    assert result['log_loss'] == log_loss(classes, probabilities, labels=classes)
+    assert result['roc_auc'] == roc_auc_score(classes, probabilities, labels=classes, multi_class='ovr', average='macro')
+    assert probabilities.dtype == np.float32
+    np.testing.assert_array_equal(probabilities, before)
+
+
+def test_probability_mass_tolerance_remains_1e_7():
+    # Accurate mass still outside the original tolerance is rejected.
+    probabilities = np.array([[.5, .5000002], [.25, .75]], dtype=np.float32)
+    assert abs(float(probabilities[0].sum(dtype=np.float64)) - 1) > 1e-7
+    with pytest.raises(ValueError, match='sum to one'):
+        compute_classification_metrics(np.array([0, 1]), np.array([0, 1]), probabilities, np.array([0, 1]))
