@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import shap
 from sklearn.base import BaseEstimator
 from sklearn.cluster import KMeans
 
@@ -35,6 +34,7 @@ def compute_shap_values(
     tree_models = {"random_forest", "extra_trees", "xgboost", "lightgbm", "catboost"}
     
     try:
+        import shap
         if normalized_type in tree_models:
             # Tree explainer is fast, but we still limit background if required by the model
             explainer = shap.TreeExplainer(model)
@@ -63,7 +63,13 @@ def compute_shap_values(
             # Take the mean absolute SHAP value across all classes and samples
             mean_abs_shap = np.mean([np.abs(sv).mean(axis=0) for sv in shap_values], axis=0)
         else:
-            mean_abs_shap = np.abs(shap_values).mean(axis=0)
+            values=np.asarray(shap_values)
+            if values.ndim == 3:
+                mean_abs_shap=np.abs(values).mean(axis=(0,2))
+            elif values.ndim == 2:
+                mean_abs_shap=np.abs(values).mean(axis=0)
+            else:
+                raise ValueError(f'Unsupported SHAP axes {values.shape}')
             
         # Format as a dictionary {feature_name: importance}
         feature_names = x_eval.columns.tolist()

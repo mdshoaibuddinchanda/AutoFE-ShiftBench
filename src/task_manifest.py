@@ -13,6 +13,7 @@ import multiprocessing as mp
 import os
 import sqlite3
 import time
+import queue as queue_module
 import traceback as traceback_module
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -682,15 +683,21 @@ def run_callable_with_timeout(target: Callable[..., Any], args: tuple[Any, ...] 
 
     process = context.Process(target=_callable_entry, args=(target, args, dict(kwargs or {}), queue))
     process.start()
-    process.join(timeout_seconds)
-    if process.is_alive():
-        process.terminate()
-        process.join(5)
-        if process.is_alive():
-            process.kill()
-            process.join(5)
-        return {"state": "timeout", "exitcode": process.exitcode}
     try:
-        return queue.get_nowait()
-    except Exception:
-        return {"state": "failed", "exitcode": process.exitcode, "exception_type": "ChildProcessError", "exception_message": "child exited without an outcome"}
+        deadline=time.monotonic()+timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                outcome=queue.get(timeout=min(.1,max(.001,deadline-time.monotonic())))
+                process.join(max(0,deadline-time.monotonic()))
+                return outcome
+            except queue_module.Empty:
+                if not process.is_alive():
+                    return {"state":"failed","exitcode":process.exitcode,"exception_type":"ChildProcessError","exception_message":"child exited without an outcome"}
+        return {"state":"timeout"}
+    finally:
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+        queue.cancel_join_thread()
+        queue.close()
+        process.close()

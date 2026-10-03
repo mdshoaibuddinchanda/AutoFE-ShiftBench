@@ -64,6 +64,7 @@ from src.fsva import (
 from src.operator_registry import OPERATOR_REGISTRY_VERSION, OPERATOR_SEMANTICS_VERSION, raw_expression
 from src.feature_selection import FeatureSelectionConfig, select_top_features
 from src.model import build_model
+from src.device_policy import fitted_device,UnsupportedDeviceError
 from src.preprocessing import _build_preprocessor, _to_dense_array
 from src.protocol import EVALUATION_PROTOCOL_VERSION, cache_root, results_ledger_path
 from src.provenance import collect_code_identity, collect_environment_identity
@@ -78,7 +79,6 @@ from src.seeding import (
 )
 from src.shift_generator import apply_perturbation,CONDITION_SEMANTICS_VERSION,CONDITION_IDENTITIES
 from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
-from src.shap_explainer import compute_shap_values
 from src.task_manifest import (
     ExecutionConfig,
     ManifestError,
@@ -716,6 +716,7 @@ def train_unit(kwargs):
         )
         model = build_model(model_type, random_state=model_seed, use_gpu=use_gpu)
         model.fit(X_tr, y_train_enc)
+        device_evidence=fitted_device(model,model_type,use_gpu)
         train_time = time.time() - t0
 
         t1 = time.time()
@@ -759,6 +760,7 @@ def train_unit(kwargs):
             "pipeline": pipeline_name,
             "pipeline_identity": pipeline_identity,
             "model": model_type,
+            "device_evidence":device_evidence,
             "status": "success",
             **_manifest_result_fields(kwargs, attempt_id),
             "n_train": len(X_tr),

@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 import json
+from src.artifact_integrity import artifact_lock,atomic_bytes,atomic_json,dataset_identity as identify_dataset,fingerprint
 
 import numpy as np
 import pandas as pd
@@ -73,12 +74,14 @@ def load_dataset_names(dataset_list_path: str | Path) -> list[str]:
     return dataset_names
 
 
-def _fetch_openml_with_fallbacks(dataset_name: str):
+def _fetch_openml_with_fallbacks(dataset_name: str, *, data_id=None, version=1):
     """Fetch an OpenML dataset by trying supported candidate names."""
     from sklearn.datasets import fetch_openml
 
-    candidates = OPENML_NAME_CANDIDATES.get(dataset_name, [dataset_name])
-    versions_to_try: tuple[int | str, ...] = (1, "active")
+    candidates = [int(data_id)] if data_id is not None else list(dict.fromkeys(OPENML_NAME_CANDIDATES.get(dataset_name, [dataset_name])))
+    if not isinstance(version,int) or version < 1:
+        raise ValueError('Acquisition requires an exact positive version')
+    versions_to_try = (version,)
     last_error: Exception | None = None
 
     for candidate in candidates:
@@ -255,10 +258,29 @@ def download_openml_dataset(
     output_dir: str | Path,
     max_rows: int = DEFAULT_MAX_ROWS,
     random_state: int = 42,
+    *, data_id: int | None = None, version: int = 1,
 ) -> Path:
     """Download one dataset from OpenML, downsample if needed, save as CSV and JSON metadata."""
     print(f"Fetching {dataset_name}...")
-    dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name)
+    if max_rows < 1:
+        raise ValueError('max_rows must be positive')
+    output_path = Path(output_dir) / f"{dataset_name}.csv"
+    meta_path = Path(output_dir) / f"{dataset_name}_meta.json"
+    if output_path.exists():
+        if meta_path.exists():
+            previous=json.loads(meta_path.read_text(encoding='utf-8'))
+            source=previous.get('source_provenance',{})
+            if data_id is not None and str(source.get('data_id')) != str(data_id):
+                raise ValueError('Existing dataset has a different source identity; choose a new version path')
+            if source and ((data_id is None and int(source['version']) != version) or previous.get('row_selection',{}).get('max_rows') != max_rows):
+                raise ValueError('Existing dataset version/row policy differs; choose a new version path')
+            saved=previous.get('dataset_identity')
+            if saved and saved['fingerprint'] != identify_dataset(output_path)['fingerprint']:
+                raise ValueError('Existing dataset bytes do not match recorded provenance')
+        else:
+            raise ValueError('Existing dataset lacks source metadata; preserved without reacquisition')
+        return output_path
+    dataset, _resolved_name = _fetch_openml_with_fallbacks(dataset_name,data_id=data_id,version=version)
     print(f"Fetched {dataset_name}. Processing X/y...")
 
     x = dataset.data
@@ -273,9 +295,7 @@ def download_openml_dataset(
             y = dataset.frame[target_name]
             x = dataset.frame.drop(columns=[target_name])
         else:
-            target_name = dataset.frame.columns[-1]
-            y = dataset.frame[target_name]
-            x = dataset.frame.drop(columns=[target_name])
+            raise ValueError('Source has no declared target; last-column inference is disallowed')
 
     if x is None or y is None:
         raise ValueError(f"Dataset '{dataset_name}' does not provide X/y data")
@@ -287,19 +307,29 @@ def download_openml_dataset(
         else "target_label"
     )
 
-    combined = features.copy()
+    combined = features.reset_index(drop=True).copy()
     combined[target_column] = pd.Series(y).reset_index(drop=True)
 
-    # Dataset cap at 100K
+    source_rows=len(combined)
+    original_counts=combined[target_column].value_counts(dropna=False).to_dict()
+    selected_rows=np.arange(source_rows)
+    # Preserve the original pandas population sampling and configured RNG.
     if len(combined) > max_rows:
         combined = combined.sample(
             n=max_rows,
             random_state=random_state,
-        ).reset_index(drop=True)
+        )
+        selected_rows=combined.index.to_numpy()
+        combined=combined.reset_index(drop=True)
 
-    output_path = Path(output_dir) / f"{dataset_name}.csv"
+    details=dict(getattr(dataset,'details',{}) or {})
+    if not details.get('id') or not details.get('version'):
+        raise ValueError('OpenML result lacks exact source ID/version metadata')
+    if data_id is not None and str(details['id']) != str(data_id):
+        raise ValueError('OpenML returned a different requested data ID')
+    if data_id is None and int(details['version']) != version:
+        raise ValueError('OpenML returned a different requested version')
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(output_path, index=False)
     
     # Compute and save meta-features
     features_sampled = combined.drop(columns=[target_column])
@@ -313,8 +343,23 @@ def download_openml_dataset(
     )
     print(f"Meta features done for {dataset_name}.")
     
-    meta_path = Path(output_dir) / f"{dataset_name}_meta.json"
-    meta_path.write_text(json.dumps(meta_features, indent=2))
+    capped_counts=combined[target_column].value_counts(dropna=False).to_dict()
+    missing_classes=set(map(str,original_counts))-set(map(str,capped_counts))
+    meta_features.update(source_provenance={'provider':'OpenML','data_id':str(details['id']),'version':str(details['version']),
+        'resolved_request':_resolved_name,'details':details,'target_names':list(getattr(dataset,'target_names',[]) or []),
+        'original_source_frame_fingerprint':fingerprint({'columns':list(features.columns),'dtypes':list(map(str,features.dtypes)),
+            'hashes':pd.util.hash_pandas_object(features,index=True).astype(str).tolist(),'target_hashes':pd.util.hash_pandas_object(pd.Series(y),index=True).astype(str).tolist()}),
+        'raw_download_bytes_status':'provider details/checksum retained; sklearn does not expose raw response bytes'},
+        row_selection={'policy':'pandas_sample_without_replacement_if_over_cap_v1','max_rows':max_rows,'random_state':random_state,
+            'source_rows':source_rows,'selected_source_positions':selected_rows.tolist()},target_column=target_column,
+        split_feasibility={'n_splits':5,'status':'infeasible_capped_population' if missing_classes or min(capped_counts.values(),default=0) < 5 else 'class_counts_feasible',
+            'missing_source_classes':sorted(missing_classes),'class_counts':{str(k):int(v) for k,v in capped_counts.items()}})
+    with artifact_lock(output_path.with_suffix('.acquire.lock')):
+        if output_path.exists():
+            raise FileExistsError('Concurrent acquisition already published this path')
+        atomic_bytes(output_path,combined.to_csv(index=False).encode('utf-8'))
+        meta_features['dataset_identity']=identify_dataset(output_path)
+        atomic_json(meta_path,meta_features)
     
     return output_path
 
@@ -324,11 +369,21 @@ def download_datasets_from_list(
     output_dir: str | Path = "data/raw",
     max_rows: int = DEFAULT_MAX_ROWS,
     random_state: int = 42,
+    *, selected_datasets: list[str] | None = None,
 ) -> dict[str, Path]:
     """Download all datasets from dataset_list.yaml into data/raw."""
     dataset_names = load_dataset_names(dataset_list_path)
+    if not selected_datasets:
+        raise ValueError('Acquisition requires an explicit selected_datasets list')
+    unknown=set(selected_datasets)-set(dataset_names)
+    if unknown:
+        raise ValueError(f'Unknown selected datasets: {sorted(unknown)}')
+    dataset_names=[name for name in dict.fromkeys(dataset_names) if name in selected_datasets]
+    declared=yaml.safe_load(Path(dataset_list_path).read_text(encoding='utf-8'))['datasets']
+    requests={item['name']:item for item in declared if isinstance(item,dict)}
 
     saved_paths: dict[str, Path] = {}
+    failures={}
     for dataset_name in dataset_names:
         print(f"Downloading {dataset_name}...")
         try:
@@ -337,11 +392,15 @@ def download_datasets_from_list(
                 output_dir=output_dir,
                 max_rows=max_rows,
                 random_state=random_state,
+                data_id=requests.get(dataset_name,{}).get('data_id'),
+                version=int(requests.get(dataset_name,{}).get('version',1)),
             )
             print(f"  -> Saved to {saved_paths[dataset_name]}")
         except Exception as e:
             print(f"  -> Failed to download {dataset_name}: {e}")
-
+            failures[dataset_name]=str(e)
+    if failures:
+        raise RuntimeError(f'Unresolved selected acquisitions: {failures}; successful files retained')
     return saved_paths
 
 
@@ -353,4 +412,10 @@ def load_csv_dataset(file_path: str | Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 if __name__ == "__main__":
-    results = download_datasets_from_list()
+    import argparse
+    parser=argparse.ArgumentParser(description='Explicit bounded acquisition; never invoked by the runner')
+    parser.add_argument('--datasets',required=True)
+    parser.add_argument('--output-dir',default='data/raw')
+    parser.add_argument('--max-rows',type=int,default=DEFAULT_MAX_ROWS)
+    args=parser.parse_args()
+    download_datasets_from_list(output_dir=args.output_dir,max_rows=args.max_rows,selected_datasets=args.datasets.split(','))

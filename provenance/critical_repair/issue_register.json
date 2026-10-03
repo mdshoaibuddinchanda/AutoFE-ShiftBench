@@ -426,67 +426,87 @@
     {
       "id": "C07",
       "title": "Exact downloaded source identity",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "archived source overwrite and missing provenance reproduced; mock acquisition controls passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "src/data_loader.py; tests/test_acquisition.py; reproduction/probe_original_helpers.py",
       "original_reproducer": null,
       "required_correction": "Exact downloaded source identity",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_acquisition.py"
+      ],
+      "status": "corrected_controlled_regression_verified",
+      "limitations": [
+        "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
+      ]
     },
     {
       "id": "C08",
       "title": "Bounded non-overwriting acquisition",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "archived source overwrite and missing provenance reproduced; mock acquisition controls passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "src/data_loader.py; tests/test_acquisition.py; reproduction/probe_original_helpers.py",
       "original_reproducer": null,
       "required_correction": "Bounded non-overwriting acquisition",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_acquisition.py"
+      ],
+      "status": "corrected_controlled_regression_verified",
+      "limitations": [
+        "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
+      ]
     },
     {
       "id": "C09",
       "title": "Supported P12 launcher",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original queue false timeout and SHAP axes errors reproduced; actual GPU fits succeeded",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "setup_and_run.bat; src/device_policy.py; src/shap_explainer.py; src/task_manifest.py; tests/test_runtime_helpers.py",
       "original_reproducer": null,
       "required_correction": "Supported P12 launcher",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_runtime_helpers.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
+      ]
     },
     {
       "id": "C10",
       "title": "Actual GPU fit and declared device policy",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original queue false timeout and SHAP axes errors reproduced; actual GPU fits succeeded",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "setup_and_run.bat; src/device_policy.py; src/shap_explainer.py; src/task_manifest.py; tests/test_runtime_helpers.py",
       "original_reproducer": null,
       "required_correction": "Actual GPU fit and declared device policy",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_runtime_helpers.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
+      ]
     },
     {
       "id": "C11",
       "title": "Unused SHAP import and output axes",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original queue false timeout and SHAP axes errors reproduced; actual GPU fits succeeded",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "setup_and_run.bat; src/device_policy.py; src/shap_explainer.py; src/task_manifest.py; tests/test_runtime_helpers.py",
       "original_reproducer": null,
       "required_correction": "Unused SHAP import and output axes",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_runtime_helpers.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
+      ]
     },
     {
       "id": "C12",
@@ -587,28 +607,36 @@
     {
       "id": "C18",
       "title": "Timeout queue drain",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original queue false timeout and SHAP axes errors reproduced; actual GPU fits succeeded",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "setup_and_run.bat; src/device_policy.py; src/shap_explainer.py; src/task_manifest.py; tests/test_runtime_helpers.py",
       "original_reproducer": null,
       "required_correction": "Timeout queue drain",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_runtime_helpers.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
+      ]
     },
     {
       "id": "C19",
       "title": "Rare-class cap feasibility",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "archived source overwrite and missing provenance reproduced; mock acquisition controls passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "src/data_loader.py; tests/test_acquisition.py; reproduction/probe_original_helpers.py",
       "original_reproducer": null,
       "required_correction": "Rare-class cap feasibility",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_acquisition.py"
+      ],
+      "status": "corrected_controlled_regression_verified",
+      "limitations": [
+        "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
+      ]
     },
     {
       "id": "E01",
