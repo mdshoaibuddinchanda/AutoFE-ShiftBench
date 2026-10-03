@@ -1,0 +1,33 @@
+{
+  "schema": "verified_source_delivery_v1",
+  "branch": "revision/leakage-seed-stability",
+  "remote": "https://github.com/mdshoaibuddinchanda/AutoFE-ShiftBench.git",
+  "verified_source_commit": "07a4efb85637f8962e0f441b9a5e59e122deab5b",
+  "source_push_verified": true,
+  "source_remote_head": "07a4efb85637f8962e0f441b9a5e59e122deab5b",
+  "verified_at_utc": "2026-10-03T06:18:26.346552+00:00",
+  "local_commits_through_verified_source": [
+    "20333b63517860d53b454912940f9ffb3a1014ca Correct probability class coordinates and freeze audit contract",
+    "31155254290d57d566f147a3da6bb92142a6efd7 Bind tasks and verified caches to exact scientific inputs",
+    "300b3a111bc7a323294afb130d4f2b2bc9e29f27 Preserve model dependencies across retryable precompute failures",
+    "47766a438c43e9223fa07818cc3b46212e1ef3b2 Close manifest connections and support read-only inspection",
+    "1401f5035471a2a2db15dc976a2cfc791b3a2175 Commit results transactionally before idempotent ledger export",
+    "1b97fc6e5d35a449e1e9625e6a401c7158d6a574 Verify provenance against authoritative results and anchored evidence",
+    "03d809811d4e9b932d62bffd750cfdd72339f61f Validate analysis run identities metric ranges and missing outcomes",
+    "bfd7c3714dd8e50b79c8f00513f1b8174d08976d Reconstruct sensitivity prefixes from transactional task history",
+    "01643f460dc65b0edf19fc2f5a852fe428f3c09b Correct feature provenance counts and training corruption measurements",
+    "5f74c4d8d6b42b9ff8eeb3f7c2bcb8118ac7ad35 Bound acquisition and validate environment device and helper behavior",
+    "38e8086a11565cd740a54c10052cd859f48736ea Supervise dependency-ready work and preserve complete prepared evidence",
+    "c428c278c46ace546e52a91bf5229836d98d89ad Apply one dataset inference contract to active tables figures and notebooks",
+    "913285be23061f8ed857168dab232df25d11408a Repair missing prepared evidence and verify executed lineage",
+    "190b0ab27b88cf1f5dcd07a648760947c9c23d97 Freeze corrected scientific reference and bounded timing evidence",
+    "982106f19f7b866f5e0199cc66fea51a44db5864 Preserve exact selection while limiting preparation to requested pipelines",
+    "f3cf119134c5b57a4bc7df828889123cd476b4ce Stream complete diagnostics and durable result reconstruction",
+    "0f7cd9499c3ff96548c06e664dd269f5be2caa4d Reject incomplete acquisition evidence and conflicting population requests",
+    "db5f448e3536263393d25027706dada5b0b6b534 Preserve explicit metafeature errors instead of fabricated numeric values",
+    "07a4efb85637f8962e0f441b9a5e59e122deab5b Reuse supervised CPU workers and verified selected inputs with exact scientific checks"
+  ],
+  "executed_source_identity": "final_checks.json source_sha256; performance records retain their separately executed src fingerprints",
+  "corrected_reference_commit": "913285b",
+  "final_documentation_head_policy": "The next commit updates delivery documentation. Its successful final push and exact remote HEAD are verified separately in ignored reports/final_validation/delivery_verification.json and the user final response. This record claims source verification through verified_source_commit, not a self-referential future HEAD."
+}

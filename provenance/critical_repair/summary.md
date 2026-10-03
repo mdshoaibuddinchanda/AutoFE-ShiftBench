@@ -42,7 +42,7 @@ Deferred/evaluated opportunities: normalized public sensitivity storage, complet
 
 ## 7. Records and Git
 
-Engineering details:record.md. Complete machine-readable dispositions:issue_register.json. Frozen contracts, source hashes and all small timing/equivalence evidence are in this directory. Full matrices/results remain under ignored local reports/performance. Source/test/performance commits and the final documentation commit are recorded in delivery.json after remote verification. Branch:revision/leakage-seed-stability. Remote push status will be recorded only after ls-remote confirms final HEAD.
+Engineering details:record.md. Complete machine-readable dispositions:issue_register.json. Frozen contracts, source hashes and all small timing/equivalence evidence are in this directory. Full matrices/results remain under ignored local reports/performance. Source/test/performance commits and the final documentation commit are recorded in delivery.json after remote verification. Branch:revision/leakage-seed-stability. Source/test/performance commit07a4efb85637f8962e0f441b9a5e59e122deab5b was pushed and verified by ls-remote. delivery.json lists the19local source commits; the final delivery-record commit is verified separately and reported with its exact HEAD.
 
 ## Complete issue index
 
