@@ -201,12 +201,12 @@ def collect_environment_identity(repo_root: str | Path = ".") -> dict[str, Any]:
     }
 
 
-def _artifact(path: Path, root: Path, role: str, *, required: bool = False, expected_sha256: str | None = None) -> dict[str, Any]:
+def _artifact(path: Path, root: Path, role: str, *, required: bool = False, expected_sha256: str | None = None, hash_file=None) -> dict[str, Any]:
     item = {"role": role, "path": relative_path(path, root), "required": required}
     if not path.exists():
         item.update({"status": "missing"})
         return item
-    actual = file_sha256(path)
+    actual = (hash_file or file_sha256)(path)
     item.update({"status": "valid" if expected_sha256 in (None, actual) else "conflict", "byte_size": path.stat().st_size, "sha256": actual})
     if expected_sha256 is not None:
         item["expected_sha256"] = expected_sha256

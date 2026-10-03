@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--repeats',type=int,default=2)
     parser.add_argument('--production',action='store_true')
+    parser.add_argument('--pipelines',default='Raw,AutoFE_Baseline',help='Comma-separated identities or all; full diagnostic budgets retained')
     args=parser.parse_args()
     root=args.source_root.resolve()
     output=args.output.resolve()
@@ -47,9 +48,11 @@ def main():
     from src.coordinator import execute_manifest
     from tests.test_dataset_statistics import _record
     from threadpoolctl import threadpool_info
+    selected_pipelines=list(runner.PIPELINE_CONFIGS) if args.pipelines=='all' else args.pipelines.split(',')
+    if not selected_pipelines or set(selected_pipelines)-set(runner.PIPELINE_CONFIGS):raise ValueError('Unknown pipeline selection')
     result={'schema':'bounded_corrected_comparison_v1','synthetic_only':True,
         'import_seconds':time.perf_counter()-start,'source_root':str(root),'stages':[],
-        'threadpools':threadpool_info(),'fixture':{'rows':480,'numeric_columns':8,'category_levels':4,'pipelines':['Raw','AutoFE_Baseline'],
+        'threadpools':threadpool_info(),'fixture':{'rows':480,'numeric_columns':8,'category_levels':4,'pipelines':selected_pipelines,
         'diagnostic_rows':128,'finite_difference_rows':32,'magnitudes':[.001,.01,.05],'analysis':AnalysisConfig().to_dict()}}
     process=psutil.Process()
     def measured(stage,call):

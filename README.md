@@ -32,6 +32,8 @@ It requests an exact source version, preserves existing bytes, rejects ambiguous
 
 The SQLite manifest owns task membership, transactional claims, attempts and results. JSONL is an idempotent export. Dependency-ready tasks run in supervised, killable spawned processes; the worker limit covers precompute and model work, with at most one GPU model concurrently. The stop limit counts model-attempt launches, including retries. Deadlines are hard during work; bounded cleanup/export follows. Resource-infeasible exact work fails explicitly without changing rows, categories, precision or candidates.
 
+Healthy CPU workers handle up to eight tasks and retire after 64 MiB of retained RSS growth; both limits are configurable. GPU workers retire after each task. CPU models use verified read-only selected numeric inputs. Native BLAS/OpenMP limits remain those of the corrected reference: reducing them changed Logistic Regression probabilities in the production comparison. Estimator `n_jobs=1` alone does not limit all native threads.
+
 Split, feature, history and diagnostic publication uses locks, hashes and atomic replacement. Model workers load their requested prepared pipeline and never regenerate diagnostics. A missing required artifact reopens its precompute dependency for one bounded exact repair; prior result evidence remains archived. Caches needed for resume and evidence referenced by committed results are retained. File counts alone are not completion proof.
 
 ```powershell
@@ -53,7 +55,7 @@ Verification is read-only and distinguishes package integrity, missing evidence 
 | `src/preprocessing.py`, `src/feature_engineering.py`, `src/operator_registry.py` | Fold-local mapping and expression universe |
 | `src/feature_selection.py`, `src/fsva.py` | Selection and complete declared diagnostics |
 | `src/artifact_integrity.py`, `src/prepared_inputs.py`, `src/resource_limits.py` | Verified prepared artifacts and allocation guards |
-| `src/model.py`, `src/device_policy.py`, `src/evaluation.py` | Estimators, device validation and defined metrics |
+| `src/model.py`, `src/model_prediction.py`, `src/device_policy.py`, `src/evaluation.py` | Estimators, proven prediction reuse, device validation and defined metrics |
 | `src/dataset_statistics.py`, `src/sensitivity_analysis.py`, `src/reporting.py` | Paired dataset inference, incomplete-run regimes and reporting inputs |
 | `src/plotting_q1.py`, `src/generate_tables.py`, `notebooks/visualization.ipynb` | Active publication output paths |
 | `src/provenance.py`, `src/provenance_evidence.py` | Anchored evidence and actual artifact lineage |

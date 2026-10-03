@@ -1,0 +1,371 @@
+{
+  "schema": "bounded_corrected_comparison_v1",
+  "synthetic_only": true,
+  "import_seconds": 1.4735701000317931,
+  "source_root": "D:\\DR2\\AutoFE-ShiftBench_for major 2 oct\\AutoFE-ShiftBench-85747a4672040591d8b35c53c3aa06b1b728e10c",
+  "stages": [
+    {
+      "stage": "cold_preparation",
+      "seconds": 1.2223183999303728,
+      "peak_aggregate_rss_sampled_bytes": 169488384,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 1269041,
+      "process_write_bytes": 1154720,
+      "call_counts": {
+        "load_csv_dataset": 1,
+        "_build_preprocessor": 1,
+        "expand_features_with_dfs": 2,
+        "compute_jacobian_diagnostic": 2,
+        "compute_empirical_amplification": 2,
+        "validate_jacobian_finite_difference": 2
+      },
+      "artifact_bytes": 1154522
+    },
+    {
+      "stage": "warm_preparation",
+      "seconds": 0.44358500000089407,
+      "peak_aggregate_rss_sampled_bytes": 171225088,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 2369795,
+      "process_write_bytes": 198,
+      "call_counts": {
+        "load_csv_dataset": 1,
+        "_build_preprocessor": 1
+      }
+    },
+    {
+      "stage": "candidate_scale",
+      "seconds": 0.205491500091739,
+      "peak_aggregate_rss_sampled_bytes": 173080576,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0
+    },
+    {
+      "stage": "diagnostics",
+      "seconds": 0.3776660000439733,
+      "peak_aggregate_rss_sampled_bytes": 174649344,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0
+    },
+    {
+      "stage": "analysis",
+      "seconds": 0.14758809993509203,
+      "peak_aggregate_rss_sampled_bytes": 183767040,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 870860,
+      "process_write_bytes": 246475
+    },
+    {
+      "stage": "cliffs_delta_scale",
+      "seconds": 0.0014857000205665827,
+      "peak_aggregate_rss_sampled_bytes": 181399552,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0,
+      "value": -0.0003333333333333333
+    },
+    {
+      "stage": "persistence",
+      "seconds": 0.05987629992887378,
+      "peak_aggregate_rss_sampled_bytes": 181178368,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 595364,
+      "process_write_bytes": 695633
+    },
+    {
+      "stage": "production_workers",
+      "seconds": 6.216378399985842,
+      "peak_aggregate_rss_sampled_bytes": 699338752,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 9014939,
+      "process_write_bytes": 551108,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 4,
+        "stop_limit_unit": "model attempt launches including retries",
+        "workers_spawned": 2,
+        "workers_recycled": 0,
+        "worker_resource_samples": [
+          {
+            "scientific_task_id": "task_2c75800a443f1d81c9643aeb",
+            "attempt_id": "attempt_e3749c66b91ff84f822b4c44",
+            "pid": 21792,
+            "rss_bytes": 165515264,
+            "baseline_rss_bytes": 165515264,
+            "tasks_executed": 1,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_478b1f70b93400ccfc6930ec",
+            "attempt_id": "attempt_026b5b1bde05e5e23272d245",
+            "pid": 21792,
+            "rss_bytes": 165679104,
+            "baseline_rss_bytes": 165515264,
+            "tasks_executed": 2,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_e5b7bfc375c01ca938ddc965",
+            "attempt_id": "attempt_6fddad86d653f1d6a610bf33",
+            "pid": 21792,
+            "rss_bytes": 165912576,
+            "baseline_rss_bytes": 165515264,
+            "tasks_executed": 3,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_35ba5e09654aeed04bf0eac2",
+            "attempt_id": "attempt_69cf1f2c71883e1507b0f2ba",
+            "pid": 21792,
+            "rss_bytes": 165908480,
+            "baseline_rss_bytes": 165515264,
+            "tasks_executed": 4,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_df9990fbf5a416df89308ef7",
+            "attempt_id": "attempt_c7c9e02a92581d90f10ef3e4",
+            "pid": 36952,
+            "rss_bytes": 162295808,
+            "baseline_rss_bytes": 162295808,
+            "tasks_executed": 1,
+            "recycle": false
+          }
+        ],
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    },
+    {
+      "stage": "resume",
+      "seconds": 2.4404827000107616,
+      "peak_aggregate_rss_sampled_bytes": 370987008,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 2168132,
+      "process_write_bytes": 116900,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 0,
+        "stop_limit_unit": "model attempt launches including retries",
+        "workers_spawned": 0,
+        "workers_recycled": 0,
+        "worker_resource_samples": [],
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    },
+    {
+      "stage": "cold_preparation",
+      "seconds": 1.427902300027199,
+      "peak_aggregate_rss_sampled_bytes": 186658816,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 1239292,
+      "process_write_bytes": 1154710,
+      "call_counts": {
+        "load_csv_dataset": 1,
+        "_build_preprocessor": 1,
+        "expand_features_with_dfs": 2,
+        "compute_jacobian_diagnostic": 2,
+        "compute_empirical_amplification": 2,
+        "validate_jacobian_finite_difference": 2
+      },
+      "artifact_bytes": 1154512
+    },
+    {
+      "stage": "warm_preparation",
+      "seconds": 0.41351840004790574,
+      "peak_aggregate_rss_sampled_bytes": 186671104,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 2369785,
+      "process_write_bytes": 198,
+      "call_counts": {
+        "load_csv_dataset": 1,
+        "_build_preprocessor": 1
+      }
+    },
+    {
+      "stage": "candidate_scale",
+      "seconds": 0.2241821000352502,
+      "peak_aggregate_rss_sampled_bytes": 185356288,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0
+    },
+    {
+      "stage": "diagnostics",
+      "seconds": 0.4495276000816375,
+      "peak_aggregate_rss_sampled_bytes": 187047936,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0
+    },
+    {
+      "stage": "analysis",
+      "seconds": 0.19684820005204529,
+      "peak_aggregate_rss_sampled_bytes": 188858368,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 870860,
+      "process_write_bytes": 246475
+    },
+    {
+      "stage": "cliffs_delta_scale",
+      "seconds": 0.001518600038252771,
+      "peak_aggregate_rss_sampled_bytes": 185950208,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 0,
+      "process_write_bytes": 0,
+      "value": -0.0003333333333333333
+    },
+    {
+      "stage": "persistence",
+      "seconds": 0.06772900000214577,
+      "peak_aggregate_rss_sampled_bytes": 184889344,
+      "rss_sampling_interval_seconds": 0.02,
+      "process_read_bytes": 595364,
+      "process_write_bytes": 695633
+    }
+  ],
+  "threadpools": [
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\numpy.libs\\libopenblas64__v0.3.23-293-gc2f4bdbb-gcc_10_3_0-2bde3a66a51006b2b53eb373ff767a3f.dll",
+      "version": "0.3.23.dev",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    },
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 8,
+      "prefix": "vcomp",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\sklearn\\.libs\\vcomp140.dll",
+      "version": null
+    },
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\scipy.libs\\libopenblas_v0.3.27--3aa239bc726cfb0bd8e5330d8d4c15c6.dll",
+      "version": "0.3.27",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    }
+  ],
+  "fixture": {
+    "rows": 480,
+    "numeric_columns": 8,
+    "category_levels": 4,
+    "pipelines": [
+      "Raw",
+      "AutoFE_Baseline"
+    ],
+    "diagnostic_rows": 128,
+    "finite_difference_rows": 32,
+    "magnitudes": [
+      0.001,
+      0.01,
+      0.05
+    ],
+    "analysis": {
+      "metric": "roc_auc",
+      "pipeline_a": "Raw",
+      "pipeline_b": "AutoFE_Baseline",
+      "task_fields": [
+        "dataset",
+        "split_policy",
+        "seed",
+        "fold",
+        "condition",
+        "severity",
+        "model"
+      ],
+      "stratum_fields": [
+        "split_policy",
+        "condition",
+        "model"
+      ],
+      "task_weighting": "equal_valid_task_within_dataset",
+      "dataset_weighting": "equal_dataset",
+      "confidence_level": 0.95,
+      "bootstrap_resamples": 2000,
+      "permutation_resamples": 5000,
+      "random_state": 20261002,
+      "alpha": 0.05,
+      "family_id": "primary_dataset_contrasts_v1",
+      "analysis_config_version": "dataset_equal_paired_run_v2",
+      "expected_protocol_version": "predictor_only_geometry_v3_integrity_metrics_fsva_v2",
+      "expected_seed_scheme_version": "sha256_canonical_json_u32_v1",
+      "min_datasets": 2,
+      "run_id": null,
+      "datasets": null
+    }
+  },
+  "data_sha256": "d6e57421893ba956523784eaaae34464398eb45f52da40b188bcb61ed45de48c",
+  "source_hashes": {
+    "src\\artifact_integrity.py": "8faffa3c36445b001da02e540b479d609890fbe05df9e4f7a483ba9b164160a6",
+    "src\\checkpoint.py": "60e214ebecc4460805ac221e209129bb229055ec6eccc987cef18017e319c0af",
+    "src\\check_progress.py": "f180c11d12fc891874a203a07821d87a228b51f34fa6f3681d617f79da03709f",
+    "src\\coordinator.py": "d55662dffe3cfd4734af9607e05965f456b00569b984826c9ce6e7bf19ccf53b",
+    "src\\create_workflow_diagram.py": "6c612ab3c45554d2882cfb666ff55fb2f35b46f802a18bf1e06810bd1e79ab0e",
+    "src\\dataset_statistics.py": "87a607e61dfc492cd126b1c6d16aed93fd6306b88c2d451699fc30a64a98bdd3",
+    "src\\data_loader.py": "ec7f540a3abd6408b246586128b34a26db44471000bdfef4c889b05ea0b8f8a3",
+    "src\\device_policy.py": "0361d0b51bf940be5146e2710ab8659542ebdcc78049e5c28e3668425b3d5c71",
+    "src\\evaluation.py": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4",
+    "src\\feature_engineering.py": "d0dfa5594c1c320714e431c42b84d44a3434e8e23a42364ceefb10cbe63a4ccc",
+    "src\\feature_selection.py": "f470ce0c7c9e9048d04ad4588d22cb47973f02e83201c726da3466c7985e11f7",
+    "src\\fsva.py": "bdc302f7d4f9af0882e1429972a5a0953579a3d420c3d68ca9fc43132df7a277",
+    "src\\generate_tables.py": "ec6c79deb96bb97bb2d8357be3b696294e797aefb512ed98cb0ce48576d15638",
+    "src\\historical_snapshot.py": "8826c412f53996f11da4dbbfb88318c52cc08863fa388207e8a50a5e2675f45f",
+    "src\\model.py": "aa216094df9cbefc0f3a4cb1bec0000971502b629c3b97978e4a879cc85e85af",
+    "src\\model_prediction.py": "f4ef3c5cd61c8cbc2ac4612add2fce68d33c23f77b5651412fac627b3e078e80",
+    "src\\operator_registry.py": "2125debcd01f5c79a0befe51501c37bb5e8fd54ffb2b892e20b3dbfcdd7d65a8",
+    "src\\pipeline_runner.py": "2ed29b8a89ab0e5160aea56da7ad0b141e4879cc9518cc92effbc25256f5cbf3",
+    "src\\plotting.py": "e43bc5d11a4a23b252471945dff885d884e4687e4b2aeec002387b6d4132edcc",
+    "src\\plotting_q1.py": "ac6d2690b809b1fe3acbe77f6ba5525eab390e14d139906fbb4a6e18cc0bc351",
+    "src\\prepared_inputs.py": "75c1125cb26ee6473d3245bd9e567090c002ad28b15c12e5cb8be1ca5f22a2b7",
+    "src\\preprocessing.py": "6ef0e626481f086fc65b28f8dc90f7cdb74c008c1c33221dc1dca7450a252a8f",
+    "src\\protocol.py": "1c33e3963897aaba5e9cca5c6d304d93b8c1c272b7c9f4d7c19dae7699306cde",
+    "src\\provenance.py": "fdd150d32a4443e78176424c8388be19409f624e01863195ead4d7431b865ab5",
+    "src\\provenance_cli.py": "5cad437f934f7c1a343ee452b9c1c3bcfce90ddefe58be4ef20cc3083b96d02e",
+    "src\\provenance_evidence.py": "018f559c6f48edac5ec7d9e3a6a456f0ee4c9059ea7f0dd8f053c485468a218d",
+    "src\\reporting.py": "5bb1618e04a8289fbb8af8a803ad3f56e054cf1363c3da9b29824585902fb6e3",
+    "src\\resource_limits.py": "63c9a03b1d33c11822adbc0874d6c207df686de837a091115319468d76930cfd",
+    "src\\seeding.py": "1d35a29a4e08adaf2ccad77863a8bb8b6bbed6776dd614b79a0d5e1fe830ed54",
+    "src\\sensitivity_analysis.py": "19ced492ab1e980f8db9f4bc93418cd76cc757950ee2c52712dfde04733d45f7",
+    "src\\shap_explainer.py": "6a74ace48a8f099697c7a42e7ad7c283f8c4d1c38008efdd48a3df9da0316a38",
+    "src\\shift_generator.py": "f8ad606f2ed9761f34132f3a8d0645d418c6659c9cf0f19b67dfd2379b8e6f1b",
+    "src\\splitters.py": "f79158365577ecf520dd303a990fd23dcb282e20f4bd1486a67834ae7099ccf4",
+    "src\\stats_analysis.py": "f112137fb03b221ae3418b2f91b5741701448a1d6dae7c9914952339c53c1556",
+    "src\\task_manifest.py": "e70a8473368a42bf55115a4b03bfa7e7eb7b556963f1aded2887ab0910dda7d8"
+  }
+}

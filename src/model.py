@@ -1,7 +1,8 @@
 """Model factory for the 10 benchmark models.
 
-All sklearn models use n_jobs=1 because we parallelize at the task level
-(multiprocessing Pool). Setting n_jobs>1 here would cause thread thrashing.
+Supported estimators use n_jobs=1 because the coordinator supervises tasks.
+This controls joblib parallelism, not every native BLAS/OpenMP library. Native
+limits are observed in results; changing them failed scientific equivalence.
 
 GPU models (XGBoost, CatBoost) are configured to use CUDA automatically.
 """
@@ -27,9 +28,8 @@ def build_model(
     """
     Build one of the 10 benchmark models with sensible defaults.
 
-    All models use n_jobs=1 to prevent CPU thread thrashing when used
-    inside a multiprocessing Pool. GPU models (XGBoost, CatBoost) are
-    configured to use CUDA when use_gpu=True.
+    Supported estimator thread parameters remain fixed. GPU models (XGBoost,
+    CatBoost) are configured to use CUDA when use_gpu=True.
     """
     normalized = model_type.strip().lower()
 

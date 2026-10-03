@@ -1,0 +1,15 @@
+{
+  "schema": "bounded_warm_model_equivalence_v1",
+  "checks": [
+    {
+      "repeat": 0,
+      "actual_model_rows": 4,
+      "status": "exact_scientific_payload_fields"
+    },
+    {
+      "repeat": 1,
+      "actual_model_rows": 4,
+      "status": "exact_scientific_payload_fields"
+    }
+  ]
+}

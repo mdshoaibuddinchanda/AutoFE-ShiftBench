@@ -5,9 +5,10 @@ import time
 import queue as queue_module
 from pathlib import Path
 import psutil
+from collections import deque
 from src.task_manifest import ManifestStore
 
-SCHEDULER_VERSION='dependency_ready_supervised_attempts_v1'
+SCHEDULER_VERSION='dependency_ready_reusable_supervised_attempts_v2'
 
 
 def task_entry(task,queue):
@@ -18,6 +19,24 @@ def task_entry(task,queue):
         precompute_unit(task)
     else:
         _train_process_entry(task,queue)
+
+
+def worker_service(commands,control,results,entry,max_tasks,rss_growth):
+    """One owned task at a time; deadline enforcement stays in the parent."""
+    import os
+    import gc
+    baseline=None
+    for index in range(max_tasks):
+        task=commands.get()
+        if task is None:return
+        entry(task,results)
+        gc.collect()
+        rss=psutil.Process().memory_info().rss
+        if baseline is None:baseline=rss
+        recycle=index+1>=max_tasks or rss-baseline>rss_growth or task.get('model') in ('xgboost','catboost')
+        control.put({'scientific_task_id':task['scientific_task_id'],'attempt_id':task['attempt_id'],
+            'pid':os.getpid(),'rss_bytes':rss,'baseline_rss_bytes':baseline,'tasks_executed':index+1,'recycle':recycle})
+        if recycle:return
 
 
 def final_status(counts,*,stopped=False,writer_failed=False):
@@ -56,18 +75,38 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
     except BaseException:
         store.set_run_status(run_id,'failed')
         raise
+    store.resume(run_id)
+    run_config=store.run_config(run_id)
     context=mp.get_context('spawn')
-    manager=context.Manager()
-    queue=manager.Queue(maxsize=max(2,config.max_workers*2))
-    writer=context.Process(target=writer_target or writer_process,args=(queue,ledger,str(store.db_path),run_id))
+    manager=None
+    try:
+        manager=context.Manager()
+        queue=manager.Queue(maxsize=max(2,config.max_workers*2))
+        control=manager.Queue(maxsize=max(2,config.max_workers*2))
+        writer_ready=context.Event()
+        writer_args=(queue,ledger,str(store.db_path),run_id)
+        if writer_target is None:writer_args=(*writer_args,writer_ready)
+        else:writer_ready.set()
+        writer=context.Process(target=writer_target or writer_process,args=writer_args)
+    except BaseException:
+        if manager is not None:manager.shutdown()
+        store.set_run_status(run_id,'failed')
+        raise
     active={}
+    workers={}
+    acknowledged={}
+    resource_samples=deque(maxlen=128)
+    spawned=recycled=0
+    def dispose(process):
+        if process.is_alive():process.terminate()
+        process.join(5)
+        workers.pop(process.pid,None)
+        process.close()
     dispatched=0
     stopped=False
     writer_failed=False
-    store.resume(run_id)
-    run_config=store.run_config(run_id)
-    writer.start()
     try:
+        writer.start()
         while True:
             now=time.monotonic()
             if not writer.is_alive():
@@ -76,17 +115,28 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             if stop_requested() or (deadline is not None and now >= deadline):
                 stopped=True
                 break # hard run deadline/signal; attempts stay explicitly recoverable
+            if not writer_ready.is_set():
+                time.sleep(.02)
+                continue # no model deadlines start while initial export is recovering
+            while True:
+                try:message=control.get_nowait()
+                except queue_module.Empty:break
+                tid=message['scientific_task_id']
+                if tid in active and active[tid][0].pid==message['pid'] and active[tid][1]['attempt_id']==message['attempt_id']:
+                    acknowledged[tid]=message
+                    resource_samples.append(message)
             states=store.task_states(run_id,active)
             for task_id,(process,task,launched,exited_at) in list(active.items()):
                 state={'state':states[task_id]}
                 timed_out=config.task_timeout_seconds is not None and now-launched >= config.task_timeout_seconds
-                if timed_out and state['state'] == 'running':
+                ack=acknowledged.get(task_id)
+                if timed_out and (ack is None or state['state']=='running'):
                     if process.is_alive():
                         process.terminate()
                     process.join(5)
-                    _record_manifest_failure(task,task['attempt_id'],failure_class='timeout',retry=task['retry'])
-                elif not process.is_alive() and state['state'] == 'running':
-                    if process.exitcode != 0:
+                    if state['state']=='running':_record_manifest_failure(task,task['attempt_id'],failure_class='timeout',retry=task['retry'])
+                elif (ack is not None or not process.is_alive()) and state['state'] == 'running':
+                    if not process.is_alive() and process.exitcode != 0:
                         _record_manifest_failure(task,task['attempt_id'],failure_class='worker_exception',exception=RuntimeError(f'Worker exit {process.exitcode}'),retry=task['retry'])
                     elif exited_at is None:
                         active[task_id]=(process,task,launched,now)
@@ -95,12 +145,18 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                         _record_manifest_failure(task,task['attempt_id'],failure_class='result_write_failure',exception=RuntimeError('Worker exited without an authoritative commit'),retry=task['retry'])
                     else:
                         continue
-                elif process.is_alive():
+                elif ack is None and process.is_alive():
                     continue
-                process.join()
-                process.close()
+                if process.is_alive() and ack is not None and not ack['recycle']:
+                    workers[process.pid]['idle']=True
+                else:
+                    if ack and ack['recycle']:recycled+=1
+                    dispose(process)
+                acknowledged.pop(task_id,None)
                 del active[task_id]
             budget_reached=config.stop_after_tasks is not None and dispatched >= config.stop_after_tasks
+            for worker in list(workers.values()):
+                if worker['idle'] and not worker['process'].is_alive():dispose(worker['process'])
             if budget_reached and not active:
                 stopped=True
                 break
@@ -125,10 +181,26 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                         'diagnostic_config':{'max_rows':run_config.get('diagnostic_max_rows',128),'random_state':stable_seed('fsva_diagnostic',{
                             'dataset':record['dataset'],'split_policy':record['split_policy'],'seed':record['seed'],'fold':record['fold'],'condition':record['condition']}),
                             'magnitudes':list(DEFAULT_PERTURBATION_MAGNITUDES)}}
-                    process=context.Process(target=entry,args=(task,queue))
-                    process.start()
-                    active[record['scientific_task_id']]=(process,task,time.monotonic(),None)
                     if record['stage'] == 'model': dispatched+=1
+                    process=None
+                    try:
+                        idle=next((value for value in workers.values() if value['idle'] and value['process'].is_alive()),None)
+                        if idle is None:
+                            commands=manager.Queue(maxsize=1)
+                            process=context.Process(target=worker_service,args=(commands,control,queue,entry,config.worker_max_tasks,config.worker_rss_growth_bytes))
+                            process.start()
+                            idle={'process':process,'commands':commands,'idle':True}
+                            workers[process.pid]=idle
+                            spawned+=1
+                        process=idle['process']
+                        idle['idle']=False
+                        active[record['scientific_task_id']]=(process,task,time.monotonic(),None)
+                        idle['commands'].put(task)
+                    except BaseException as error:
+                        if record['scientific_task_id'] not in active:
+                            _record_manifest_failure(task,task['attempt_id'],failure_class='worker_exception',exception=error,retry=task['retry'])
+                            if process is not None and process.pid is None:process.close()
+                        raise
                     gpu_active=gpu_active or gpu
             if not active:
                 counts=store.state_counts(run_id)
@@ -148,7 +220,7 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             state=store.get_task(run_id,task['scientific_task_id'])
             if state and state['state']=='running':
                 _record_manifest_failure(task,task['attempt_id'],failure_class='coordinator_crash',retry=True)
-            process.close()
+        for worker in list(workers.values()):dispose(worker['process'])
         if writer.is_alive():
             try:
                 queue.put('DONE',timeout=5)
@@ -168,5 +240,6 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
         store.set_run_status(run_id,status)
     return {'status':status,'state_counts':store.state_counts(run_id),'attempt_counts':store.attempt_counts(run_id),
         'model_attempts_dispatched_this_invocation':dispatched,'stop_limit_unit':'model attempt launches including retries',
+        'workers_spawned':spawned,'workers_recycled':recycled,'worker_resource_samples':list(resource_samples),
         'run_deadline_policy':'hard during precompute/model; bounded cleanup/export follows',
         'cache_retention_policy':'retain all resumable inputs and committed diagnostic evidence; no automatic eviction'}

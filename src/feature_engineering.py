@@ -9,7 +9,7 @@ import heapq
 import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
-from src.resource_limits import require_bytes
+from src.resource_limits import require_bytes,dense_budget
 
 from src.operator_registry import (
     OPERATOR_REGISTRY,
@@ -93,12 +93,40 @@ def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return numeric.fillna(0.0)
 
 
-def _base_columns(x_train: pd.DataFrame, cfg: DFSConfig) -> tuple[pd.DataFrame, list[str], list[str]]:
-    numeric = _numeric_frame(x_train)
+class _CandidateWorkspace:
+    """A bounded memo for one owner's fixed upstream frames, never a disk cache."""
+    def __init__(self,train,test):
+        self.owner=(train,test)
+        self.numeric=(_numeric_frame(train),_numeric_frame(test))
+        self.variances=None
+        self.capacity=min(64*1024**2,dense_budget()//16)
+        self.bytes=0
+        self.values={}
+        self.hits=self.misses=0
+
+    def evaluate(self,expression,partition):
+        key=(partition,expression)
+        if key in self.values:
+            self.hits+=1
+            values,status=self.values[key]
+            return values,status.copy()
+        self.misses+=1
+        values,status=_evaluate_expression(expression,self.numeric[partition])
+        if self.bytes+values.nbytes<=self.capacity:
+            self.values[key]=(values,status.copy())
+            self.bytes+=values.nbytes
+        return values,status
+
+
+def _base_columns(x_train: pd.DataFrame, cfg: DFSConfig,workspace=None) -> tuple[pd.DataFrame, list[str], list[str]]:
+    numeric = _numeric_frame(x_train) if workspace is None else workspace.numeric[0]
     eligible = list(numeric.columns)
     if cfg.max_base_features is None or len(eligible) <= cfg.max_base_features:
         return numeric, eligible, []
-    variances = pd.Series({col:pd.Series(numeric[col].to_numpy(dtype=float)).var() for col in numeric}).fillna(0.0)
+    variances=workspace.variances if workspace is not None else None
+    if variances is None:
+        variances = pd.Series({col:pd.Series(numeric[col].to_numpy(dtype=float)).var() for col in numeric}).fillna(0.0)
+        if workspace is not None:workspace.variances=variances
     ranked = sorted(eligible, key=lambda col: (-float(variances[col]), str(col)))
     retained = ranked[: cfg.max_base_features]
     excluded = [col for col in eligible if col not in set(retained)]
@@ -182,6 +210,7 @@ def expand_features_with_dfs(
     x_test: pd.DataFrame,
     y_train: np.ndarray | None = None,
     config: DFSConfig | None = None,
+    *, _workspace=None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Fit candidate construction and selection on training rows only."""
     cfg = config or DFSConfig()
@@ -191,8 +220,10 @@ def expand_features_with_dfs(
         raise ValueError("trans_primitives must exactly match the declared operator set")
 
     ram_before = _get_process_ram_mb() if cfg.monitor_ram else None
-    train_base, base_columns, excluded_base = _base_columns(x_train, cfg)
-    test_numeric = _numeric_frame(x_test)
+    if _workspace is not None and (_workspace.owner[0] is not x_train or _workspace.owner[1] is not x_test):
+        raise ValueError('Candidate workspace belongs to a different upstream unit')
+    train_base, base_columns, excluded_base = _base_columns(x_train, cfg,_workspace)
+    test_numeric = _numeric_frame(x_test) if _workspace is None else _workspace.numeric[1]
     missing = [col for col in base_columns if col not in test_numeric.columns]
     if missing:
         raise ValueError(f"Held-out predictors are missing training columns: {missing}")
@@ -202,7 +233,7 @@ def expand_features_with_dfs(
     retained_count=len(expressions) if cfg.max_features is None else min(len(expressions),cfg.max_features)
     streaming=cfg.selection_method in ('variance','random','none')
     train_count=retained_count if streaming else len(expressions)
-    require_bytes((len(train_base)*train_count+len(test_base)*retained_count)*8*3+len(expressions)*2048+len(train_base)*8*3,purpose='exact candidate scoring, selected matrices and complete histories')
+    require_bytes((len(train_base)*train_count+len(test_base)*retained_count)*8*3+len(expressions)*2048+len(train_base)*8*3+(_workspace.capacity if _workspace is not None else 0),purpose='exact candidate scoring, selected matrices, scoped memo and complete histories')
     train_values: dict[str, np.ndarray] = {}
     test_values: dict[str, np.ndarray] = {}
     validity: dict[str, dict[str, int]] = {}
@@ -212,7 +243,7 @@ def expand_features_with_dfs(
     random_scores=np.random.default_rng(cfg.random_seed) if cfg.selection_method == 'random' else None
     for expression in expressions:
         fid = candidate_id(expression)
-        train_value, train_status = _evaluate_expression(expression, train_base)
+        train_value, train_status = _evaluate_expression(expression, train_base) if _workspace is None else _workspace.evaluate(expression,0)
         if streaming:
             if cfg.selection_method == 'variance':
                 # Numeric bases are cleaned once; operators already publish finite
@@ -302,7 +333,7 @@ def expand_features_with_dfs(
         selected_train.attrs['discrete_features']=discrete_ids
     else:
         selected_train = train_matrix[selected].copy()
-    selected_test=pd.DataFrame({fid:_evaluate_expression(expression_by_id[fid],test_base)[0] for fid in selected},index=test_base.index)
+    selected_test=pd.DataFrame({fid:(_evaluate_expression(expression_by_id[fid],test_base)[0] if _workspace is None else _workspace.evaluate(expression_by_id[fid],1)[0]) for fid in selected},index=test_base.index)
     selected_meta = [_metadata_for_expression(expression_by_id[fid], fid, validity[fid]) for fid in selected]
     generated_selected = sum(bool(expression_operators(expression_by_id[fid])) for fid in selected)
     raw_selected = len(selected) - generated_selected

@@ -20,7 +20,7 @@
     "notebooks/visualization.ipynb (code and markdown cells)",
     "production src/*.py (canonical execution and active/legacy reporting paths)"
   ],
-  "tests": "All 133 collected tests executed; defect-specific files read and extended. Baseline tests were reviewed by purpose; no claim that test execution reads every assertion semantically.",
+  "tests": "Final supported suite227passed+7subtests; all active tests executed, new/affected tests reviewed. Baseline tests reviewed by purpose, not a claim every assertion was semantically read.",
   "sampled": [
     {
       "path": "paper\\figures\\AutoFE_ShiftBench_Workflow.pdf",
@@ -1781,5 +1781,10 @@
       "sha256": "ecc41be50d48cb5ba5e24d188881305d1a8075b058ef183084f1367b18cafdfd"
     }
   ],
-  "historical_cache_metadata_count": 14
+  "historical_cache_metadata_count": 14,
+  "final_inspection": {
+    "added_or_changed_modules": "Full relevant paths/diffs for coordinator,prepared_inputs,model_prediction,feature_engineering,provenance_evidence,sensitivity,data_loader and active reporting sidecars",
+    "reference_inventory": "Original inventory/hashes retained as baseline; final_checks.json records final src hashes",
+    "new_large_artifacts": "Synthetic performance inputs/matrices/histories/outputs retained under ignored reports/performance; no real datasets acquired"
+  }
 }

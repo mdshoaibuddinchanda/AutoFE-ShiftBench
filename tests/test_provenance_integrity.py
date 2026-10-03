@@ -121,3 +121,58 @@ def test_analysis_edges_require_recorded_matching_inputs(tmp_path,changed):
     edges=[edge for edge in graph['edges'] if edge['relationship']=='recorded_analysis_scientific_input']
     assert len(edges) == (1 if changed is None else 0)
     assert any(x['reason']=='analysis_dependency_unverified' for x in graph['unverified_dependencies']) == (changed is not None)
+
+
+def test_sensitivity_links_exact_manifest_eligibility(tmp_path):
+    from src.provenance_evidence import actual_lineage,snapshot_digest
+    from src.sensitivity_analysis import analyze_sensitivity,SensitivityConfig
+    store,payload,ledger,package,kwargs=package_fixture(tmp_path)
+    output=tmp_path/'sensitivity'
+    bundle=analyze_sensitivity(store.db_path,ledger,'r',output_dir=output,
+        config=SensitivityConfig(bootstrap_resamples=0,permutation_resamples=0))
+    assert bundle.config['manifest_snapshot_sha256']==snapshot_digest(store.snapshot('r'))
+    inventory=[{'path':'results.jsonl','role':'result_ledger_export','sha256':bundle.config['ledger_sha256']},
+        {'path':'sensitivity/bounds.csv','role':'analysis_output','sha256':'example'}]
+    graph=actual_lineage(store.snapshot('r'),inventory,tmp_path)
+    assert any(edge['relationship']=='recorded_analysis_eligibility_input' for edge in graph['edges'])
+    config=json.loads((output/'sensitivity_config.json').read_text())
+    config['manifest_snapshot_sha256']='0'*64
+    (output/'sensitivity_config.json').write_text(json.dumps(config))
+    graph=actual_lineage(store.snapshot('r'),inventory,tmp_path)
+    assert any(row['reason']=='analysis_dependency_unverified' for row in graph['unverified_dependencies'])
+
+
+def test_hash_reuse_is_scoped_fresh_and_preserves_conflicting_expectations(tmp_path,monkeypatch):
+    from src import provenance as p
+    from src.provenance_evidence import _FileHashes
+    path=tmp_path/'artifact';path.write_bytes(b'original')
+    calls=[];original=p.file_sha256
+    def counted(path):calls.append(str(path));return original(path)
+    monkeypatch.setattr(p,'file_sha256',counted)
+    hashes=_FileHashes()
+    expected=original(path)
+    for _ in range(20):
+        assert p._artifact(path,tmp_path,'selected',expected_sha256=expected,hash_file=hashes)['status']=='valid'
+    assert len(calls)==1
+    assert p._artifact(path,tmp_path,'selected',expected_sha256='0'*64,hash_file=hashes)['status']=='conflict'
+    hashes.validate()
+    path.write_bytes(b'changed')
+    with pytest.raises(ValueError):hashes(path)
+    assert _FileHashes()(path)==original(path)
+
+
+def test_conflicting_shared_dependency_is_retained_and_invalid(tmp_path):
+    from src.provenance import canonical_sha256
+    store,payload,ledger,package,kwargs=package_fixture(tmp_path)
+    path=tmp_path/'shared';path.write_bytes(b'original')
+    artifacts=[{'path':str(path),'role':'shared','sha256':__import__('hashlib').sha256(path.read_bytes()).hexdigest()},
+        {'path':str(path),'role':'shared','sha256':'0'*64}]
+    payload={**payload,'artifacts':artifacts}
+    with store._connect() as connection:
+        connection.execute('UPDATE durable_results SET payload_json=?,payload_hash=? WHERE run_id=?',
+            (json.dumps(payload),canonical_sha256(payload),'r'))
+    ledger.write_text(json.dumps(payload)+'\n')
+    build_provenance_package(output_dir=package,repo_root=tmp_path,manifest_db=store.db_path,ledger_path=ledger,run_id='r')
+    inventory=json.loads((package/'artifact_inventory.json').read_text())
+    assert len([x for x in inventory['artifacts'] if x.get('role')=='shared'])==2
+    assert verify_provenance(**kwargs)['overall_status']=='invalid'

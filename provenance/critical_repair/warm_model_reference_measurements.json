@@ -1,0 +1,64 @@
+{
+  "schema": "bounded_warm_model_execution_v1",
+  "synthetic_only": true,
+  "source_root": "D:\\DR2\\AutoFE-ShiftBench_for major 2 oct\\AutoFE-ShiftBench-85747a4672040591d8b35c53c3aa06b1b728e10c\\reports\\references\\corrected_checkout_913285b",
+  "measurements": [
+    {
+      "repeat": 0,
+      "seconds": 6.884974799933843,
+      "model_tasks_executed": 4,
+      "new_precompute_execution": 0,
+      "import_spawn_included": true,
+      "peak_aggregate_rss_sampled_bytes": 690839552,
+      "rss_sampling_interval_seconds": 0.02,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 4,
+        "stop_limit_unit": "model attempt launches including retries",
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    },
+    {
+      "repeat": 1,
+      "seconds": 5.061974799958989,
+      "model_tasks_executed": 4,
+      "new_precompute_execution": 0,
+      "import_spawn_included": true,
+      "peak_aggregate_rss_sampled_bytes": 690987008,
+      "rss_sampling_interval_seconds": 0.02,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 4,
+        "stop_limit_unit": "model attempt launches including retries",
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    }
+  ],
+  "precompute_evidence_policy": "Each controlled run starts with an explicitly committed verified identical prepared dependency; no precompute worker runs."
+}

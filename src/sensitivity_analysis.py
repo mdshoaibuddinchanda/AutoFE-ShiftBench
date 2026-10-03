@@ -31,6 +31,7 @@ from src.dataset_statistics import (
 )
 from src.task_manifest import ManifestError, ManifestStore
 from src.historical_snapshot import HistoricalSnapshotUnsupported,at_event,completed_model_events
+from src.provenance_evidence import snapshot_digest
 
 
 SENSITIVITY_SCHEMA_VERSION = "incomplete_run_information_boundary_v2"
@@ -377,14 +378,19 @@ def _pair_fingerprint(pairs):
     return hashlib.sha256(_canonical(sorted(rows,key=_canonical)).encode()).hexdigest()
 
 
-def _normalise_pairs_for_analysis(pairs: pd.DataFrame, regime: str, selected: set[tuple[str, str, tuple[Any, ...]]]) -> pd.DataFrame:
+def _pair_keys(pairs):
+    return [(str(row.contrast_id),str(row.stratum),tuple(row.task_key_tuple)) for row in pairs.itertuples()]
+
+
+def _selection_mask(keys,selected):
+    return np.fromiter((key in selected for key in keys),dtype=bool,count=len(keys))
+
+
+def _normalise_pairs_for_analysis(pairs: pd.DataFrame, regime: str, selected: set[tuple[str, str, tuple[Any, ...]]], *, _selected_mask=None) -> pd.DataFrame:
     if pairs.empty:
         return pairs.assign(selected=False, regime=regime)
     result = pairs.copy()
-    result["selected"] = [
-        (str(row.contrast_id), str(row.stratum), tuple(row.task_key_tuple)) in selected
-        for row in result.itertuples()
-    ]
+    result["selected"] = _selection_mask(_pair_keys(pairs),selected) if _selected_mask is None else _selected_mask
     result["regime"] = regime
     return result
 
@@ -624,19 +630,20 @@ def analyze_sensitivity(
     dataset_rows: list[dict[str, Any]] = []
     bound_rows: list[dict[str, Any]] = []
     membership: list[pd.DataFrame] = []
+    key_indexes={}
     for regime, selected in selections.items():
         universe=universes[regime]
-        selected_frame = universe.iloc[0:0] if universe.empty else universe[
-            universe.apply(
-                lambda row: (str(row["contrast_id"]), str(row["stratum"]), tuple(row["task_key_tuple"])) in selected,
-                axis=1,
-            )
-        ]
+        keys=key_indexes.setdefault(id(universe),None)
+        if keys is None:
+            keys=_pair_keys(universe)
+            key_indexes[id(universe)]=keys
+        selected_mask=_selection_mask(keys,selected)
+        selected_frame=universe.iloc[0:0] if universe.empty else universe[selected_mask]
         summaries, datasets, bounds = _dataset_summary(selected_frame, universe, config, regime=regime, fingerprint=_pair_fingerprint(universe))
         summary_rows.extend(summaries)
         dataset_rows.extend(datasets)
         bound_rows.extend(bounds)
-        membership.append(_normalise_pairs_for_analysis(universe, regime, selected))
+        membership.append(_normalise_pairs_for_analysis(universe, regime, selected,_selected_mask=selected_mask))
     summaries_frame = _apply_holm(pd.DataFrame(summary_rows), config.alpha)
     dataset_frame = pd.DataFrame(dataset_rows)
     bounds_frame = pd.DataFrame(bound_rows)
@@ -650,12 +657,17 @@ def analyze_sensitivity(
             loo_rows.append({"regime": "leave_one_dataset_out", "inference_role":"descriptive_only", "contrast_id": contrast_id, "stratum": stratum, "omitted_dataset": omitted, "estimate_b_minus_a": float(remain["estimate_b_minus_a"].mean()) if len(remain) else None, "n_datasets": int(len(remain)), "status": "complete" if len(remain) >= config.min_datasets else "too_few_datasets"})
     cutoff_frame = pd.DataFrame(cutoff_rows)
     exclusions_frame = pd.DataFrame(exclusions)
+    model_ids=set(coverage.get('scientific_task_id',pd.Series(dtype=str)))
     config_dict = {
         **config.to_dict(),
         "schema_version": SENSITIVITY_SCHEMA_VERSION,
         "snapshot_id": snapshot["snapshot_id"],
         "manifest_run_id": run_id,
         "ledger_sha256": snapshot["ledger_sha256"],
+        "run_id": run_id,
+        "input_fingerprint_sha256": snapshot["ledger_sha256"],
+        "manifest_snapshot_sha256": snapshot_digest(snapshot),
+        "analysis_input_task_ids": sorted(row['scientific_task_id'] for row in snapshot['durable_results'] if row['scientific_task_id'] in model_ids),
         "aggregation": {"task_weighting": "equal_valid_task_within_dataset", "dataset_weighting": "equal_dataset"},
         "bounds": {"metric": config.metric, "lower": config.metric_lower, "upper": config.metric_upper, "interpretation": "identification_bounds_not_confidence_intervals"},
         "regime_definitions":{"matched_task_blocks":"explicit alias of primary observed paired blocks; no independent robustness claim",

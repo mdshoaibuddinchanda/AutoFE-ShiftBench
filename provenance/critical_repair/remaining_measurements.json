@@ -1,0 +1,155 @@
+{
+  "schema": "bounded_remaining_optimization_probes_v1",
+  "synthetic_only": true,
+  "pipeline": "Raw_Full",
+  "matrix_shape_before_split": [
+    32768,
+    128
+  ],
+  "load_probes": [
+    {
+      "numeric_memmap": false,
+      "seconds": 0.7167707000626251,
+      "peak_rss_sampled_bytes": 204062720,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 78657789,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            128
+          ],
+          "sha256": "07c41c01dbf66a86f2ae4372804ab5098294878e6d865e976aae5ce39ba48112"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            128
+          ],
+          "sha256": "5c3d0410769c6def112cf55f615f62ceaf7ceac37c02560fed6e38dcf579d8ad"
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "numeric_memmap": true,
+      "seconds": 0.6548913000151515,
+      "peak_rss_sampled_bytes": 165175296,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 61905020,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            128
+          ],
+          "sha256": "07c41c01dbf66a86f2ae4372804ab5098294878e6d865e976aae5ce39ba48112"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            128
+          ],
+          "sha256": "5c3d0410769c6def112cf55f615f62ceaf7ceac37c02560fed6e38dcf579d8ad"
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "numeric_memmap": false,
+      "seconds": 0.6764927000040188,
+      "peak_rss_sampled_bytes": 204554240,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 78657789,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            128
+          ],
+          "sha256": "07c41c01dbf66a86f2ae4372804ab5098294878e6d865e976aae5ce39ba48112"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            128
+          ],
+          "sha256": "5c3d0410769c6def112cf55f615f62ceaf7ceac37c02560fed6e38dcf579d8ad"
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "numeric_memmap": true,
+      "seconds": 0.6131763000739738,
+      "peak_rss_sampled_bytes": 165285888,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 61905020,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            128
+          ],
+          "sha256": "07c41c01dbf66a86f2ae4372804ab5098294878e6d865e976aae5ce39ba48112"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            128
+          ],
+          "sha256": "5c3d0410769c6def112cf55f615f62ceaf7ceac37c02560fed6e38dcf579d8ad"
+        }
+      ],
+      "repeat": 1
+    }
+  ],
+  "membership_probes": [
+    {
+      "repeat": 0,
+      "rows": 50000,
+      "row_apply_seconds": 0.36988789995666593,
+      "indexed_seconds": 0.04805730003863573,
+      "expanded_four_regime_bytes_estimate": 37600528,
+      "key_index_bytes_approx": 3644376
+    },
+    {
+      "repeat": 1,
+      "rows": 50000,
+      "row_apply_seconds": 0.35424100002273917,
+      "indexed_seconds": 0.04845759994350374,
+      "expanded_four_regime_bytes_estimate": 37600528,
+      "key_index_bytes_approx": 3644376
+    }
+  ],
+  "hash_probes": [
+    {
+      "repeat": 0,
+      "repeated_dependencies": 1000,
+      "distinct_files": 1,
+      "uncached_seconds": 0.6281863999320194,
+      "scoped_seconds": 0.13216050004120916,
+      "hash_bytes_before": 65536000,
+      "hash_bytes_after": 65536
+    },
+    {
+      "repeat": 1,
+      "repeated_dependencies": 1000,
+      "distinct_files": 1,
+      "uncached_seconds": 0.6272340000141412,
+      "scoped_seconds": 0.13609590008854866,
+      "hash_bytes_before": 65536000,
+      "hash_bytes_after": 65536
+    }
+  ],
+  "artifact_bytes": 133861765,
+  "limits": "Input-loading fixture has diagnostics disabled to isolate loading; it is not an alternative benchmark contract. RSS is sampled, timings exclude spawn/import, process I/O omits child OS page-cache accounting."
+}

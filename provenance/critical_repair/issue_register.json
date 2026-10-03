@@ -18,8 +18,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical outputs require recomputation/revalidation; no real-data run"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B02",
@@ -38,8 +50,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Concurrent history/diagnostic ownership handled separately in B16; real data absent"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B03",
@@ -55,7 +79,19 @@
         "tests/test_task_manifest.py: 12 passed, 2.76s"
       ],
       "status": "corrected_verified",
-      "limitations": []
+      "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B04",
@@ -72,8 +108,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Process supervisor fault injection remains B17; no full benchmark"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B05",
@@ -91,8 +139,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B06",
@@ -109,8 +169,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Legacy manifests without complete transactional history have unsupported stop-prefix analyses."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B07",
@@ -129,8 +201,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B08",
@@ -149,8 +233,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B09",
@@ -168,8 +264,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B10",
@@ -188,8 +296,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B11",
@@ -208,8 +328,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B12",
@@ -228,8 +360,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B13",
@@ -248,8 +392,20 @@
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B14",
@@ -268,8 +424,20 @@
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B15",
@@ -288,8 +456,20 @@
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B16",
@@ -307,8 +487,20 @@
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Damage arising after startup verification is detected by the worker; bounded dependency repair occurs on the next resume. Missing or changed original descriptor bytes cannot certify an exact repair and fail explicitly."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B17",
@@ -327,8 +519,20 @@
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No automatic cache eviction; retained artifacts may require disk capacity planning. Worker startup included in task deadlines. Full-grid and large-VRAM behavior unverified."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "B18",
@@ -346,8 +550,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical native crash cause unestablished"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C01",
@@ -366,8 +582,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C02",
@@ -386,8 +614,20 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Prefix universe and unknown eligibility repaired separately under B06/C14; real-data analysis unavailable"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C03",
@@ -405,27 +645,54 @@
       ],
       "status": "corrected_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C04",
       "title": "Actual artifact lineage",
       "evidence_level": "controlled exact-artifact repair, concurrent spawn ownership and negative analysis-lineage controls",
       "path": "active lineage",
-      "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py; src/provenance_evidence.py; tests/test_prepared_execution.py",
+      "supporting_locations": "src/provenance_evidence.py actual_lineage; src/prepared_inputs.py unit_artifacts; src/sensitivity_analysis.py; notebooks/visualization.ipynb",
       "original_reproducer": null,
       "required_correction": "Actual artifact lineage",
       "compatibility_impact": "real task IDs and declared dependencies; unsupported links explicit incomplete",
       "tests": [
         "tests/test_artifact_ownership.py",
         "tests/test_provenance_integrity.py",
-        "tests/test_prefix_information.py"
+        "tests/test_prefix_information.py",
+        "tests/test_provenance_integrity.py",
+        "tests/test_prepared_numeric.py"
       ],
       "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Damage arising after startup verification is detected by the worker; bounded dependency repair occurs on the next resume. Missing or changed original descriptor bytes cannot certify an exact repair and fail explicitly."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      },
+      "final_disposition": "Executed numeric/source/history/FSVA inventories complete; sensitivity records exact manifest eligibility snapshot; notebook sidecars record run/ledger/task IDs."
     },
     {
       "id": "C05",
@@ -444,8 +711,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C06",
@@ -464,8 +743,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C07",
@@ -477,12 +768,26 @@
       "required_correction": "Exact downloaded source identity",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [
-        "tests/test_acquisition.py"
+        "tests/test_acquisition.py",
+        "tests/test_acquisition.py: incomplete metadata and sampling-seed mismatch controls"
       ],
       "status": "corrected_controlled_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      },
+      "final_disposition": "Follow-up missing-metadata acceptance reproduced on913285b and rejected; existing bytes always preserved."
     },
     {
       "id": "C08",
@@ -499,8 +804,21 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No actual OpenML acquisition performed. Existing P12 preserved."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      },
+      "final_disposition": "Conflicting duplicate requests rejected before fetch; identical selected names deduplicated."
     },
     {
       "id": "C09",
@@ -517,8 +835,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No actual OpenML acquisition performed. Existing P12 preserved."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C10",
@@ -534,8 +864,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C11",
@@ -551,8 +893,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C12",
@@ -570,8 +924,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C13",
@@ -589,8 +955,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C14",
@@ -607,8 +985,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Legacy manifests without complete transactional history have unsupported stop-prefix analyses."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C15",
@@ -626,8 +1016,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C16",
@@ -645,8 +1047,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C17",
@@ -665,8 +1079,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C18",
@@ -682,8 +1108,20 @@
       ],
       "status": "corrected_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "C19",
@@ -699,514 +1137,918 @@
       ],
       "status": "corrected_controlled_regression_verified",
       "limitations": [
+        "Real-data execution and full benchmark are unverified; historical outputs are preserved and require compatible recomputation where semantics changed."
+      ],
+      "historical_limitations": [
         "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
-      ]
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E01",
       "title": "Requested prepared inputs only",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/prepared_inputs.py load_pipeline; src/pipeline_runner.py train_unit",
       "original_reproducer": null,
       "required_correction": "Requested prepared inputs only",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_prepared_execution.py",
+        "tests/test_prepared_numeric.py"
+      ],
+      "status": "implemented_regression_production_and_synthetic_measured",
+      "limitations": [
+        "Windows handles close explicitly; exact CPU factories tested; GPU keeps legacy selected-frame conversion."
+      ],
+      "final_disposition": "Model workers verify and load only their selected pipeline; no CSV reread or refitting.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E02",
       "title": "Compute and reuse complete diagnostics once",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/pipeline_runner.py _run_pipeline_generation; src/prepared_inputs.py",
       "original_reproducer": null,
       "required_correction": "Compute and reuse complete diagnostics once",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_prepared_execution.py",
+        "tests/test_artifact_ownership.py"
+      ],
+      "status": "implemented_regression_production_and_synthetic_measured",
+      "limitations": [
+        "Settings, ordered maps, seeds, artifact hashes and statuses must match; all required budgets retained."
+      ],
+      "final_disposition": "Complete per-unit history/FSVA reuse and compatible map memo: full14 retains14 artifacts with11 diagnostic kernel calls.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E03",
       "title": "Selected pipeline precompute",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/pipeline_runner.py get_data_splits/precompute_unit",
       "original_reproducer": null,
       "required_correction": "Selected pipeline precompute",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "tests/test_performance_equivalence.py"
       ],
       "status": "implemented_equivalence_verified_synthetic_measurement",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "Selected-subset speedup does not describe full-grid speedup."
+      ],
+      "final_disposition": "Requested2 pipelines now prepare2; full14 still prepares14.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E04",
       "title": "Native thread budget",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/pipeline_runner.py train_unit; reproduction/verify_thread_policy.py",
       "original_reproducer": null,
       "required_correction": "Native thread budget",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "thread_policy_rejection_probe.json",
+        "rejected_thread_measurements.json",
+        "worker_equivalence.json"
+      ],
+      "status": "rejected_numerical_equivalence_failure",
+      "limitations": [
+        "n_jobs1 is not a native-thread limit. Oversubscription remains possible; no safe global one-thread rewrite established."
+      ],
+      "final_disposition": "Native limit1 rejected: production AutoFE Logistic ROC-AUC0.9021739130434783 became0.9026086956521738; inherited reference limits restored.",
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E05",
       "title": "Concurrent killable timed tasks",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/coordinator.py execute_manifest",
       "original_reproducer": null,
       "required_correction": "Concurrent killable timed tasks",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py"
+      ],
+      "status": "implemented_regression_and_production_verified",
+      "limitations": [
+        "Hard deadlines include work; cleanup/export follows with bounded waits. No scheduler-order RNG dependency introduced."
+      ],
+      "final_disposition": "Bounded concurrent killable attempts, independent deadlines, ownership acknowledgements and exact launch-budget reservation.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E06",
       "title": "Reuse Windows workers",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/coordinator.py worker_service; src/task_manifest.py ExecutionConfig",
       "original_reproducer": null,
       "required_correction": "Reuse Windows workers",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_coordinator.py",
+        "worker_measurements.json"
+      ],
+      "status": "implemented_regression_production_and_synthetic_measured",
+      "limitations": [
+        "Recycling guard is conservative, not calibrated optimal for real datasets. Every GPU task retires its worker; last128 acknowledgements retained."
+      ],
+      "final_disposition": "5 actual tasks use2 worker imports; one worker executes4tasks with~0.57MiB retained RSS growth. Recycle after8tasks or64MiB growth.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E07",
       "title": "Common candidate artifact sharing",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/feature_engineering.py _CandidateWorkspace; src/pipeline_runner.py",
       "original_reproducer": null,
       "required_correction": "Common candidate artifact sharing",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_performance_equivalence.py",
+        "all_pipeline_equivalence.json"
+      ],
+      "status": "implemented_regression_and_all_pipeline_equivalence_verified",
+      "limitations": [
+        "No persistent filename/mtime cache; allocation guard includes cache demand; no approximations."
+      ],
+      "final_disposition": "Owner-scoped cleaned bases, variance and exact expression values share a bounded <=64MiB cache; selectors keep independent seeds/scores/universes.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E08",
       "title": "Select before held-out materialization",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/feature_engineering.py expand_features_with_dfs",
       "original_reproducer": null,
       "required_correction": "Select before held-out materialization",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "tests/test_performance_equivalence.py"
       ],
       "status": "implemented_equivalence_verified_synthetic_measurement",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "MI keeps original full training matrix and noise order."
+      ],
+      "final_disposition": "Training-only scoring precedes selected held-out evaluation; complete histories retained.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E09",
       "title": "Stream exact candidate scoring",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/feature_engineering.py expand_features_with_dfs",
       "original_reproducer": null,
       "required_correction": "Stream exact candidate scoring",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "tests/test_performance_equivalence.py"
       ],
       "status": "implemented_equivalence_verified_synthetic_measurement",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "MI is not approximated or streamed through a changed estimator. Initial slower streaming version was profiled and reworked."
+      ],
+      "final_disposition": "Variance/random/none scores stream every candidate with exact stable-ID top-k ties.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E10",
       "title": "Batch NumPy and memoize expressions",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/feature_engineering.py _CandidateWorkspace; src/pipeline_runner.py get_data_splits",
       "original_reproducer": null,
       "required_correction": "Batch NumPy and memoize expressions",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
         "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "all_pipeline_equivalence.json"
       ],
       "status": "implemented_equivalence_verified_synthetic_measurement",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "Arithmetic protections/dtypes/RNG order preserved; no general vectorization speedup claimed."
+      ],
+      "final_disposition": "Common numeric cleanup/frame hashes and frozen clean transforms are reused; common expressions memoized.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E11",
       "title": "Value-only perturbation evaluation",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/fsva.py empirical value evaluation",
       "original_reproducer": null,
       "required_correction": "Value-only perturbation evaluation",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
         "tests/test_diagnostic_streaming.py",
-        "tests/test_durable_publication.py",
-        "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "diagnostic_equivalence.json"
       ],
       "status": "implemented_regression_and_synthetic_equivalence_verified",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "Derivative invalidity is retained; nonfinite fallback keeps exact original path."
+      ],
+      "final_disposition": "Value-only evaluation skips unnecessary zero derivative allocations on proven finite inputs.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E12",
       "title": "Stream sparse Jacobian summaries",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/fsva.py compute_jacobian_diagnostic",
       "original_reproducer": null,
       "required_correction": "Stream sparse Jacobian summaries",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
         "tests/test_diagnostic_streaming.py",
-        "tests/test_durable_publication.py",
-        "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "diagnostic_measurements.json"
       ],
       "status": "implemented_regression_and_synthetic_equivalence_verified",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "Prefrozen norm tolerance1e-12; no invalid-count/threshold/coverage tolerance."
+      ],
+      "final_disposition": "Stream expression summaries; exact raw identities; wide diagnostic ~9.1x with all128 sampled rows and96 outputs.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E13",
       "title": "Dependency-aware finite differences",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/fsva.py validate_jacobian_finite_difference",
       "original_reproducer": null,
       "required_correction": "Dependency-aware finite differences",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
         "tests/test_diagnostic_streaming.py",
-        "tests/test_durable_publication.py",
-        "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "diagnostic_equivalence.json"
       ],
       "status": "implemented_regression_and_synthetic_equivalence_verified",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "32 FD rows unchanged; maximum error/status exact; mean-error summation tolerance prefrozen."
+      ],
+      "final_disposition": "Central directions restricted to proven dependencies with all analytic zeros in unchanged denominator.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E14",
       "title": "Exact sparse one-hot representation",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/preprocessing.py; src/resource_limits.py",
       "original_reproducer": null,
       "required_correction": "Exact sparse one-hot representation",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_memory_safety.py",
+        "tests/test_feature_semantics.py"
+      ],
+      "status": "implemented_correctness_baseline_regression_verified",
+      "limitations": [
+        "Not counted as performance gain against corrected reference; no category grouping/row reduction."
+      ],
+      "final_disposition": "Exact sparse one-hot vocabulary/dtypes retained until guarded dense arithmetic.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E15",
       "title": "Final matrices and read-only memmaps",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py train_unit",
       "original_reproducer": null,
       "required_correction": "Final matrices and read-only memmaps",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_prepared_numeric.py",
+        "prepared_prediction_equivalence.json",
+        "remaining_measurements.json"
+      ],
+      "status": "implemented_regression_production_and_synthetic_measured",
+      "limitations": [
+        "Adds~16.8MB arrays on32768x128 fixture; mandatory source and array hashes still read. GPU input path preserved. Old descriptors remain compatible without arrays."
+      ],
+      "final_disposition": "Cache historical exact float32 final arrays; readonly memmaps avoid source unpickle/conversion.128-column fixture loading mean0.697s->0.634s; peak~195MiB->158MiB.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "E16",
       "title": "Dynamic dependency-ready scheduling",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/coordinator.py; src/task_manifest.py ready_tasks",
       "original_reproducer": null,
       "required_correction": "Dynamic dependency-ready scheduling",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_dependency_dispatch.py",
+        "tests/test_coordinator.py"
+      ],
+      "status": "implemented_correctness_baseline_regression_production_verified",
+      "limitations": [
+        "Ordering may differ; task identities, seeds and scientific inputs do not."
+      ],
+      "final_disposition": "Dynamic dependency-ready units; no dataset barrier or empty CPU/GPU pools.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E17",
       "title": "Memory/VRAM and queue backpressure",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/resource_limits.py; src/coordinator.py; src/preprocessing.py",
       "original_reproducer": null,
       "required_correction": "Memory/VRAM and queue backpressure",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_memory_safety.py",
+        "tests/test_coordinator.py"
+      ],
+      "status": "partially_implemented_resource_guards_full_demand_unverified",
+      "limitations": [
+        "Real estimator workspace/VRAM demand calibration and long-run allocator behavior unavailable; these guards cannot certify full-grid feasibility."
+      ],
+      "final_disposition": "Per-worker byte budget,85% RAM backpressure, bounded queues, one GPU active, explicit resource outcomes and RSS recycling.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E18",
       "title": "Reference-aware cache lifetime",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/coordinator.py; src/prepared_inputs.py",
       "original_reproducer": null,
       "required_correction": "Reference-aware cache lifetime",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_prepared_execution.py",
+        "tests/test_artifact_ownership.py",
+        "worker_measurements.json"
+      ],
+      "status": "implemented_regression_production_and_resume_verified",
+      "limitations": [
+        "No automatic eviction; full-grid disk capacity unverified; damaged artifacts after startup repair on next resume."
+      ],
+      "final_disposition": "Resumable inputs and diagnostics referenced by durable results retained; exact bounded repair instead of wholesale deletion.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": true,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E19",
       "title": "Batched manifest queries",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/task_manifest.py task_states/run_config; src/coordinator.py",
       "original_reproducer": null,
       "required_correction": "Batched manifest queries",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_diagnostic_streaming.py",
-        "tests/test_durable_publication.py",
         "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "tests/test_coordinator.py"
       ],
-      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "status": "implemented_regression_verified_no_general_speedup_claim",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "Transactional claims and fencing remain per task. Small persistence fixture shows no reliable speedup."
+      ],
+      "final_disposition": "Batch active states and reuse run configuration; existing-only worker/writer manifest opening; deterministic connection closure.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E20",
       "title": "Durable persistence batching",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/task_manifest.py export_durable_results; src/pipeline_runner.py writer_process",
       "original_reproducer": null,
       "required_correction": "Durable persistence batching",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_diagnostic_streaming.py",
         "tests/test_durable_publication.py",
-        "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "tests/test_critical_recovery.py",
+        "tests/test_coordinator.py"
       ],
-      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "status": "implemented_regression_and_recovery_verified",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "Per-result SQLite commit and fsync retained; no unsafe batching. Full-grid export wall time unmeasured."
+      ],
+      "final_disposition": "Streamed consistent outbox export and disk-backed deduplication; bounded result/control queues; no redundant legacy checkpoint mirror.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E21",
       "title": "Lazy unused imports",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/pipeline_runner.py; src/model.py; src/shap_explainer.py",
       "original_reproducer": null,
       "required_correction": "Lazy unused imports",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_runtime_helpers.py",
+        "tests/test_coordinator.py"
+      ],
+      "status": "implemented_unused_import_removal_startup_gain_unquantified",
+      "limitations": [
+        "Further writer/module import splitting deferred without isolated profile; no SHAP execution introduced."
+      ],
+      "final_disposition": "Unused SHAP production import removed; GPU/LightGBM imports lazy; workers reused.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E22",
       "title": "Equivalent prediction reuse",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/model_prediction.py; src/pipeline_runner.py train_unit",
       "original_reproducer": null,
       "required_correction": "Equivalent prediction reuse",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_model_prediction.py",
+        "prepared_prediction_equivalence.json"
+      ],
+      "status": "implemented_exact_prediction_regression_verified",
+      "limitations": [
+        "Logistic/NB/MLP/LightGBM/GPU keep original predict then predict_proba order."
+      ],
+      "final_disposition": "RF/ExtraTrees/calibrated/uniform-KNN labels reuse probabilities with proven class-order/tie rule.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E23",
       "title": "RNG-preserving perturbation vectorization",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/shift_generator.py; src/feature_engineering.py",
       "original_reproducer": null,
       "required_correction": "RNG-preserving perturbation vectorization",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_seed_scheme.py",
+        "tests/test_leakage_boundaries.py",
+        "worker_equivalence.json"
+      ],
+      "status": "evaluated_deferred_unproven_RNG_dtype_equivalence",
+      "limitations": [
+        "Broadcasting/row-major draws and mixed categorical assignment may alter inputs. No demonstrated bottleneck saving justifies an unproven rewrite."
+      ],
+      "final_disposition": "Preserved column-major corruption draws and per-column assignment/dtypes; no generic perturbation vectorization enabled.",
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "E24",
       "title": "Bounded acquisition and metadata reuse",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/data_loader.py download_datasets_from_list/download_openml_dataset",
       "original_reproducer": null,
       "required_correction": "Bounded acquisition and metadata reuse",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_acquisition.py",
+        "acquisition_gap_reproducer.json"
+      ],
+      "status": "implemented_controlled_regression_actual_acquisition_unverified",
+      "limitations": [
+        "No real download or provider-byte validation performed; no metafeature budget reduction. Cross-name aliases are not certified identical without source evidence."
+      ],
+      "final_disposition": "Selection before fetch; exact same-name requests deduplicated; conflicts rejected; verified existing metadata/data reuse avoids repeated metafeatures.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "R01",
       "title": "Shared ledger and analysis bundle",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/reporting.py report_inputs; src/dataset_statistics.py",
       "original_reproducer": null,
       "required_correction": "Shared ledger and analysis bundle",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "tests/test_reporting_contract.py",
+        "worker_equivalence.json"
       ],
-      "status": "implemented_equivalence_verified_synthetic_measurement",
+      "status": "implemented_regression_and_synthetic_measured",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "Ledger-wide parse still materializes records; full1.225million-row memory pilot unavailable."
+      ],
+      "final_disposition": "Single byte-fingerprinted ledger parse and canonical analysis bundle shared by figures/tables.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "R02",
       "title": "Indexed joins",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/sensitivity_analysis.py _pair_keys/_selection_mask",
       "original_reproducer": null,
       "required_correction": "Indexed joins",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_sensitivity_evidence_controls.py",
+        "remaining_measurements.json"
+      ],
+      "status": "implemented_exact_index_selection_synthetic_measured",
+      "limitations": [
+        "Task/row ordering and prefix universes retained; no changed join grain or stochastic outputs."
+      ],
+      "final_disposition": "Reuse pair indexes per immutable universe; exact selection mask reused by summaries and memberships.50k rows0.362s->0.048s.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "R03",
       "title": "Normalized sensitivity memberships",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/sensitivity_analysis.py SensitivityBundle/write_sensitivity_bundle",
       "original_reproducer": null,
       "required_correction": "Normalized sensitivity memberships",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "remaining_measurements.json",
+        "tests/test_prefix_information.py"
+      ],
+      "status": "evaluated_deferred_public_expanded_schema_compatibility",
+      "limitations": [
+        "Normalized storage requires a versioned reconstructable schema and complete prefix-state roundtrip; no unverified output removal implemented."
+      ],
+      "final_disposition": "Measured50k-row minimal table: four expanded regimes~37.6MB, compact keys~3.6MB. Expanded public table/CSV remains.",
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "R04",
       "title": "Identical regime calculation reuse",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/sensitivity_analysis.py _dataset_summary/analyze_sensitivity",
       "original_reproducer": null,
       "required_correction": "Identical regime calculation reuse",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_prefix_information.py",
+        "tests/test_sensitivity_evidence_controls.py"
+      ],
+      "status": "evaluated_partial_index_reuse_complete_inference_reuse_deferred",
+      "limitations": [
+        "Bootstrap/sign-flip seeds include regime labels and Holm families differ; reusing complete intervals/tests would change contract. Deterministic aggregate reuse not separately implemented."
+      ],
+      "final_disposition": "Immutable selection-key indexes reused; identical selections retain their declared regime-specific calculations.",
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "R05",
       "title": "Exact sign enumeration and batched resampling",
-      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/dataset_statistics.py _exact_signs/_sign_flip_test",
       "original_reproducer": null,
       "required_correction": "Exact sign enumeration and batched resampling",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
-        "tests/test_diagnostic_streaming.py",
-        "tests/test_durable_publication.py",
-        "tests/test_manifest_resources.py",
-        "tests/test_coordinator.py",
-        "tests/test_prepared_execution.py",
-        "tests/test_performance_equivalence.py"
+        "tests/test_performance_equivalence.py",
+        "tests/test_dataset_statistics.py"
       ],
-      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "status": "implemented_exact_sign_cache_MC_batching_deferred",
       "limitations": [
-        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
-      ]
+        "Monte Carlo/bootstrap batching remains unchanged to avoid altered RNG/reduction/decision boundaries; counts2000/5000 unchanged."
+      ],
+      "final_disposition": "Exact sign matrices preserve itertools order and @ kernel, readonly LRU3 cache.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "R06",
       "title": "Equivalent legacy Cliff delta",
-      "evidence_level": "same corrected-reference data/config, exact retained outputs, all selector/operator dense-oracle controls",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/stats_analysis.py cliffs_delta",
       "original_reproducer": null,
       "required_correction": "Equivalent legacy Cliff delta",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
       "tests": [
         "tests/test_performance_equivalence.py",
-        "tests/test_prepared_execution.py",
-        "reproduction/compare_corrected.py"
+        "worker_measurements.json"
       ],
       "status": "implemented_equivalence_verified_synthetic_measurement",
       "limitations": [
-        "Synthetic-only speedup; streaming MI intentionally keeps complete training matrix and original RNG/kernel. First variance streaming implementation regressed timing and was reworked to preserve the pandas kernel without redundant finite cleanup. No full-data timing claim."
-      ]
+        "NaN/equal-infinity undefined states preserved; legacy exploratory calculation is not active publication inference."
+      ],
+      "final_disposition": "Exact sorted/search counts replace quadratic pairwise tile;3000x3000~0.150s->~0.001s.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "R07",
       "title": "Scoped artifact hash reuse",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/provenance_evidence.py _FileHashes/build_package/actual_lineage/verify",
       "original_reproducer": null,
       "required_correction": "Scoped artifact hash reuse",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_provenance_integrity.py",
+        "remaining_measurements.json"
+      ],
+      "status": "implemented_scoped_integrity_and_synthetic_measured",
+      "limitations": [
+        "No persistent mtime-only shortcut; concurrent observed change rejects evidence. Manifest snapshot still materializes authoritative records."
+      ],
+      "final_disposition": "Fresh file bytes once per invocation, rechecked stat identity; expected-hash conflicts preserved.1000claims1file hash bytes65.5MB->65.5kB;~4.7x local probe.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": true,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "integrated or targeted synthetic fixture only; see referenced measurements"
+      }
     },
     {
       "id": "R08",
       "title": "Figure aggregate reuse with required formats",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "evidence_level": "bounded controlled verification or explicit documented rejection/deferment",
+      "path": "active implementation or identified deferred optimization",
+      "supporting_locations": "src/plotting_q1.py; src/generate_tables.py; notebooks/visualization.ipynb",
       "original_reproducer": null,
       "required_correction": "Figure aggregate reuse with required formats",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "No scientific input/budget/precision reduction; declared numerical-equivalence rejection preserved where applicable",
+      "tests": [
+        "tests/test_reporting_contract.py",
+        "tests/test_provenance_integrity.py"
+      ],
+      "status": "implemented_reporting_bundle_reuse_regression_verified",
+      "limitations": [
+        "300DPI PNG/vectorPDF and600DPI notebook PNG/TIFF/PDF defaults retained; rendering speedup not separately measured."
+      ],
+      "final_disposition": "Inferential panels/tables reuse canonical summaries; notebook/figure sidecars link actual ledger/task IDs.",
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "M01",
@@ -1225,14 +2067,27 @@
       "status": "corrected_regression_verified",
       "limitations": [
         "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
-      ]
+      ],
+      "historical_limitations": [
+        "No real ledger exists; no empirical publication figures or manuscript claims generated. Historical exploratory functions remain explicitly named/opt-in; obsolete pooled ranking/structural CLIs and empty CD helper are retired. Notebook cells require a declared real ledger and were schema reviewed; execution is bounded synthetic elsewhere."
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      },
+      "final_disposition": "Active invalid escape labels repaired; final15warnings are2deliberate sklearn metric warnings+13upstream Matplotlib/Pyparsing warnings."
     },
     {
       "id": "M02",
       "title": "Shared P12 unrelated package conflicts",
       "evidence_level": "P12 pip check exit 1",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "provenance/critical_repair/record.md: P12 pip check; requirements.txt",
       "original_reproducer": null,
       "required_correction": "Shared P12 unrelated package conflicts",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
@@ -1240,14 +2095,26 @@
       "status": "documented_unrelated_environment_conflicts_retained",
       "limitations": [
         "Tableshift missing dependencies and numpy/ray pins; OpenCV numpy>=2 and TabPFN LightGBM>=4.4 conflicts remain. AutoFE supported suite passes; unrelated packages were not changed."
-      ]
+      ],
+      "historical_limitations": [
+        "Tableshift missing dependencies and numpy/ray pins; OpenCV numpy>=2 and TabPFN LightGBM>=4.4 conflicts remain. AutoFE supported suite passes; unrelated packages were not changed."
+      ],
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "M03",
       "title": "Historical manuscript grid is separate",
       "evidence_level": "manuscript and cover letter fully read; current grid recalculated",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "README.md; paper/manuscript.tex; corrected_reference_contract.json",
       "original_reproducer": null,
       "required_correction": "Historical manuscript grid is separate",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
@@ -1255,7 +2122,19 @@
       "status": "documented_historical_scope_preserved",
       "limitations": [
         "Historical manuscript and publication PDFs preserved, including empirical claims not revalidated against absent real outputs."
-      ]
+      ],
+      "historical_limitations": [
+        "Historical manuscript and publication PDFs preserved, including empirical claims not revalidated against absent real outputs."
+      ],
+      "verification_states": {
+        "code_implemented": false,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "M04",
@@ -1274,7 +2153,19 @@
       "status": "corrected_verified",
       "limitations": [
         "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
-      ]
+      ],
+      "historical_limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     },
     {
       "id": "M05",
@@ -1293,7 +2184,66 @@
       "status": "corrected_verified",
       "limitations": [
         "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
-      ]
+      ],
+      "historical_limitations": [
+        "Missing real datasets remain unavailable; external artifacts require explicit mapping; production artifact linkage tracked separately in C04/B16"
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": false,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
+    },
+    {
+      "id": "M06",
+      "title": "Acquisition metafeature errors disguised as measured values",
+      "evidence_level": "original injected failure reproduced, failing-then-passing regression",
+      "path": "active explicit acquisition metadata; not production model training",
+      "supporting_locations": "src/data_loader.py compute_meta_features",
+      "original_reproducer": "tests/test_acquisition.py::test_failed_metafeatures_are_missing_with_error_status:1failed before repair",
+      "required_correction": "Preserve missing/error states instead of numeric fallback",
+      "compatibility_impact": "dataset_metafeature_availability_v2; successful values/sample budget/seeds unchanged; historical metadata retained",
+      "tests": [
+        "tests/test_acquisition.py",
+        "tests/test_runtime_helpers.py:11passed2.28s"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "No real acquired metadata verified; historical metadata values need separate validation."
+      ],
+      "verification_states": {
+        "code_implemented": true,
+        "regression_verified": true,
+        "production_smoke_verified": false,
+        "performance_measured": false,
+        "real_data_verified": false,
+        "full_benchmark_completed": false,
+        "performance_scope": "not separately measured"
+      }
     }
-  ]
+  ],
+  "final_verification": {
+    "supported_suite": "227passed,7subtests,15warnings,75.52s",
+    "default_collection_repair": "pytest.ini testpaths=tests; retained reports/reference tests excluded without deletion",
+    "scientific_reference_commit": "913285b",
+    "root_seeds": [
+      42,
+      123,
+      456,
+      789,
+      2025
+    ],
+    "intended_precompute_tasks": 8750,
+    "intended_model_tasks": 1225000,
+    "no_pending_issue_dispositions": true,
+    "real_data_available": false,
+    "full_benchmark_run": false,
+    "issue_count": 75,
+    "supplied_register_items": 74,
+    "source_hash_record": "final_checks.json"
+  }
 }

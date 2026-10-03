@@ -1,0 +1,258 @@
+{
+  "schema": "native_thread_equivalence_probe_v2",
+  "results": [
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "logistic_regression",
+      "seconds_threads_8": 0.002806799951940775,
+      "seconds_threads_1": 0.002468300051987171,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "random_forest",
+      "seconds_threads_8": 0.13777919998392463,
+      "seconds_threads_1": 0.12621849996503443,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "extra_trees",
+      "seconds_threads_8": 0.08892410004045814,
+      "seconds_threads_1": 0.09620179992634803,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "linear_svm",
+      "seconds_threads_8": 0.014080299995839596,
+      "seconds_threads_1": 0.014115500031039119,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "knn",
+      "seconds_threads_8": 0.03218949993606657,
+      "seconds_threads_1": 0.0024519999278709292,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "gaussian_nb",
+      "seconds_threads_8": 0.0013120999792590737,
+      "seconds_threads_1": 0.0014132000505924225,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "mlp",
+      "seconds_threads_8": 0.02181980002205819,
+      "seconds_threads_1": 0.02349509997293353,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "small",
+      "shape": [
+        192,
+        24
+      ],
+      "model": "lightgbm",
+      "seconds_threads_8": 0.05132169998250902,
+      "seconds_threads_1": 0.050188499968498945,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "logistic_regression",
+      "seconds_threads_8": 0.004056100035086274,
+      "seconds_threads_1": 0.006317000021226704,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "random_forest",
+      "seconds_threads_8": 0.7250931001035497,
+      "seconds_threads_1": 0.7337342000100762,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "extra_trees",
+      "seconds_threads_8": 0.27008069993462414,
+      "seconds_threads_1": 0.2819745000451803,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "linear_svm",
+      "seconds_threads_8": 0.03851320000831038,
+      "seconds_threads_1": 0.04103399999439716,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "knn",
+      "seconds_threads_8": 0.045358299976214767,
+      "seconds_threads_1": 0.01762639998923987,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "gaussian_nb",
+      "seconds_threads_8": 0.0036507999757304788,
+      "seconds_threads_1": 0.0030886000022292137,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "mlp",
+      "seconds_threads_8": 0.12849310005549341,
+      "seconds_threads_1": 0.08297450002282858,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "larger",
+      "shape": [
+        1024,
+        96
+      ],
+      "model": "lightgbm",
+      "seconds_threads_8": 2.2321898998925462,
+      "seconds_threads_1": 1.945340699981898,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "fixture": "retained_gaussian_autofe",
+      "shape": [
+        384,
+        100
+      ],
+      "model": "logistic_regression",
+      "seconds_threads_8": 0.04918949992861599,
+      "seconds_threads_1": 0.015204800060018897,
+      "prediction_exact": true,
+      "probability_exact": false,
+      "maximum_probability_difference": 0.0016422370315654078
+    }
+  ],
+  "restored_threadpools": [
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\numpy.libs\\libopenblas64__v0.3.23-293-gc2f4bdbb-gcc_10_3_0-2bde3a66a51006b2b53eb373ff767a3f.dll",
+      "version": "0.3.23.dev",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    },
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 8,
+      "prefix": "vcomp",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\sklearn\\.libs\\vcomp140.dll",
+      "version": null
+    },
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\scipy.libs\\libopenblas_v0.3.27--3aa239bc726cfb0bd8e5330d8d4c15c6.dll",
+      "version": "0.3.27",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    }
+  ],
+  "policy": "Inherited reference limits retained: actual AutoFE production outputs rejected global one-thread rewrite.",
+  "retained_autofe_fixture_note": "Gaussian cold-preparation matrix replayed with the same recorded estimator seed on both thread settings; production-specific failure is separately recorded in rejected_thread_measurements.json."
+}

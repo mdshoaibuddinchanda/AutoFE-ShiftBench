@@ -1,0 +1,71 @@
+{
+  "python_source_files_compiled_without_bytecode": 77,
+  "notebook_code_cells_compiled": {
+    "notebooks\\sanity_checks.ipynb": 1,
+    "notebooks\\visualization.ipynb": 3
+  },
+  "source_sha256": {
+    "src\\artifact_integrity.py": "8faffa3c36445b001da02e540b479d609890fbe05df9e4f7a483ba9b164160a6",
+    "src\\checkpoint.py": "60e214ebecc4460805ac221e209129bb229055ec6eccc987cef18017e319c0af",
+    "src\\check_progress.py": "f180c11d12fc891874a203a07821d87a228b51f34fa6f3681d617f79da03709f",
+    "src\\coordinator.py": "cc9c12491866a660d28c6294415ce33762ad85ce786fee9395e490c8aa7b6824",
+    "src\\create_workflow_diagram.py": "6c612ab3c45554d2882cfb666ff55fb2f35b46f802a18bf1e06810bd1e79ab0e",
+    "src\\dataset_statistics.py": "87a607e61dfc492cd126b1c6d16aed93fd6306b88c2d451699fc30a64a98bdd3",
+    "src\\data_loader.py": "e356ab635fe4e85da431f4682480faa81e0950c75471a1c39b97eb44d03571c1",
+    "src\\device_policy.py": "0361d0b51bf940be5146e2710ab8659542ebdcc78049e5c28e3668425b3d5c71",
+    "src\\evaluation.py": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4",
+    "src\\feature_engineering.py": "d0dfa5594c1c320714e431c42b84d44a3434e8e23a42364ceefb10cbe63a4ccc",
+    "src\\feature_selection.py": "f470ce0c7c9e9048d04ad4588d22cb47973f02e83201c726da3466c7985e11f7",
+    "src\\fsva.py": "bdc302f7d4f9af0882e1429972a5a0953579a3d420c3d68ca9fc43132df7a277",
+    "src\\generate_tables.py": "ec6c79deb96bb97bb2d8357be3b696294e797aefb512ed98cb0ce48576d15638",
+    "src\\historical_snapshot.py": "8826c412f53996f11da4dbbfb88318c52cc08863fa388207e8a50a5e2675f45f",
+    "src\\model.py": "d4bec8eea8f34a517ae91ba42f5a2a030c48bf5b3aea02176139c516641e8520",
+    "src\\model_prediction.py": "f4ef3c5cd61c8cbc2ac4612add2fce68d33c23f77b5651412fac627b3e078e80",
+    "src\\operator_registry.py": "2125debcd01f5c79a0befe51501c37bb5e8fd54ffb2b892e20b3dbfcdd7d65a8",
+    "src\\pipeline_runner.py": "1efbfa5ba2a1655a1dc78aea03baaf8fc4d26c40e054ef5dea221750fc47b672",
+    "src\\plotting.py": "e43bc5d11a4a23b252471945dff885d884e4687e4b2aeec002387b6d4132edcc",
+    "src\\plotting_q1.py": "ac6d2690b809b1fe3acbe77f6ba5525eab390e14d139906fbb4a6e18cc0bc351",
+    "src\\prepared_inputs.py": "dc951bb8b55df9c48d2fb11ba15ce2498f8acb4bf0878643738fbcb49d42c375",
+    "src\\preprocessing.py": "6ef0e626481f086fc65b28f8dc90f7cdb74c008c1c33221dc1dca7450a252a8f",
+    "src\\protocol.py": "1c33e3963897aaba5e9cca5c6d304d93b8c1c272b7c9f4d7c19dae7699306cde",
+    "src\\provenance.py": "6b259ef7b8ceacc2935be8d46f391aaf91eb79dfe2d8a8fb22c7711b39506e71",
+    "src\\provenance_cli.py": "5cad437f934f7c1a343ee452b9c1c3bcfce90ddefe58be4ef20cc3083b96d02e",
+    "src\\provenance_evidence.py": "2f44b51d07ced40856dbacb73ca2263f733365a5757fef39faccf04f6d2689df",
+    "src\\reporting.py": "5bb1618e04a8289fbb8af8a803ad3f56e054cf1363c3da9b29824585902fb6e3",
+    "src\\resource_limits.py": "63c9a03b1d33c11822adbc0874d6c207df686de837a091115319468d76930cfd",
+    "src\\seeding.py": "1d35a29a4e08adaf2ccad77863a8bb8b6bbed6776dd614b79a0d5e1fe830ed54",
+    "src\\sensitivity_analysis.py": "dfca5dbc849b9af01431356db1505033222bf000bdd69393d09aee33f9197512",
+    "src\\shap_explainer.py": "6a74ace48a8f099697c7a42e7ad7c283f8c4d1c38008efdd48a3df9da0316a38",
+    "src\\shift_generator.py": "91c8fb6e6bc52c6a68a41132cba86d9464ef1049aca9bde448540c8b5bb121c0",
+    "src\\splitters.py": "f79158365577ecf520dd303a990fd23dcb282e20f4bd1486a67834ae7099ccf4",
+    "src\\stats_analysis.py": "f112137fb03b221ae3418b2f91b5741701448a1d6dae7c9914952339c53c1556",
+    "src\\task_manifest.py": "e70a8473368a42bf55115a4b03bfa7e7eb7b556963f1aded2887ab0910dda7d8"
+  },
+  "launcher_smoke": {
+    "environment": "Conda P12",
+    "intended_precompute_tasks": 1,
+    "intended_model_tasks": 1,
+    "attempts": 0,
+    "durable_model_results": 0,
+    "skipped_missing_data_tasks": 2,
+    "mode": "manifest_only"
+  },
+  "supported_suite": {
+    "command": "D:\\Conda\\P12\\python.exe -B -m pytest -q -p no:cacheprovider",
+    "passed": 227,
+    "subtests_passed": 7,
+    "warnings": 15,
+    "seconds": 75.52,
+    "initial_collection_failure": "30 import-mismatch errors: retained corrected checkout tests auto-collected under reports; fixed with pytest.ini without deleting reference",
+    "warnings_scope": "2 deliberate single-class metric warnings;13 upstream Matplotlib/Pyparsing deprecations"
+  },
+  "previous_integrated_suite": {
+    "command": "D:\\Conda\\P12\\python.exe -B -m pytest -q -p no:cacheprovider",
+    "passed": 226,
+    "subtests_passed": 7,
+    "warnings": 15,
+    "seconds": 75.79,
+    "initial_collection_failure": "30 import-mismatch errors: retained corrected checkout tests auto-collected under reports; fixed with pytest.ini without deleting reference",
+    "warnings_scope": "2 deliberate single-class metric warnings;13 upstream Matplotlib/Pyparsing deprecations"
+  }
+}

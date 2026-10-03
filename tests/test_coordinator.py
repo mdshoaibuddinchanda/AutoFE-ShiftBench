@@ -20,6 +20,11 @@ def fast_worker(task,queue):
         queue.put({**{key:task[key] for key in ('run_id','scientific_task_id','attempt_id','seed','fold','condition','pipeline','model','split_policy')},'dataset':task['dataset'],'status':'success','roc_auc':.5})
 
 
+def crashing_first_attempt(task,queue):
+    if task['stage']=='precompute' and task['attempt_count']==0:os._exit(23)
+    fast_worker(task,queue)
+
+
 def fixture(tmp_path,monkeypatch,config):
     monkeypatch.chdir(tmp_path)
     (tmp_path/'reports/worker_logs').mkdir(parents=True)
@@ -74,3 +79,54 @@ def test_pending_work_is_never_successful():
     counts={key:0 for key in ('pending','running','failed','timeout','skipped')}
     counts['pending']=1
     assert final_status(counts) == 'unfinished'
+
+
+def test_reused_worker_acknowledges_each_owned_attempt(tmp_path,monkeypatch):
+    config=ExecutionConfig(max_workers=1,worker_max_tasks=8)
+    store,_=fixture(tmp_path,monkeypatch,config)
+    result=execute_manifest(store,'r',tmp_path/'results.jsonl',config,entry=fast_worker)
+    assert result['status']=='completed_successfully'
+    assert result['state_counts']['completed']==4
+    assert result['attempt_counts']=={'completed':4}
+    assert result['workers_spawned']==1
+    assert [row['tasks_executed'] for row in result['worker_resource_samples']]==[1,2,3,4]
+    assert len({row['pid'] for row in result['worker_resource_samples']})==1
+
+
+def test_recycling_and_crashed_retry_preserve_exact_accounting(tmp_path,monkeypatch):
+    config=ExecutionConfig(max_workers=1,max_attempts=2,worker_max_tasks=2)
+    store,_=fixture(tmp_path,monkeypatch,config)
+    result=execute_manifest(store,'r',tmp_path/'results.jsonl',config,entry=crashing_first_attempt)
+    assert result['status']=='completed_successfully'
+    assert result['state_counts']['completed']==4
+    assert result['attempt_counts']=={'completed':4,'failed':2}
+    assert result['workers_spawned']>=3
+    assert result['workers_recycled']>=1
+
+
+def test_worker_launch_failure_records_attempt_and_closes_supervision(tmp_path,monkeypatch):
+    import multiprocessing.context
+    import pytest
+    config=ExecutionConfig(max_workers=1,max_attempts=2)
+    store,_=fixture(tmp_path,monkeypatch,config)
+    original=multiprocessing.context.SpawnProcess.start
+    def start(process):
+        if process._target.__name__=='worker_service':raise OSError('injected worker launch failure')
+        return original(process)
+    monkeypatch.setattr(multiprocessing.context.SpawnProcess,'start',start)
+    with pytest.raises(OSError):execute_manifest(store,'r',tmp_path/'results.jsonl',config,entry=fast_worker)
+    assert store.state_counts('r')['running']==0
+    assert store.attempt_counts('r')=={'failed':1}
+    assert store.run_config('r')['execution']['max_attempts']==2
+
+
+def test_manager_startup_failure_records_failed_run_without_claims(tmp_path,monkeypatch):
+    import multiprocessing.context
+    import pytest
+    config=ExecutionConfig(max_workers=1)
+    store,_=fixture(tmp_path,monkeypatch,config)
+    def fail(*args,**kwargs):raise OSError('injected manager startup failure')
+    monkeypatch.setattr(multiprocessing.context.SpawnContext,'Manager',fail)
+    with pytest.raises(OSError):execute_manifest(store,'r',tmp_path/'results.jsonl',config,entry=fast_worker)
+    assert store.attempt_counts('r')=={}
+    assert store.snapshot('r')['run']['status']=='failed'

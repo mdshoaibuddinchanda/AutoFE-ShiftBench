@@ -45,3 +45,24 @@ conda run -n P12 python -m src.provenance_cli package `
 The package contains metadata, hashes, schema/status records, lineage, and
 commands only. It excludes datasets, caches, benchmark outputs, credentials,
 and machine-specific installation prefixes.
+
+## Corrected-reference performance comparisons
+
+The frozen reference is commit `913285b`; retained local copies are under ignored
+`reports/references/`. Run the current harness against each source root into a
+new output directory. These fixtures are synthetic and bounded; existing
+measurement directories cannot be overwritten.
+
+```powershell
+conda run -n P12 python -B reproduction/benchmark_corrected.py --source-root . --output reports/performance/new_probe --production
+conda run -n P12 python -B reproduction/benchmark_corrected.py --source-root . --output reports/performance/new_all_pipeline_probe --pipelines all
+conda run -n P12 python -B reproduction/compare_corrected.py reports/performance/corrected_reference reports/performance/new_probe --output reports/performance/new_equivalence.json
+```
+
+`benchmark_remaining.py` measures guarded selected-input loading, exact indexed
+membership and fresh scoped hashing. `benchmark_warm_models.py` runs four actual
+models twice against already verified prepared inputs. `verify_prepared_predictions.py`
+replays recorded estimator seeds and exact prepared dependencies to compare labels
+and probabilities. `verify_thread_policy.py` retains the rejected numerical thread
+rewrite evidence. See the engineering record for commands, limitations, warm-model
+dependency setup, and unchanged diagnostic/resampling budgets.

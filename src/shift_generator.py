@@ -28,7 +28,7 @@ def _apply_gaussian_noise(
         noise = rng.normal(loc=0.0, scale=std * sigma, size=len(series))
         
         # We don't impute here; the pipeline handles imputation. We just add noise to non-NaNs.
-        # Actually, adding noise to NaNs makes them non-NaN, so let's only add noise to non-NaNs.
+        # Preserve missing positions while applying the column's original draws.
         mask = series.notna()
         # Cast to float to avoid FutureWarning when adding float noise to int columns
         if not pd.api.types.is_float_dtype(shifted[col]):
@@ -103,10 +103,7 @@ def _apply_class_prior_shift(
     majority_class = counts.idxmax()
     majority_indices = shifted_y[shifted_y == majority_class].index
     
-    # Drop half of the majority class by setting them to NaN (or we can just leave as is since we need equal length array?)
-    # Wait, apply_perturbation returns x and y of the same length.
-    # To truly do class prior shift without dropping rows (which messes up x alignment), we can flip some majority class instances to minority class.
-    # This simulates a different prior without changing dataset size.
+    # Preserve the historical majority-half relabel operation and its RNG order.
     minority_classes = [c for c in counts.index if c != majority_class]
     
     n_to_flip = int(len(majority_indices) * 0.5)

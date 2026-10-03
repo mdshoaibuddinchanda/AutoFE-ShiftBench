@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
@@ -79,3 +80,31 @@ def test_vector_exact_signs_preserve_enumeration_order_and_dtype(n):
     np.testing.assert_array_equal(actual,expected,strict=True)
     assert actual is _exact_signs(n)
     assert not actual.flags.writeable
+
+
+@pytest.mark.parametrize('selector',['variance','random','none','mi'])
+def test_common_candidate_memo_preserves_selectors_scores_history_and_values(selector):
+    train=pd.DataFrame(np.random.default_rng(371).normal(size=(30,4)),columns=list('abcd'))
+    test=train.iloc[:4].copy()
+    config=fe.DFSConfig(selection_method=selector,max_features=6,monitor_ram=False,random_seed=16)
+    workspace=fe._CandidateWorkspace(train,test)
+    expected=fe.expand_features_with_dfs(train,test,np.arange(30)%2,config)
+    actual=fe.expand_features_with_dfs(train,test,np.arange(30)%2,config,_workspace=workspace)
+    again=fe.expand_features_with_dfs(train,test,np.arange(30)%2,config,_workspace=workspace)
+    pd.testing.assert_frame_equal(expected[0],actual[0],check_exact=True)
+    pd.testing.assert_frame_equal(expected[1],actual[1],check_exact=True)
+    assert expected[2]==actual[2]==again[2]
+    assert workspace.hits>0
+    assert workspace.bytes<=workspace.capacity
+    with pytest.raises(ValueError):fe.expand_features_with_dfs(train.copy(),test,np.arange(30)%2,config,_workspace=workspace)
+
+
+def test_production_preparation_can_publish_all_metadata_without_holding_all_matrices(tmp_path,monkeypatch):
+    from src import pipeline_runner as runner
+    monkeypatch.chdir(tmp_path)
+    frame=pd.DataFrame({'x':np.arange(60),'z':np.sin(np.arange(60)),'target':np.arange(60)%2})
+    frame.to_csv('d.csv',index=False)
+    value=runner.get_data_splits('d.csv','d',42,1,'clean','clean',0,selected_pipelines=['Raw','AutoFE_Baseline'],retain_matrices=False)
+    assert value[0]=={}
+    assert set(value[4])=={'Raw','AutoFE_Baseline'}
+    assert all(Path(meta['artifacts']['train']['path']).exists() for meta in value[4].values())

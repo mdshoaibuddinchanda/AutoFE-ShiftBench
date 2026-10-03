@@ -1,0 +1,144 @@
+{
+  "schema": "bounded_warm_model_execution_v1",
+  "synthetic_only": true,
+  "source_root": "D:\\DR2\\AutoFE-ShiftBench_for major 2 oct\\AutoFE-ShiftBench-85747a4672040591d8b35c53c3aa06b1b728e10c",
+  "measurements": [
+    {
+      "repeat": 0,
+      "seconds": 5.343676000018604,
+      "model_tasks_executed": 4,
+      "new_precompute_execution": 0,
+      "import_spawn_included": true,
+      "peak_aggregate_rss_sampled_bytes": 676667392,
+      "rss_sampling_interval_seconds": 0.02,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 4,
+        "stop_limit_unit": "model attempt launches including retries",
+        "workers_spawned": 2,
+        "workers_recycled": 0,
+        "worker_resource_samples": [
+          {
+            "scientific_task_id": "task_478b1f70b93400ccfc6930ec",
+            "attempt_id": "attempt_cedaff263a84933b99a4b1d6",
+            "pid": 31104,
+            "rss_bytes": 162295808,
+            "baseline_rss_bytes": 162295808,
+            "tasks_executed": 1,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_35ba5e09654aeed04bf0eac2",
+            "attempt_id": "attempt_54bb9b972e3178ac09d1fc5d",
+            "pid": 39616,
+            "rss_bytes": 162729984,
+            "baseline_rss_bytes": 162729984,
+            "tasks_executed": 1,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_df9990fbf5a416df89308ef7",
+            "attempt_id": "attempt_8f0376ffbf0f817d6c8fc699",
+            "pid": 39616,
+            "rss_bytes": 162992128,
+            "baseline_rss_bytes": 162729984,
+            "tasks_executed": 2,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_e5b7bfc375c01ca938ddc965",
+            "attempt_id": "attempt_6518788c806eaac01685c328",
+            "pid": 31104,
+            "rss_bytes": 163385344,
+            "baseline_rss_bytes": 162295808,
+            "tasks_executed": 2,
+            "recycle": false
+          }
+        ],
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    },
+    {
+      "repeat": 1,
+      "seconds": 4.255673600011505,
+      "model_tasks_executed": 4,
+      "new_precompute_execution": 0,
+      "import_spawn_included": true,
+      "peak_aggregate_rss_sampled_bytes": 676175872,
+      "rss_sampling_interval_seconds": 0.02,
+      "outcome": {
+        "status": "completed_successfully",
+        "state_counts": {
+          "pending": 0,
+          "running": 0,
+          "completed": 5,
+          "failed": 0,
+          "timeout": 0,
+          "skipped": 0,
+          "intended": 5
+        },
+        "attempt_counts": {
+          "completed": 5
+        },
+        "model_attempts_dispatched_this_invocation": 4,
+        "stop_limit_unit": "model attempt launches including retries",
+        "workers_spawned": 2,
+        "workers_recycled": 0,
+        "worker_resource_samples": [
+          {
+            "scientific_task_id": "task_35ba5e09654aeed04bf0eac2",
+            "attempt_id": "attempt_6bbc82062fc50f818265c0c7",
+            "pid": 38124,
+            "rss_bytes": 162201600,
+            "baseline_rss_bytes": 162201600,
+            "tasks_executed": 1,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_478b1f70b93400ccfc6930ec",
+            "attempt_id": "attempt_a3e758b4e596604665189ac6",
+            "pid": 30300,
+            "rss_bytes": 161587200,
+            "baseline_rss_bytes": 161587200,
+            "tasks_executed": 1,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_df9990fbf5a416df89308ef7",
+            "attempt_id": "attempt_d1ef5c6b3cc8c82c07daa93d",
+            "pid": 38124,
+            "rss_bytes": 162463744,
+            "baseline_rss_bytes": 162201600,
+            "tasks_executed": 2,
+            "recycle": false
+          },
+          {
+            "scientific_task_id": "task_e5b7bfc375c01ca938ddc965",
+            "attempt_id": "attempt_0ce179993c806847f99cbbbc",
+            "pid": 30300,
+            "rss_bytes": 162684928,
+            "baseline_rss_bytes": 161587200,
+            "tasks_executed": 2,
+            "recycle": false
+          }
+        ],
+        "run_deadline_policy": "hard during precompute/model; bounded cleanup/export follows",
+        "cache_retention_policy": "retain all resumable inputs and committed diagnostic evidence; no automatic eviction"
+      }
+    }
+  ],
+  "precompute_evidence_policy": "Each controlled run starts with an explicitly committed verified identical prepared dependency; no precompute worker runs."
+}

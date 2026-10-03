@@ -1,0 +1,154 @@
+{
+  "schema": "bounded_remaining_optimization_probes_v1",
+  "synthetic_only": true,
+  "matrix_shape_before_split": [
+    32768,
+    128
+  ],
+  "load_probes": [
+    {
+      "numeric_memmap": false,
+      "seconds": 0.5780150999780744,
+      "peak_rss_sampled_bytes": 149811200,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 21687471,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            20
+          ],
+          "sha256": "36888e397a213ece9eb740dff256715034696f26c37cbb0680d91a5f78c4251c"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            20
+          ],
+          "sha256": "ea966f9d503010a3dd37f50d6e1bb68f945f53502a96cb7687fe0354b2d49fcf"
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "numeric_memmap": true,
+      "seconds": 0.5699228000594303,
+      "peak_rss_sampled_bytes": 138788864,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 19096526,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            20
+          ],
+          "sha256": "36888e397a213ece9eb740dff256715034696f26c37cbb0680d91a5f78c4251c"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            20
+          ],
+          "sha256": "ea966f9d503010a3dd37f50d6e1bb68f945f53502a96cb7687fe0354b2d49fcf"
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "numeric_memmap": false,
+      "seconds": 0.572793300030753,
+      "peak_rss_sampled_bytes": 147562496,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 21687471,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            20
+          ],
+          "sha256": "36888e397a213ece9eb740dff256715034696f26c37cbb0680d91a5f78c4251c"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            20
+          ],
+          "sha256": "ea966f9d503010a3dd37f50d6e1bb68f945f53502a96cb7687fe0354b2d49fcf"
+        }
+      ],
+      "repeat": 1
+    },
+    {
+      "numeric_memmap": true,
+      "seconds": 0.5607113000005484,
+      "peak_rss_sampled_bytes": 142131200,
+      "rss_sampling_interval_seconds": 0.005,
+      "process_read_bytes": 19096526,
+      "array_identities": [
+        {
+          "dtype": "float32",
+          "shape": [
+            26214,
+            20
+          ],
+          "sha256": "36888e397a213ece9eb740dff256715034696f26c37cbb0680d91a5f78c4251c"
+        },
+        {
+          "dtype": "float32",
+          "shape": [
+            6554,
+            20
+          ],
+          "sha256": "ea966f9d503010a3dd37f50d6e1bb68f945f53502a96cb7687fe0354b2d49fcf"
+        }
+      ],
+      "repeat": 1
+    }
+  ],
+  "membership_probes": [
+    {
+      "repeat": 0,
+      "rows": 50000,
+      "row_apply_seconds": 0.3582825999474153,
+      "indexed_seconds": 0.05192900006659329,
+      "expanded_four_regime_bytes_estimate": 37600528,
+      "key_index_bytes_approx": 3644376
+    },
+    {
+      "repeat": 1,
+      "rows": 50000,
+      "row_apply_seconds": 0.3564431000268087,
+      "indexed_seconds": 0.04389949992764741,
+      "expanded_four_regime_bytes_estimate": 37600528,
+      "key_index_bytes_approx": 3644376
+    }
+  ],
+  "hash_probes": [
+    {
+      "repeat": 0,
+      "repeated_dependencies": 1000,
+      "distinct_files": 1,
+      "uncached_seconds": 0.6260522999800742,
+      "scoped_seconds": 0.1298582999734208,
+      "hash_bytes_before": 65536000,
+      "hash_bytes_after": 65536
+    },
+    {
+      "repeat": 1,
+      "repeated_dependencies": 1000,
+      "distinct_files": 1,
+      "uncached_seconds": 0.6185446000890806,
+      "scoped_seconds": 0.12945830007083714,
+      "hash_bytes_before": 65536000,
+      "hash_bytes_after": 65536
+    }
+  ],
+  "artifact_bytes": 91220830,
+  "limits": "Input-loading fixture has diagnostics disabled to isolate loading; it is not an alternative benchmark contract. RSS is sampled, timings exclude spawn/import, process I/O omits child OS page-cache accounting."
+}

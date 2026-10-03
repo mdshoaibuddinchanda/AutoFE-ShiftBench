@@ -62,6 +62,8 @@ class ExecutionConfig:
     run_wall_time_seconds: float | None = None
     max_attempts: int = 1
     max_artifact_repairs_per_unit: int = 1
+    worker_max_tasks: int = 8
+    worker_rss_growth_bytes: int = 64*1024*1024
     retryable_failure_classes: tuple[str, ...] = tuple(sorted(RETRYABLE_FAILURES))
     stop_after_tasks: int | None = None
     stale_after_seconds: float = 3600.0
@@ -72,6 +74,8 @@ class ExecutionConfig:
             raise ValueError("max_workers and max_attempts must be positive")
         if self.max_artifact_repairs_per_unit < 0:
             raise ValueError("max_artifact_repairs_per_unit must be nonnegative")
+        if self.worker_max_tasks < 1 or self.worker_rss_growth_bytes < 1:
+            raise ValueError('Worker recycling limits must be positive')
         if self.task_timeout_seconds is not None and self.task_timeout_seconds <= 0:
             raise ValueError("task_timeout_seconds must be positive")
         if self.run_wall_time_seconds is not None and self.run_wall_time_seconds <= 0:

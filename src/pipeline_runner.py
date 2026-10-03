@@ -292,7 +292,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                              diagnostics_enabled: bool = False,
                              diagnostic_config: dict[str, Any] | None = None,
                              data_identity: dict[str, Any] | None = None,
-                             selected_pipelines: list[str] | None = None):
+                             selected_pipelines: list[str] | None = None,
+                             retain_matrices: bool = True,on_pipeline=None):
     """Generate all configured raw controls and arithmetic variants for one unit.
 
     Returns:
@@ -310,6 +311,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
         "protocol":EVALUATION_PROTOCOL_VERSION,"seed_scheme":SEED_SCHEME_VERSION,
         "preprocessing":PREPROCESSING_SEMANTICS_VERSION,"diagnostics_enabled":diagnostics_enabled,
         "diagnostic_config":diagnostic_config if diagnostics_enabled else None}
+    workspace=None
+    diagnostic_memo={}
 
     for p_name, cfg in PIPELINE_CONFIGS.items():
         if p_name not in requested:
@@ -353,8 +356,11 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                 meta["dfs_cache_hit"] = True
             else:
                 t0 = time.time()
+                if workspace is None:
+                    from src.feature_engineering import _CandidateWorkspace
+                    workspace=_CandidateWorkspace(x_train,x_test)
                 x_train_fe, x_test_fe, dfs_meta = expand_features_with_dfs(
-                    x_train, x_test, y_train, config=cfg_copy,
+                    x_train, x_test, y_train, config=cfg_copy,_workspace=workspace,
                 )
                 gen_time = time.time() - t0
 
@@ -420,18 +426,23 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                     "magnitudes": list(diagnostic_cfg.get("magnitudes", DEFAULT_PERTURBATION_MAGNITUDES)),
                 }
                 try:
-                    jac = compute_jacobian_diagnostic(
-                        x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                        max_rows=max_rows, random_state=diag_seed,
-                    )
-                    amp = compute_empirical_amplification(
-                        x_train, selected_exprs, raw_control_expressions=raw_exprs,
-                        magnitudes=settings["magnitudes"],
-                        max_rows=max_rows, random_state=diag_seed,
-                    )
-                    derivative_validation = validate_jacobian_finite_difference(
-                        x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
-                    )
+                    diagnostic_key=fingerprint({'outputs':selected_expressions,'settings':settings})
+                    if diagnostic_key in diagnostic_memo:
+                        jac,amp,derivative_validation=diagnostic_memo[diagnostic_key]
+                    else:
+                        jac = compute_jacobian_diagnostic(
+                            x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                            max_rows=max_rows, random_state=diag_seed,
+                        )
+                        amp = compute_empirical_amplification(
+                            x_train, selected_exprs, raw_control_expressions=raw_exprs,
+                            magnitudes=settings["magnitudes"],
+                            max_rows=max_rows, random_state=diag_seed,
+                        )
+                        derivative_validation = validate_jacobian_finite_difference(
+                            x_train, selected_exprs, max_rows=min(max_rows, 32), random_state=diag_seed,
+                        )
+                        diagnostic_memo[diagnostic_key]=(jac,amp,derivative_validation)
                     diagnostic_status = "diagnostic_complete"
                     diagnostics = {
                         "schema_version": FSVA_SCHEMA_VERSION,
@@ -472,7 +483,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                         meta['artifacts'][role]={'path':str(path),'sha256':file_sha256(path)}
                 atomic_json(meta_cache,_json_safe({key:value for key,value in meta.items() if key != 'selection_history'}))
             meta['metadata_path']=str(meta_cache)
-        res_pipelines[p_name] = (x_train_fe, x_test_fe)
+        if on_pipeline is not None:on_pipeline(p_name,x_train_fe,x_test_fe,meta)
+        if retain_matrices:res_pipelines[p_name] = (x_train_fe, x_test_fe)
         res_meta[p_name] = meta
 
     return res_pipelines, res_meta
@@ -485,7 +497,8 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 def get_data_splits(data_path, dataset_name, seed, fold, condition,
                     shift_family, severity, diagnostics_enabled: bool = False,
                     diagnostic_config: dict[str, Any] | None = None,
-                    selected_pipelines: list[str] | None = None):
+                    selected_pipelines: list[str] | None = None,
+                    retain_matrices: bool = True):
     """Load data and keep labels out of feature-based split geometry.
 
     Covariate/population fold definitions intentionally use all predictor rows
@@ -578,27 +591,23 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         columns=preprocessor.get_feature_names_out(),
     )
 
-    res_pipelines, res_meta = _run_pipeline_generation(
-        x_train_prep, x_test_prep, y_train_enc,
-        dataset_name, split_policy, seed, fold, condition,
-        diagnostics_enabled=diagnostics_enabled,
-        diagnostic_config=diagnostic_config,
-        data_identity=data_signature,
-        selected_pipelines=selected_pipelines,
-    )
     clean_train=processed_frame(preprocessor.transform(x_train),columns=preprocessor.get_feature_names_out())
-    for pipeline_name, meta in res_meta.items():
+    def record_mapping(pipeline_name,selected_train,selected_test,meta):
         from src.operator_registry import expression_from_dict
         from src.feature_engineering import _evaluate_expression
         selected_exprs=[expression_from_dict(item['expression']) for item in meta['selected_feature_expressions']]
         map_clean=lambda frame:pd.DataFrame({fid:_evaluate_expression(expr,frame)[0] for fid,expr in zip(meta['selected_feature_identities'],selected_exprs)},index=frame.index)
         distance_state=distance_sample_seed(dataset_name,split_policy,seed,fold,condition)
-        meta['training_distribution_distance']=compute_distribution_distance(map_clean(clean_train),res_pipelines[pipeline_name][0],random_state=distance_state)
-        meta['held_out_distribution_distance']=compute_distribution_distance(map_clean(x_test_clean_prep),res_pipelines[pipeline_name][1],random_state=distance_state)
+        meta['training_distribution_distance']=compute_distribution_distance(map_clean(clean_train),selected_train,random_state=distance_state)
+        meta['held_out_distribution_distance']=compute_distribution_distance(map_clean(x_test_clean_prep),selected_test,random_state=distance_state)
         meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
         meta["corruption_seed"] = derived_corruption_seed
         meta["seed_scheme_version"] = SEED_SCHEME_VERSION
         meta['input_artifacts']=[artifact(split_cache,'split_indices',split_dependency),artifact(split_meta,'split_metadata',split_dependency),artifact(preprocessing_path,'fitted_preprocessor')]
+    res_pipelines,res_meta=_run_pipeline_generation(
+        x_train_prep,x_test_prep,y_train_enc,dataset_name,split_policy,seed,fold,condition,
+        diagnostics_enabled=diagnostics_enabled,diagnostic_config=diagnostic_config,data_identity=data_signature,
+        selected_pipelines=selected_pipelines,retain_matrices=retain_matrices,on_pipeline=record_mapping)
 
     return res_pipelines, y_train_enc, y_test_enc, label_enc, res_meta, x_test_clean_prep
 
@@ -684,6 +693,7 @@ def precompute_unit(kwargs):
         allowed=('data_path','dataset_name','seed','fold','condition','shift_family','severity','diagnostics_enabled','diagnostic_config')
         kwargs_copy={key:kwargs[key] for key in allowed if key in kwargs}
         kwargs_copy['selected_pipelines']=list(kwargs['prepared_pipelines']) if kwargs.get('prepared_pipelines') else None
+        kwargs_copy['retain_matrices']=False
         store = _manifest_for_task(kwargs)
         if store is not None:
             expected=store.task_payload(str(kwargs['run_id']),str(kwargs['scientific_task_id']))['data_identity']
@@ -700,10 +710,11 @@ def precompute_unit(kwargs):
             restore_metadata_after_exact_repair(descriptor)
         store = _manifest_for_task(kwargs)
         if store is not None and attempt_id:
+            from src.prepared_inputs import unit_artifacts
             store.commit_result(
                 str(kwargs["run_id"]), str(kwargs["scientific_task_id"]), str(attempt_id),
                 {**_manifest_result_fields(kwargs, attempt_id), "stage": "precompute", "status": "completed",
-                    'prepared_descriptor':descriptor,'artifacts':[descriptor,*first_meta['input_artifacts']]},
+                    'prepared_descriptor':descriptor,'artifacts':unit_artifacts(descriptor)},
                 result_ref=str(cache_root() / kwargs["dataset_name"]),
             )
         gc.collect()
@@ -720,6 +731,7 @@ def train_unit(kwargs):
     attempt_id = _claim_manifest_task(kwargs, worker_id=f"train:{os.getpid()}")
     if kwargs.get("manifest_db") and kwargs.get("scientific_task_id") and attempt_id is None:
         return
+    mapped_inputs=[]
     try:
         dataset_name = kwargs["dataset_name"]
         seed = kwargs["seed"]
@@ -742,7 +754,7 @@ def train_unit(kwargs):
             if len(dependencies) != 1:
                 raise ManifestError('Production model needs exactly one prepared dependency')
             dependency=owning_store.durable_payload(str(kwargs['run_id']),dependencies[0])
-            prepared=load_pipeline(dependency['prepared_descriptor'],pipeline_name)
+            prepared=load_pipeline(dependency['prepared_descriptor'],pipeline_name,model_numeric=model_type not in GPU_MODELS)
         else:
             prepared=get_data_splits(
                 kwargs["data_path"], dataset_name, seed, fold, condition,
@@ -754,9 +766,12 @@ def train_unit(kwargs):
 
         X_tr, X_te = pipelines[pipeline_name]
         # Replace infs with large finite values so models don't crash
-        X_tr = np.nan_to_num(X_tr.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
-        X_te = np.nan_to_num(X_te.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
         meta = res_meta[pipeline_name]
+        if meta.get('model_numeric_policy'):
+            mapped_inputs=[X_tr,X_te]
+        else:
+            X_tr = np.nan_to_num(X_tr.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
+            X_te = np.nan_to_num(X_te.astype(np.float32), nan=np.nan, posinf=1e10, neginf=-1e10)
         owning_store=_manifest_for_task(kwargs)
         run_config=owning_store.run_config(str(kwargs["run_id"])) if owning_store is not None else {}
 
@@ -771,23 +786,18 @@ def train_unit(kwargs):
             model_type,
         )
         model = build_model(model_type, random_state=model_seed, use_gpu=use_gpu)
+        from threadpoolctl import threadpool_info
+        effective_native_threads=[{'internal_api':item['internal_api'],'num_threads':item['num_threads']} for item in threadpool_info()]
         model.fit(X_tr, y_train_enc)
         device_evidence=fitted_device(model,model_type,use_gpu)
         train_time = time.time() - t0
 
         t1 = time.time()
-        y_pred = model.predict(X_te)
-        if hasattr(model, "predict_proba"):
-            y_proba = model.predict_proba(X_te)
-        else:
-            y_proba = None
+        from src.model_prediction import predict_labels_and_probabilities
+        y_pred,y_proba=predict_labels_and_probabilities(model,X_te)
         infer_time = time.time() - t1
 
-        y_pred_train = model.predict(X_tr)
-        if hasattr(model, "predict_proba"):
-            y_proba_train = model.predict_proba(X_tr)
-        else:
-            y_proba_train = None
+        y_pred_train,y_proba_train=predict_labels_and_probabilities(model,X_tr)
 
         encoded_classes = np.arange(len(label_enc.classes_))
         probability_classes = np.asarray(model.classes_)
@@ -817,6 +827,7 @@ def train_unit(kwargs):
             "pipeline_identity": pipeline_identity,
             "model": model_type,
             "device_evidence":device_evidence,
+            "native_thread_policy":{'limit':None,'scope':'inherited corrected-reference native limits; one-thread rewrite rejected by production equivalence','effective_libraries':effective_native_threads},
             "status": "success",
             **_manifest_result_fields(kwargs, attempt_id),
             "n_train": len(X_tr),
@@ -880,6 +891,8 @@ def train_unit(kwargs):
         _record_manifest_failure(kwargs, attempt_id, failure_class=failure, exception=exc, retry=kwargs.get("retry", False))
         with open("reports/worker_logs/phase2_error.log", "a") as f:
             f.write(f"Train error {kwargs}: {traceback.format_exc()}\n")
+    finally:
+        for values in mapped_inputs:values._mmap.close()
 
 
 # ---------------------------------------------------------------------------
@@ -899,7 +912,7 @@ def run_bounded_train_task(*args,**kwargs):
 def dispatch_training_tasks(*args,**kwargs):
     raise NotImplementedError('Dataset-barrier pool dispatcher retired; use supervised src.coordinator.execute_manifest')
 
-def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None):
+def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None, ready_event=None):
     """Transactionally commit task/attempt/result, then export an idempotent row."""
     store = ManifestStore(manifest_db,initialize=False) if manifest_db and run_id else None
     if store is None: init_db()
@@ -907,6 +920,7 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
     if store is not None:
         store.export_durable_results(str(run_id),results_path)
     with open(results_path, "a", encoding="utf-8", newline="\n") as f:
+        if ready_event is not None:ready_event.set()
         while True:
             res = queue.get()
             if res == "DONE":
@@ -983,6 +997,8 @@ def main() -> None:
     parser.add_argument("--manifest-path", type=Path, default=None)
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--max-workers", type=int, default=None)
+    parser.add_argument('--worker-max-tasks',type=int,default=8)
+    parser.add_argument('--worker-rss-growth-mib',type=int,default=64)
     parser.add_argument("--task-timeout-seconds", type=float, default=None)
     parser.add_argument("--run-wall-time-seconds", type=float, default=None)
     parser.add_argument("--max-attempts", type=int, default=1)
@@ -1080,6 +1096,8 @@ def main() -> None:
         task_timeout_seconds=args.task_timeout_seconds,
         run_wall_time_seconds=args.run_wall_time_seconds,
         max_attempts=args.max_attempts,
+        worker_max_tasks=args.worker_max_tasks,
+        worker_rss_growth_bytes=args.worker_rss_growth_mib*1024**2,
         stop_after_tasks=args.stop_after_tasks,
         stale_after_seconds=args.stale_after_seconds,
     )
@@ -1091,7 +1109,7 @@ def main() -> None:
         "code_identity": collect_code_identity(Path.cwd()),
         "environment_identity": collect_environment_identity(Path.cwd()),
         "durability_protocol": "sqlite_result_outbox_v2",
-        "scheduler_version":"dependency_ready_supervised_attempts_v1",
+        "scheduler_version":"dependency_ready_reusable_supervised_attempts_v2",
         "stop_limit_unit":"model_attempt_launches_including_retries",
         "run_deadline_policy":"hard during work; bounded cleanup/export follows",
         "datasets": datasets,
@@ -1104,6 +1122,7 @@ def main() -> None:
         "diagnostics_enabled": args.enable_fsva_diagnostics,
         "diagnostic_max_rows": args.fsva_max_rows,
         "execution": execution_config.to_dict(),
+        "native_model_thread_limit":None,
     }
     run_id = args.run_id or run_id_for(manifest_config)
     manifest_db = args.manifest_db or Path("reports/manifests/task_manifest.db")

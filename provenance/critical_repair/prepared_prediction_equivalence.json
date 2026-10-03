@@ -1,0 +1,187 @@
+{
+  "schema": "executed_seed_prepared_prediction_replay_v1",
+  "checks": [
+    {
+      "pipeline": "Raw",
+      "model": "logistic_regression",
+      "estimator_seed": 2158484216,
+      "partitions": [
+        {
+          "partition": "train",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              384
+            ],
+            "sha256": "29e7b7d6f6d45cc2110fef96734ccb621578db493e03eaed9baf1309c179704b"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              384,
+              2
+            ],
+            "sha256": "011d2dd630defb604d6c973b77261da846a0428ea842739808b9de14fcdb2375"
+          },
+          "exact": true
+        },
+        {
+          "partition": "test",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              96
+            ],
+            "sha256": "b1db13cd989c41e48c98acd576049f79c0d20e87ee8cd058df1286fa1024d60b"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              96,
+              2
+            ],
+            "sha256": "3716ceb033f6037dbe3fa855d2d04d2855b1ee0ee5e5f3cfdaf6528f5e084655"
+          },
+          "exact": true
+        }
+      ]
+    },
+    {
+      "pipeline": "Raw",
+      "model": "gaussian_nb",
+      "estimator_seed": 3646231908,
+      "partitions": [
+        {
+          "partition": "train",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              384
+            ],
+            "sha256": "0916263b68d0d160e332fef98322ea2d74f1ff5c70db146da0a292cb203360c1"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              384,
+              2
+            ],
+            "sha256": "dcd28e57b740eea6f555ff9a90e2359a4bc212192d45d338ae011f7ce86261a7"
+          },
+          "exact": true
+        },
+        {
+          "partition": "test",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              96
+            ],
+            "sha256": "c855a7123544bad94b73ad299f1c2f90c3a7c07be68c50f99daa0774a14913d1"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              96,
+              2
+            ],
+            "sha256": "fbd5b6bdf10afd7690d5e1a0bbc3816efcad49f5e61c436649e57766efc42978"
+          },
+          "exact": true
+        }
+      ]
+    },
+    {
+      "pipeline": "AutoFE_Baseline",
+      "model": "logistic_regression",
+      "estimator_seed": 2158484216,
+      "partitions": [
+        {
+          "partition": "train",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              384
+            ],
+            "sha256": "7ac56b6d1d00070dd7729b02cc62d9649fba5a718f25ed02096b7dd771db78dd"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              384,
+              2
+            ],
+            "sha256": "631386d2eccd5180ba7043d7c3e13fb276336774f4cc7f302025deb639e503f3"
+          },
+          "exact": true
+        },
+        {
+          "partition": "test",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              96
+            ],
+            "sha256": "5facb1c2140dbb970bf1a235bd6f2ce79c9c4470766e263a67978675b49e5167"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              96,
+              2
+            ],
+            "sha256": "497f6043ca6816ae3725a661a2e8011ed80993b8d71e13ee09afac88bbfc5812"
+          },
+          "exact": true
+        }
+      ]
+    },
+    {
+      "pipeline": "AutoFE_Baseline",
+      "model": "gaussian_nb",
+      "estimator_seed": 3646231908,
+      "partitions": [
+        {
+          "partition": "train",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              384
+            ],
+            "sha256": "6b9a4b5df1037958e814b1c6ad42be3dad346b7f422b6baca802958644261f4e"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              384,
+              2
+            ],
+            "sha256": "c48f14bb04755781abd0579a16c9c3ed777926f7b56dea835bff383b661d347e"
+          },
+          "exact": true
+        },
+        {
+          "partition": "test",
+          "prediction_identity": {
+            "dtype": "int32",
+            "shape": [
+              96
+            ],
+            "sha256": "75a292fa6e6f2ddb5688fd197c368b5e47790c86898658b91d8ebd60b15a5d34"
+          },
+          "probability_identity": {
+            "dtype": "float64",
+            "shape": [
+              96,
+              2
+            ],
+            "sha256": "c71c4240f3bd9cc1e1e9de09cca231b72dfeb64f3ca5d07298a3c9897967d76c"
+          },
+          "exact": true
+        }
+      ]
+    }
+  ],
+  "scientific_equivalence": "exact labels/probabilities/inputs on replayed actual production seeds and prepared dependencies",
+  "native_threads": "inherited corrected-reference limits"
+}
