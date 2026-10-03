@@ -18,88 +18,95 @@ from sklearn.metrics import (
     average_precision_score,
 )
 
+METRIC_SEMANTICS_VERSION = "encoded_class_probability_metrics_v2"
+METRIC_RANGES = {name: (0.0, 1.0) for name in ("accuracy", "balanced_accuracy", "precision", "recall", "f1", "f1_macro", "roc_auc", "pr_auc", "brier_score")}
+METRIC_RANGES.update({"mcc": (-1.0, 1.0), "log_loss": (0.0, np.inf)})
+
+
+class MetricInputError(ValueError):
+    """An input violates the declared target/probability coordinate contract."""
+
 
 def compute_classification_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_proba: np.ndarray,
     classes: np.ndarray | None = None,
-) -> dict[str, float]:
+    *,
+    probability_classes: np.ndarray | None = None,
+) -> dict:
     """
     Compute 10 classification metrics for the benchmark.
     
     Supports both Binary and Multiclass tasks automatically.
     """
-    if classes is not None:
-        unique_classes = classes
-    else:
-        unique_classes = np.unique(y_true)
-        
-    is_binary = len(unique_classes) == 2
-    
-    metrics = {}
-    
-    # Standard metrics
-    metrics["accuracy"] = float(accuracy_score(y_true, y_pred))
-    metrics["balanced_accuracy"] = float(balanced_accuracy_score(y_true, y_pred))
-    metrics["mcc"] = float(matthews_corrcoef(y_true, y_pred))
-    
-    # Averages for multi-class support
-    avg_type = "binary" if is_binary else "macro"
-    
-    metrics["precision"] = float(precision_score(y_true, y_pred, average=avg_type, zero_division=0))
-    metrics["recall"] = float(recall_score(y_true, y_pred, average=avg_type, zero_division=0))
-    metrics["f1"] = float(f1_score(y_true, y_pred, average=avg_type, zero_division=0))
-    
-    # Probabilistic metrics
-    if len(unique_classes) < 2 or y_proba is None or y_proba.size == 0:
-        metrics["roc_auc"] = np.nan
-        metrics["pr_auc"] = np.nan
-        metrics["log_loss"] = np.nan
-        metrics["brier_score"] = np.nan
+    y_true = np.asarray(y_true).reshape(-1)
+    y_pred = np.asarray(y_pred).reshape(-1)
+    declared = np.asarray(classes if classes is not None else np.unique(y_true))
+    if declared.ndim != 1 or len(set(declared.tolist())) != len(declared):
+        raise MetricInputError("class coordinates must be unique and one-dimensional")
+    if len(y_true) != len(y_pred):
+        raise MetricInputError("target and prediction lengths differ")
+    allowed = set(declared.tolist())
+    if not set(y_true.tolist()).issubset(allowed) or not set(y_pred.tolist()).issubset(allowed):
+        raise MetricInputError("target/prediction class is absent from declared class coordinates")
+    # sklearn log_loss orders label coordinates; align to that order explicitly.
+    labels = np.unique(declared)
+    binary = len(labels) == 2
+    names = list(METRIC_RANGES)
+    metrics = {name: np.nan for name in names}
+    statuses = {name: "undefined_empty_target" for name in names}
+    metrics.update({"metric_semantics_version": METRIC_SEMANTICS_VERSION,
+        "metric_status": statuses, "f1_averaging": "binary" if binary else "macro",
+        "brier_normalization": "positive_class_mean_squared_error" if binary else "mean_over_samples_and_declared_classes"})
+    if not len(y_true):
         return metrics
-
-    # Log Loss
-    try:
-        metrics["log_loss"] = float(log_loss(y_true, y_proba, labels=unique_classes))
-    except Exception:
-        metrics["log_loss"] = np.nan
-        
-    # Brier Score (only standard for binary, but we can compute average Brier for multiclass)
-    try:
-        if is_binary:
-            metrics["brier_score"] = float(brier_score_loss(y_true, y_proba[:, 1]))
-        else:
-            # Multiclass Brier Score approximation (Brier Score per class, averaged)
-            brier_scores = []
-            for i, cls in enumerate(unique_classes):
-                y_true_binary = (y_true == cls).astype(int)
-                brier_scores.append(brier_score_loss(y_true_binary, y_proba[:, i]))
-            metrics["brier_score"] = float(np.mean(brier_scores))
-    except Exception:
-        metrics["brier_score"] = np.nan
-        
-    # ROC-AUC and PR-AUC
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            if is_binary:
-                metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba[:, 1]))
-                metrics["pr_auc"] = float(average_precision_score(y_true, y_proba[:, 1]))
-            else:
-                metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba, multi_class="ovr", average="macro"))
-                # PR-AUC multiclass is not natively "macro" in sklearn average_precision_score for labels.
-                # Compute OVR PR-AUC manually
-                pr_scores = []
-                for i, cls in enumerate(unique_classes):
-                    y_true_binary = (y_true == cls).astype(int)
-                    if y_true_binary.sum() > 0:
-                        pr_scores.append(average_precision_score(y_true_binary, y_proba[:, i]))
-                metrics["pr_auc"] = float(np.mean(pr_scores)) if pr_scores else np.nan
-    except Exception:
-        metrics["roc_auc"] = np.nan
-        metrics["pr_auc"] = np.nan
-
+    metrics.update(accuracy=float(accuracy_score(y_true, y_pred)),
+        balanced_accuracy=float(balanced_accuracy_score(y_true, y_pred)),
+        mcc=float(matthews_corrcoef(y_true, y_pred)))
+    kwargs = {"average": "binary", "pos_label": labels[1]} if binary else {"average": "macro", "labels": labels}
+    metrics["precision"] = float(precision_score(y_true,y_pred,zero_division=0,**kwargs))
+    metrics["recall"] = float(recall_score(y_true,y_pred,zero_division=0,**kwargs))
+    metrics["f1"] = float(f1_score(y_true,y_pred,zero_division=0,**kwargs))
+    metrics["f1_macro"] = float(f1_score(y_true,y_pred,average="macro",labels=labels,zero_division=0))
+    for name in ("accuracy","balanced_accuracy","mcc","precision","recall","f1","f1_macro"):
+        statuses[name] = "complete"
+    for name in ("roc_auc","pr_auc","log_loss","brier_score"):
+        statuses[name] = "undefined_no_probabilities" if y_proba is None else "undefined_single_declared_class"
+    if y_proba is None:
+        return metrics
+    probabilities = np.asarray(y_proba)
+    columns = np.asarray(probability_classes if probability_classes is not None else declared)
+    if probabilities.ndim != 2 or probabilities.shape != (len(y_true), len(columns)):
+        raise MetricInputError("probability dimensions do not match rows and class columns")
+    if columns.ndim != 1 or len(set(columns.tolist())) != len(columns) or not set(columns.tolist()).issubset(allowed):
+        raise MetricInputError("probability class coordinates are incompatible")
+    if not np.isfinite(probabilities).all() or np.any(probabilities < 0) or np.any(probabilities > 1):
+        raise MetricInputError("probabilities must be finite and within [0,1]")
+    if not np.allclose(probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-7):
+        raise MetricInputError("probability rows must sum to one")
+    aligned = np.zeros((len(y_true),len(labels)), dtype=probabilities.dtype)
+    positions = {label: i for i,label in enumerate(labels.tolist())}
+    for i,label in enumerate(columns.tolist()):
+        aligned[:,positions[label]] = probabilities[:,i]
+    if len(labels) < 2:
+        return metrics
+    metrics["log_loss"] = float(log_loss(y_true, aligned, labels=labels))
+    if binary:
+        metrics["brier_score"] = float(brier_score_loss(y_true == labels[1], aligned[:,1]))
+    else:
+        metrics["brier_score"] = float(np.mean([brier_score_loss(y_true == label, aligned[:,i]) for i,label in enumerate(labels)]))
+    statuses["log_loss"] = statuses["brier_score"] = "complete"
+    if len(np.unique(y_true)) != len(labels):
+        statuses["roc_auc"] = statuses["pr_auc"] = "undefined_missing_held_out_class"
+        return metrics
+    if binary:
+        metrics["roc_auc"] = float(roc_auc_score(y_true == labels[1],aligned[:,1]))
+        metrics["pr_auc"] = float(average_precision_score(y_true == labels[1],aligned[:,1]))
+    else:
+        metrics["roc_auc"] = float(roc_auc_score(y_true,aligned,labels=labels,multi_class="ovr",average="macro"))
+        metrics["pr_auc"] = float(np.mean([average_precision_score(y_true == label,aligned[:,i]) for i,label in enumerate(labels)]))
+    statuses["roc_auc"] = statuses["pr_auc"] = "complete"
     return metrics
 
 from scipy.stats import wasserstein_distance, ks_2samp

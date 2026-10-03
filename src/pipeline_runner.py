@@ -683,17 +683,19 @@ def train_unit(kwargs):
         if hasattr(model, "predict_proba"):
             y_proba = model.predict_proba(X_te)
         else:
-            y_proba = np.zeros((len(y_test_enc), len(label_enc.classes_)))
+            y_proba = None
         infer_time = time.time() - t1
 
         y_pred_train = model.predict(X_tr)
         if hasattr(model, "predict_proba"):
             y_proba_train = model.predict_proba(X_tr)
         else:
-            y_proba_train = np.zeros((len(y_train_enc), len(label_enc.classes_)))
+            y_proba_train = None
 
-        metrics_test = compute_classification_metrics(y_test_enc, y_pred, y_proba, label_enc.classes_)
-        metrics_train = compute_classification_metrics(y_train_enc, y_pred_train, y_proba_train, label_enc.classes_)
+        encoded_classes = np.arange(len(label_enc.classes_))
+        probability_classes = np.asarray(model.classes_)
+        metrics_test = compute_classification_metrics(y_test_enc, y_pred, y_proba, encoded_classes, probability_classes=probability_classes)
+        metrics_train = compute_classification_metrics(y_train_enc, y_pred_train, y_proba_train, encoded_classes, probability_classes=probability_classes)
 
         distance_seed = distance_sample_seed(
             dataset_name, split_policy, seed, fold, condition,
