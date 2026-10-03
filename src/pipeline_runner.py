@@ -895,9 +895,12 @@ def _wait_for_manifest_tasks(
         time.sleep(0.05)
 
 def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None):
-    """Write durable result records, then commit their manifest completion."""
+    """Transactionally commit task/attempt/result, then export an idempotent row."""
     init_db()
     store = ManifestStore(manifest_db) if manifest_db and run_id else None
+    Path(results_path).parent.mkdir(parents=True,exist_ok=True)
+    if store is not None:
+        store.export_durable_results(str(run_id),results_path)
     with open(results_path, "a", encoding="utf-8", newline="\n") as f:
         while True:
             res = queue.get()
@@ -905,23 +908,14 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
                 break
             res = _json_safe(res)
             if store is not None and res.get("run_id") and res.get("scientific_task_id") and res.get("attempt_id"):
-                task = store.get_task(str(run_id), str(res["scientific_task_id"]))
-                if task is None:
-                    raise ManifestError(f"result references unknown manifest task {res['scientific_task_id']}")
-                if task["state"] == "completed":
-                    # Idempotent duplicate delivery: the authoritative result
-                    # is already durable, so do not append a second analysis row.
+                if res["run_id"] != run_id:
+                    raise ManifestConflictError("writer result belongs to a different run")
+                if not store.commit_result(str(run_id),str(res["scientific_task_id"]),str(res["attempt_id"]),res,result_ref=str(results_path)):
                     continue
-                if task["state"] != "running" or task["active_attempt_id"] != res["attempt_id"]:
-                    raise ManifestConflictError("result writer received a stale task attempt")
-            f.write(json.dumps(res, allow_nan=False) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-            if store is not None:
-                store.commit_result(
-                    str(run_id), str(res["scientific_task_id"]), str(res["attempt_id"]),
-                    res, result_ref=str(results_path),
-                )
+            with artifact_lock(Path(results_path).with_suffix(Path(results_path).suffix+".lock")):
+                f.write(json.dumps(res, allow_nan=False) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
             log_run(
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
@@ -1097,6 +1091,7 @@ def main() -> None:
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
         "seed_scheme_version": SEED_SCHEME_VERSION,
         "code_identity": collect_code_identity(Path.cwd()),
+        "durability_protocol": "sqlite_result_outbox_v2",
         "datasets": datasets,
         "dataset_identities": data_identities,
         "seeds": seeds,
@@ -1123,6 +1118,12 @@ def main() -> None:
     )
     manifest_store = ManifestStore(manifest_db, manifest_path=manifest_path)
     expected_manifest_count = manifest_store.create_run(run_id, manifest_config, manifest_records, manifest_path=manifest_path)
+    if results_path.exists():
+        reconciliation = manifest_store.reconcile_result_ledger(run_id,results_path)
+        if reconciliation["conflicts"]:
+            raise ManifestConflictError("Resume found conflicting ledger evidence; retain evidence for inspection")
+    if not args.dry_run_manifest:
+        manifest_store.export_durable_results(run_id,results_path)
     recovered_attempts = manifest_store.recover_stale_attempts(
         run_id,
         stale_after_seconds=execution_config.stale_after_seconds,

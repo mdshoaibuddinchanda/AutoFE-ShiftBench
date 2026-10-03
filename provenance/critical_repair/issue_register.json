@@ -60,15 +60,20 @@
     {
       "id": "B04",
       "title": "Durable results and crash recovery",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py,task_manifest.py",
-      "original_reproducer": null,
+      "evidence_level": "original fsync-failure defect reproduced; transaction/export/fencing regressions verified",
+      "path": "active writer and coordinator resume",
+      "supporting_locations": "ManifestStore.commit_result/export_durable_results/reconcile_result_ledger; pipeline_runner.writer_process/main",
+      "original_reproducer": "tests/test_durable_publication.py: 3 failed, 1 passed",
       "required_correction": "Durable results and crash recovery",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "sqlite_result_outbox_v2; JSONL is idempotent export; legacy import only pre-fence owning attempt",
+      "tests": [
+        "tests/test_durable_publication.py: 7 passed",
+        "affected manifest/recovery/production: 17 passed"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Process supervisor fault injection remains B17; no full benchmark"
+      ]
     },
     {
       "id": "B05",

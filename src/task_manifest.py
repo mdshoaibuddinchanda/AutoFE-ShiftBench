@@ -21,7 +21,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from src.protocol import EVALUATION_PROTOCOL_VERSION
 from src.seeding import SEED_SCHEME_VERSION
-from src.artifact_integrity import dataset_identity
+from src.artifact_integrity import artifact_lock, atomic_bytes, dataset_identity, file_sha256
 
 
 MANIFEST_SCHEMA_VERSION = "task_manifest_v1"
@@ -455,9 +455,9 @@ class ManifestStore:
             task = connection.execute("SELECT state, active_attempt_id FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if task is None:
                 raise ManifestError(f"Unknown task: {task_id}")
-            existing = connection.execute("SELECT payload_hash FROM durable_results WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
+            existing = connection.execute("SELECT payload_hash, attempt_id FROM durable_results WHERE run_id = ? AND scientific_task_id = ?", (run_id, task_id)).fetchone()
             if existing is not None:
-                if existing["payload_hash"] != payload_hash:
+                if existing["payload_hash"] != payload_hash or existing["attempt_id"] != attempt_id:
                     raise ManifestConflictError("conflicting durable result for scientific task")
                 return False
             if task["state"] != "running" or task["active_attempt_id"] != attempt_id:
@@ -466,6 +466,63 @@ class ManifestStore:
             self._finish_attempt(connection, run_id, attempt_id, "completed", outcome="success", result_ref=result_ref)
             connection.execute("UPDATE tasks SET state = 'completed', outcome_reason = 'success', active_attempt_id = NULL, result_ref = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (result_ref, _now(), run_id, task_id))
             return True
+
+    def export_durable_results(self, run_id: str, ledger_path: str | Path) -> dict[str, int]:
+        """Repair the idempotent export from SQLite's transactional authority.
+
+        Only a truncated final line is recoverable. Conflicting complete rows
+        are rejected; originals are retained before any repair publication.
+        """
+        path = Path(ledger_path)
+        with artifact_lock(path.with_suffix(path.suffix+".lock")):
+            snapshot = self.snapshot(run_id)
+            tasks = {t["scientific_task_id"]:t for t in snapshot["tasks"]}
+            authoritative = {}
+            for row in snapshot["durable_results"]:
+                task = tasks.get(row["scientific_task_id"])
+                if task is None or task["stage"] != "model":
+                    continue
+                payload = json.loads(row["payload_json"])
+                payload.setdefault("run_id",run_id)
+                payload.setdefault("scientific_task_id",row["scientific_task_id"])
+                payload.setdefault("attempt_id",row["attempt_id"])
+                authoritative[row["scientific_task_id"]] = payload
+            rows,seen = [],{}
+            malformed,duplicates = 0,0
+            lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+            nonempty = [i for i,line in enumerate(lines) if line.strip()]
+            for index,line in enumerate(lines):
+                if not line.strip():
+                    continue
+                try:
+                    payload=json.loads(line)
+                    if not isinstance(payload,dict):
+                        raise ManifestConflictError("Non-object ledger record")
+                except json.JSONDecodeError:
+                    if index != nonempty[-1] or line.rstrip().endswith("}"):
+                        raise ManifestConflictError("Malformed nontruncated ledger evidence")
+                    malformed += 1
+                    continue
+                if payload.get("run_id") != run_id:
+                    rows.append(payload)
+                    continue
+                task_id=payload.get("scientific_task_id")
+                if task_id not in authoritative or _canonical(payload) != _canonical(authoritative[task_id]):
+                    raise ManifestConflictError("Ledger payload conflicts with authoritative result")
+                if task_id in seen:
+                    duplicates += 1
+                    continue
+                seen[task_id]=payload
+                rows.append(payload)
+            missing=sorted(set(authoritative)-set(seen))
+            rows.extend(authoritative[task_id] for task_id in missing)
+            if missing or malformed or duplicates:
+                if path.exists():
+                    backup=path.with_name(path.name+".recovery_"+file_sha256(path)[:16])
+                    if not backup.exists():
+                        atomic_bytes(backup,path.read_bytes())
+                atomic_bytes(path,("".join(_canonical(row)+"\n" for row in rows)).encode("utf-8"))
+            return {"rows_added":len(missing),"malformed_lines":malformed,"duplicates_removed":duplicates}
 
     def recover_stale_attempts(self, run_id: str, *, stale_after_seconds: float, retry: bool = True) -> int:
         cutoff = time.time() - stale_after_seconds
@@ -521,6 +578,7 @@ class ManifestStore:
         valid = 0
         malformed = 0
         conflicts = 0
+        sqlite_first = self.run_config(run_id).get("durability_protocol") == "sqlite_result_outbox_v2"
         with path.open(encoding="utf-8") as handle:
             for line in handle:
                 if not line.strip():
@@ -534,7 +592,15 @@ class ManifestStore:
                 attempt_id = result.get("attempt_id")
                 if not task_id or not attempt_id:
                     continue
+                if result.get("run_id") not in (None,run_id):
+                    continue
                 try:
+                    if sqlite_first:
+                        with self._connect() as connection:
+                            saved=connection.execute("SELECT payload_json FROM durable_results WHERE run_id=? AND scientific_task_id=?",(run_id,task_id)).fetchone()
+                        if saved is None or saved["payload_json"] != _canonical(result):
+                            raise ManifestConflictError("SQLite-first ledger lacks matching authoritative commit")
+                        continue
                     if self.commit_result(run_id, task_id, attempt_id, result, result_ref=str(path)):
                         valid += 1
                 except ManifestConflictError:

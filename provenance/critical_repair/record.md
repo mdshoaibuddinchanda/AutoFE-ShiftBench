@@ -105,3 +105,23 @@ violation's cause has been established.
 
 References: Python 3.12 sqlite3 connection-context behavior and
 https://www.sqlite.org/uri.html (read-only mode).
+
+## B04: transactional authority and idempotent export
+
+Original durable-publication checks: 3 failed, 1 passed. An injected fsync
+failure left a running task without authoritative completion. Current runs
+declare `sqlite_result_outbox_v2`: result, task and attempt completion commit
+in one SQLite transaction **before** JSONL export. The ledger is an export,
+not a second transactional authority. Startup reconstructs missing/truncated
+exports from committed results; conflicting complete rows are rejected.
+Repair retains original bytes in a content-addressed recovery backup.
+
+Historical ledger-first stores may reconcile an active owning attempt before
+stale fencing. New SQLite-first stores cannot import uncommitted ledger-only
+rows. Late fenced attempts remain rejected, including duplicate-shaped writes.
+
+Affected publication/recovery/manifest/production suite: 17 passed, 13 warnings,
+10.01 s. Additional transaction rollback, pre-fence legacy reconciliation and
+late-takeover controls: all 7 publication tests passed, 2.86 s. These tests cover
+commit/export boundaries; coordinator/writer process-failure supervision and
+bounded queue integration remain B15/B17 work.
