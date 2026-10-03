@@ -407,5 +407,5 @@ def verify_provenance(
     counts: dict[str, int] = {}
     for check in checks:
         counts[check["status"]] = counts.get(check["status"], 0) + 1
-    overall = "valid" if not any(status in counts for status in ("conflict", "error", "malformed", "duplicate", "unrecognized_task")) else "attention_required"
+    overall = "valid" if not any(status in counts for status in ("conflict", "error", "malformed", "duplicate", "unrecognized_task", "unverified", "truncated_unverified")) else "attention_required"
     return {"schema_version": "provenance_verification_v1", "overall_status": overall, "counts": counts, "checks": checks, "code_identity": collect_code_identity(root), "registry_id": registry["registry_id"]}
