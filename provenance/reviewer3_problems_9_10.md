@@ -55,6 +55,16 @@ Final record:
 - A separate same-run resume fixture deliberately completed only 8 of 20 manifest tasks before the first sensitivity snapshot (**12 pending, 3 valid pairs, 15 selected membership rows**), then claimed the remaining tasks under the same run ID. The resumed snapshot had **20/20 completed, 12 valid pairs, 111 selected membership rows**, distinct snapshot/ledger fingerprints, and unique scientific task IDs. This compares incomplete versus complete membership and provenance without pooling retries or treating precompute rows as model outcomes.
 - The current repository contains no raw benchmark CSVs or full result ledger. No full benchmark, manuscript, or historical claim was generated. The existing `.venv` was not removed; all commands used Conda `P12`.
 
+Roadmap status at this revision:
+
+| Problems | Current evidence | Real corrected benchmark evidence |
+| --- | --- | --- |
+| 1–5 | Implemented in the prior records; regression suite retained; the new smoke exercised seeded splits, fair controls, operator identities, and diagnostics. | Not available without the configured raw datasets and full run. |
+| 6 | Dataset-level paired reader, fair-control entry points, fixture tests, and smoke sensitivity input path. | No historical corrected ledger in the checkout. |
+| 7–8 | Manifest, durable results, timeout/retry/recovery, isolated writer/resume test, full suite, and bounded production smoke. | No full benchmark completion claim. |
+| 9 | Versioned coverage/sensitivity reader, identification bounds, fair contrasts, incomplete-versus-resumed fixture, and smoke CLI output. | No real corrected incomplete-run ledger to interpret. |
+| 10 | Dataset/code/environment registry, lineage, compatibility checker, tamper test, metadata package, and smoke verification. | Configured real datasets remain explicitly unavailable; synthetic bytes only were hashed in smoke. |
+
 Commits pushed to `origin/revision/leakage-seed-stability`:
 
 - `4dcb8ef` — Add incomplete-run sensitivity analysis.
