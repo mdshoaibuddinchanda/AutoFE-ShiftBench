@@ -224,3 +224,19 @@ Archived table2 fixture rendered4unavailable conditions as0.0000. Corrected cell
 Legacy pooled table5/6 are opt-in historical appendices; approximate-CD ranking and unpaired structural CLIs are explicitly retired. Empty plotting helper raisesunsupported rather than silently passing. The notebook uses actual Raw/AutoFE identities and canonical analysis schema, retaining600DPI PNG/TIFF/PDF defaults and configurable output flags. Resampling CLI flags are forwarded;0sign-flip resamples explicitly disables even exact enumeration. The existing denominator regression now requests100resamples to test an enabled exact test; its original0setting relied on the flag defect. Invalid escape labels use raw strings. Identical export duplicate controls and adverse hashed-ID chronological ordering now pass.
 
 Affected reporting/dataset/sensitivity/provenance suite:27passed,13upstreamMatplotlib/Pyparsing warnings,13.05s. Initial control failures were an empty-frame test accessor and the existing denominator test relying on disabled flags, both corrected explicitly. No manuscript/PDF asset was edited and no real findings generated.
+
+## Integrated corrected reference acceptance
+
+P12 `python -B -m pytest -q -p no:cacheprovider`: **133 passed, 7 subtests, 15 warnings, 63.57s**. Warnings are two deliberate single-class metric cases and thirteen upstream Matplotlib/Pyparsing deprecations. Artifact/lineage/history subset:23passed,28.95s. A duplicate-operation patch was rejected before applying; corrected patch was applied and tested.
+
+Missing diagnostics reopen one completed precompute dependency for one exact repair, with a separate persisted maintenance budget. Original result/attempt evidence is archived; historical cutoffs select the original visible result. Regenerated scientific artifact hashes must match before restoring original metadata. Controlled resume completes2precomputeattempts+1modelattempt with identical diagnostic bytes. Damage after startup is detected by workers and repaired at next resume. Changed source or missing original descriptor cannot certify exact repair and fails explicitly. Preflight hash cancellation is checked per1MiB block.
+
+Actual lineage checks bytes and links dataset to partition to fitted preprocessing to selected features, candidate history to selection, task to transactional result, and recorded results to analysis. Wrong-run/hash/task analysis controls reject certification.
+
+main.py previously invoked acquisition without explicit selection before bounded arguments; now it delegates to the runner. Workflow generator labels current controls and transductive stress splits accurately; existing PDFs remain preserved. README stale full-download, pooled-inference and multi-day runtime claims removed.
+
+Coverage inventory and PDF metadata/first-page samples:coverage.json. Methodological text, revisions and notebook cells were read. Large artifacts were sampled as identified, not certified as corrected outputs.
+
+P12 pip check exits1:Tableshift14missing dependencies plus numpy/ray pin conflicts; OpenCV numpy>=2; TabPFN LightGBM>=4.4. Unrelated packages remain untouched. No real acquisition, real-data pilot or full benchmark was run.
+
+Engineering-record writing initially failed on Windows cp1252 encoding. The committed record was restored exactly and the addition written explicitly asUTF8; no historical record was lost.

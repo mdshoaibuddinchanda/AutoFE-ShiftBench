@@ -53,3 +53,11 @@ def test_integer_openml_request_not_retried_with_irrelevant_versions(monkeypatch
     with pytest.raises(RuntimeError):
         loader._fetch_openml_with_fallbacks('mock',data_id=999)
     assert len(seen) == 1
+def test_repository_entry_point_delegates_without_acquisition(monkeypatch):
+    import main
+    from src import pipeline_runner,data_loader
+    calls=[]
+    monkeypatch.setattr(pipeline_runner,'main',lambda:calls.append('runner'))
+    monkeypatch.setattr(data_loader,'download_datasets_from_list',lambda *a,**k:(_ for _ in ()).throw(AssertionError('implicit acquisition')))
+    main.main()
+    assert calls == ['runner']

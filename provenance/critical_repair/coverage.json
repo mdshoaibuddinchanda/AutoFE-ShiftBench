@@ -1,0 +1,1785 @@
+{
+  "schema": "audit_coverage_v1",
+  "read_fully": [
+    "authoritative attachment",
+    "README.md",
+    "reproduction/README.md",
+    "config/dataset_list.yaml",
+    "requirements.txt",
+    ".gitignore",
+    "main.py",
+    "paper/manuscript.tex",
+    "paper/references.bib",
+    "paper/highlights.txt",
+    "paper/cover_letter.txt",
+    "paper/README.md",
+    "paper/figures/README.md",
+    "provenance/reviewer1_problems_1_2.md",
+    "provenance/reviewer2_problems_6_8.md",
+    "provenance/reviewer3_problems_9_10.md",
+    "notebooks/visualization.ipynb (code and markdown cells)",
+    "production src/*.py (canonical execution and active/legacy reporting paths)"
+  ],
+  "tests": "All 133 collected tests executed; defect-specific files read and extended. Baseline tests were reviewed by purpose; no claim that test execution reads every assertion semantically.",
+  "sampled": [
+    {
+      "path": "paper\\figures\\AutoFE_ShiftBench_Workflow.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803141333+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "DATA AND SHIFT CONTROL\nINPUT\nDATA\nOpenML tables\nfeatures + target\nconfigured tasks\nREPEATED\nSPLITS\n5 seeds \u00d7 5 folds\nstratified train/test\npaired task key\nTRAINING\nSHIFT\nclean + missingness\ncovariate + population\n14 settings; test fixed\nFOLD-LOCAL\nPREP\nimpute \u00b7 encode\nscale on train only\ncache by ta"
+    },
+    {
+      "path": "paper\\figures\\Figure_10_Ablation_Study.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803032352+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "Raw\nRaw_MI\nAutoFE_Baseline\nAutoFE_MI\nAutoFE_Random\nAutoFE_NoMultiply\n0.5\n0.6\n0.7\n0.8\n0.9\n1.0\nMean ROC-AUC\n0.826\n0.748\n0.798\n0.824\n0.826\n0.780\nFigure 10: Ablation Study of Feature Generation/Selection\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_2_Dataset_Diversity.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031350+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "0\n1\n2\n3\n4\n5\n6\nNumber of datasets\nOther\nHealthcare\nFinance\nEngineering\nCybersecurity\nBiology\nSoftware\n6\n5\n4\n2\n2\n2\n1\nFigure 2: Dataset Domain Diversity (N=22)\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_3_Pipeline_Ranking.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031359+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "Raw\nRaw_Variance\nRaw_MI\nAutoFE_NoMultiply\nAutoFE_MI\nAutoFE_Random\nAutoFE_Baseline\n0.5\n0.6\n0.7\n0.8\n0.9\n1.0\nROC-AUC\n0.826\n0.826\n0.826\n0.824\n0.798\n0.780\n0.748\nFigure 3: Overall Pipeline Ranking (Mean ROC-AUC)\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_4_Model_Ranking.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031411+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "0.5\n0.6\n0.7\n0.8\n0.9\n1.0\nMean ROC-AUC across shifts and pipelines\nlightgbm\ncatboost\nrandom_forest\nxgboost\nextra_trees\nlogistic_regression\nmlp\nlinear_svm\nknn\ngaussian_nb\n0.843\n0.842\n0.837\n0.837\n0.829\n0.785\n0.773\n0.771\n0.769\n0.756\nFigure 4: Classifier Robustness Ranking\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_5_Robustness_Shift.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803032341+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "0.000\n0.025\n0.050\n0.075\n0.100\n0.125\n0.150\n0.175\n0.200\nMissing value fraction\n0.70\n0.72\n0.74\n0.76\n0.78\n0.80\n0.82\n0.84\nROC-AUC\nFigure 5: Performance Degradation under Missing Values\nRaw\nAutoFE_Baseline\nAutoFE_NoMultiply\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_6_Runtime_Comparison.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031419+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "AutoFE_Baseline\nAutoFE_MI\nAutoFE_NoMultiply\nAutoFE_Random\nRaw\nRaw_MI\nRaw_Variance\n10\n2\n10\n1\n10\n0\nTime (seconds; log scale)\nFigure 6: Computational Overhead (Median Seconds)\nFeature generation\nTraining\nInference\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_7_Feature_Complexity.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031424+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "Raw\nRaw_MI\nRaw_Variance\nAutoFE_Baseline\nAutoFE_MI\nAutoFE_NoMultiply\nAutoFE_Random\n10\n1\n10\n2\nNumber of retained features\nFigure 7: Feature Dimensionality per Pipeline\n"
+    },
+    {
+      "path": "paper\\figures\\Figure_8_CD_Diagram.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031427+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "AutoFE_Baseline\nAutoFE_MI\nAutoFE_NoMultiply\nAutoFE_Random\nRaw\nRaw_MI\nRaw_Variance\nPipeline\nAutoFE_Baseline\nAutoFE_MI\nAutoFE_NoMultiply\nAutoFE_Random\nRaw\nRaw_MI\nRaw_Variance\nPipeline\n1\n0.001\n0.001\n0.001\n0.001\n0.001\n0.001\n0.001\n1\n0.001\n0.001\n0.001\n0.001\n0.001\n0.001\n0.001\n1\n0.001\n0.001\n0.001\n0.001\n0.00"
+    },
+    {
+      "path": "paper\\figures\\Figure_9_Heatmap.pdf",
+      "pages": 1,
+      "metadata": {
+        "format": "PDF 1.4",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Matplotlib v3.10.8, https://matplotlib.org",
+        "producer": "Matplotlib pdf backend v3.10.8",
+        "creationDate": "D:20260803031637+05'1800'",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "first_page_text_excerpt": "AutoFE_Baseline\nAutoFE_MI\nAutoFE_NoMultiply\nAutoFE_Random\nRaw\nRaw_MI\nRaw_Variance\nPipeline\nPhishingWebsites\nadult\nairlines\nbank-marketing\nblood-transfusion-service-center\nbreast-cancer-wisconsin\ncredit-g\ndefault-of-credit-card-clients\ndiabetes\ndry-bean-dataset\nelectricity\nhaberman\nheart-disease\niono"
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v2_baselines_operators_fsva_v1\\sha256_canonical_json_u32_v1\\smoke\\AutoFE_AddSubDiv__add_sub_div_v1__autofe__cap100__base20__selvariance__depth1_s17_f1_gaussian_noise_0.05_meta.json",
+      "metadata": {
+        "num_original": 2,
+        "num_generated": 0,
+        "num_selected": 13,
+        "generation_time_s": 0.004515171051025391,
+        "ram_used_mb": 0.0234375,
+        "feature_metadata": [
+          {
+            "feature_id": "cand_bb42310c584ac055e01f",
+            "name": "([a]/[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_b561c6c6c92d6362335b",
+            "name": "([b]/[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "b",
+              "a"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_876719318834ddfe34f6",
+            "name": "([a]+[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c4c2699518fc6206bc95",
+            "name": "([b]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c3f686400479167ed041",
+            "name": "([a]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_cd75ccb58c47fb0663f3",
+            "name": "([b]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "b",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_a2fd4c319854f446363a",
+            "name": "([a]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_6d204a57a1d6ebbae6fc",
+            "name": "[a]",
+            "expression": {
+              "kind": "raw",
+              "column": "a"
+            },
+            "parents": [
+              "a"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c62c6f76369816e48dfc",
+            "name": "[b]",
+            "expression": {
+              "kind": "raw",
+              "column": "b"
+            },
+            "parents": [
+              "b"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_0618b220938517a35e12",
+            "name": "([a]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_37ad8c1d33725fcb5af7",
+            "name": "([b]/[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_bff364bb8021b85da608",
+            "name": "([a]/[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_ecc74deb84958b88698f",
+            "name": "([b]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          }
+        ],
+        "dfs_cache_hit": false
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v2_baselines_operators_fsva_v1\\sha256_canonical_json_u32_v1\\smoke\\AutoFE_AddSub__add_sub_v1__autofe__cap100__base20__selvariance__depth1_s17_f1_gaussian_noise_0.05_meta.json",
+      "metadata": {
+        "num_original": 2,
+        "num_generated": 0,
+        "num_selected": 9,
+        "generation_time_s": 0.006029367446899414,
+        "ram_used_mb": 0.01171875,
+        "feature_metadata": [
+          {
+            "feature_id": "cand_876719318834ddfe34f6",
+            "name": "([a]+[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c4c2699518fc6206bc95",
+            "name": "([b]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c3f686400479167ed041",
+            "name": "([a]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_cd75ccb58c47fb0663f3",
+            "name": "([b]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "b",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_a2fd4c319854f446363a",
+            "name": "([a]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_6d204a57a1d6ebbae6fc",
+            "name": "[a]",
+            "expression": {
+              "kind": "raw",
+              "column": "a"
+            },
+            "parents": [
+              "a"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c62c6f76369816e48dfc",
+            "name": "[b]",
+            "expression": {
+              "kind": "raw",
+              "column": "b"
+            },
+            "parents": [
+              "b"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_0618b220938517a35e12",
+            "name": "([a]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_ecc74deb84958b88698f",
+            "name": "([b]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          }
+        ],
+        "dfs_cache_hit": false
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v2_baselines_operators_fsva_v1\\sha256_canonical_json_u32_v1\\smoke\\AutoFE_Baseline__full_arithmetic_v1__autofe__cap100__base20__selvariance__depth1_s17_f1_gaussian_noise_0.05_meta.json",
+      "metadata": {
+        "num_original": 2,
+        "num_generated": 0,
+        "num_selected": 16,
+        "generation_time_s": 0.007181644439697266,
+        "ram_used_mb": 0.0546875,
+        "feature_metadata": [
+          {
+            "feature_id": "cand_bb42310c584ac055e01f",
+            "name": "([a]/[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_b561c6c6c92d6362335b",
+            "name": "([b]/[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "b",
+              "a"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_876719318834ddfe34f6",
+            "name": "([a]+[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c4c2699518fc6206bc95",
+            "name": "([b]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c3f686400479167ed041",
+            "name": "([a]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_cd75ccb58c47fb0663f3",
+            "name": "([b]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "b",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_a2fd4c319854f446363a",
+            "name": "([a]+[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "add_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "add_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_6d204a57a1d6ebbae6fc",
+            "name": "[a]",
+            "expression": {
+              "kind": "raw",
+              "column": "a"
+            },
+            "parents": [
+              "a"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c62c6f76369816e48dfc",
+            "name": "[b]",
+            "expression": {
+              "kind": "raw",
+              "column": "b"
+            },
+            "parents": [
+              "b"
+            ],
+            "operators": [],
+            "depth": 0,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_07548751605f0327c27e",
+            "name": "([a]*[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "multiply_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "a",
+              "b"
+            ],
+            "operators": [
+              "multiply_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_c3ebce9fd37a94b9adb7",
+            "name": "([a]*[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "multiply_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "multiply_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_9449c6aac25808f66b74",
+            "name": "([b]*[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "multiply_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "multiply_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_0618b220938517a35e12",
+            "name": "([a]-[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_37ad8c1d33725fcb5af7",
+            "name": "([b]/[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_bff364bb8021b85da608",
+            "name": "([a]/[a])",
+            "expression": {
+              "kind": "operation",
+              "operator": "divide_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "a"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "a"
+              }
+            },
+            "parents": [
+              "a",
+              "a"
+            ],
+            "operators": [
+              "divide_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          },
+          {
+            "feature_id": "cand_ecc74deb84958b88698f",
+            "name": "([b]-[b])",
+            "expression": {
+              "kind": "operation",
+              "operator": "subtract_numeric",
+              "left": {
+                "kind": "raw",
+                "column": "b"
+              },
+              "right": {
+                "kind": "raw",
+                "column": "b"
+              }
+            },
+            "parents": [
+              "b",
+              "b"
+            ],
+            "operators": [
+              "subtract_numeric"
+            ],
+            "depth": 1,
+            "validity": {
+              "nonfinite_count": 0,
+              "clipped_count": 0,
+              "protected_count": 0
+            }
+          }
+        ],
+        "dfs_cache_hit": false
+      }
+    }
+  ],
+  "unavailable": [
+    "data/raw real dataset CSVs",
+    "current benchmark manifest/ledger",
+    "full benchmark outputs"
+  ],
+  "hardware": {
+    "logical_cpu": 8,
+    "physical_cpu": 4,
+    "ram_bytes": 34073251840
+  },
+  "pip_check": "exit 1: unrelated shared P12 package conflicts recorded in engineering record; no package mutation",
+  "file_inventory": [
+    {
+      "path": ".gitignore",
+      "bytes": 1050,
+      "sha256": "7d57ef81fcd71f6c20ca3da76d7875cbc9edebf6c3dfd1251850556b84e4e80b"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1081,
+      "sha256": "4beb4c2a1c09dc35d6c58f1e3f481ac00836c4573fe1b12ec5e42f8d997d59e4"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5951,
+      "sha256": "2749cb4cc37aad9ac4db91f0abb0c6c079c3572d96e3fe994f0f2c06bba39de4"
+    },
+    {
+      "path": "config/dataset_list.yaml",
+      "bytes": 718,
+      "sha256": "e1bc2d8d96e2fb369bb68f6005c64605a1727956cf6bfe2094147b048af8994a"
+    },
+    {
+      "path": "main.py",
+      "bytes": 338,
+      "sha256": "57786fba0998f209613b225d815738129908fd054a36f6cbef94ac204895d71d"
+    },
+    {
+      "path": "notebooks/sanity_checks.ipynb",
+      "bytes": 882,
+      "sha256": "03f4279243a68baba1f09e5f14bc78e315b4a61dc6af1cd914b1dc3d4bff769a"
+    },
+    {
+      "path": "notebooks/visualization.ipynb",
+      "bytes": 3826,
+      "sha256": "c7add6fe890f43845460b44fa61356659f368cfc3a3821c5f86b221e4043eec0"
+    },
+    {
+      "path": "paper/README.md",
+      "bytes": 1888,
+      "sha256": "175a0aeb081fe5db7ea4aa4a3ca6531327b13eaaf6f7f7242695ce3a4a746ea6"
+    },
+    {
+      "path": "paper/cover_letter.txt",
+      "bytes": 3895,
+      "sha256": "0e5b3768726910dc73f9bd0f9d764cbcb5fbf96e6eaa6edd4414c35841fa24c0"
+    },
+    {
+      "path": "paper/figures/AutoFE_ShiftBench_Workflow.pdf",
+      "bytes": 28492,
+      "sha256": "5dc23f19a00090e38573ba348d00efd07109c7932ccf67c632b004254a50b038"
+    },
+    {
+      "path": "paper/figures/Figure_10_Ablation_Study.pdf",
+      "bytes": 25967,
+      "sha256": "c7492852146ff412bfb85c155bcb3c6f8f289b931b574c35695cd8dbe0455ad6"
+    },
+    {
+      "path": "paper/figures/Figure_2_Dataset_Diversity.pdf",
+      "bytes": 24764,
+      "sha256": "34c772fc7bd8cbc93d06b556b08fda761198891ad21cf6c26a32e1bd90244d07"
+    },
+    {
+      "path": "paper/figures/Figure_3_Pipeline_Ranking.pdf",
+      "bytes": 26814,
+      "sha256": "caecefa0b77aaa4e20ff3d124b08935e67171231d9c19dcf8f5e25bcd608ee88"
+    },
+    {
+      "path": "paper/figures/Figure_4_Model_Ranking.pdf",
+      "bytes": 26262,
+      "sha256": "7bc26f23b64ffc5fdc1428f14157b138c25d2c96d68f80425941719c2a047e8f"
+    },
+    {
+      "path": "paper/figures/Figure_5_Robustness_Shift.pdf",
+      "bytes": 27269,
+      "sha256": "9b71750dd16cd41a665efa655eccff7a88b1a0b74d6760978606d68fe5376e3a"
+    },
+    {
+      "path": "paper/figures/Figure_6_Runtime_Comparison.pdf",
+      "bytes": 26824,
+      "sha256": "c61f3b52880b4b7aa64c8988bce753f62cfa19994eb096df5bd1c8ff3ab25a03"
+    },
+    {
+      "path": "paper/figures/Figure_7_Feature_Complexity.pdf",
+      "bytes": 22428,
+      "sha256": "387df8d3593dbb1e0195828e8fb51f3895eeeb44c48d7a243feadc4045a80251"
+    },
+    {
+      "path": "paper/figures/Figure_8_CD_Diagram.pdf",
+      "bytes": 30332,
+      "sha256": "87ad802952635bddfa1a05c0f70e84b1bf9448ad63e119608c47fb0b08fb2360"
+    },
+    {
+      "path": "paper/figures/Figure_9_Heatmap.pdf",
+      "bytes": 44344,
+      "sha256": "52ec08c537e95c02720bf1972c11addc1760b1824585c1544a983b1f2b9cdb18"
+    },
+    {
+      "path": "paper/figures/README.md",
+      "bytes": 684,
+      "sha256": "7151d7a9f9b5e7d32195c2d58c6ae3783afff05a52153e78ae1fdba7a0cecea2"
+    },
+    {
+      "path": "paper/highlights.txt",
+      "bytes": 344,
+      "sha256": "89e4fd21352f8c4aaa152aae7a8e2648cd6a1de784f3435f83e4a4733ddb8225"
+    },
+    {
+      "path": "paper/manuscript.tex",
+      "bytes": 59356,
+      "sha256": "a216579392913dbdb1e496b75292c6e709f3724c28eb44bcd538e2962186483c"
+    },
+    {
+      "path": "paper/references.bib",
+      "bytes": 9833,
+      "sha256": "dc09ce0fd1684687319cdc1f77e8b3c1439d054ffaa60278fa56bc379a5c27cc"
+    },
+    {
+      "path": "provenance/critical_repair/baseline_contract.json",
+      "bytes": 118868,
+      "sha256": "0a80806b5e83cfddb94e52c3a47a465e3386a70737bedca5c8a4fcb6605251e6"
+    },
+    {
+      "path": "provenance/critical_repair/issue_register.json",
+      "bytes": 64233,
+      "sha256": "b9df9842a97f37ee4f69d5dd51501840b4f528a64375bbb0fc32c7f345d64407"
+    },
+    {
+      "path": "provenance/critical_repair/record.md",
+      "bytes": 19799,
+      "sha256": "66e23d67643dc9d4767c40a1a824cd3f185542d497261c965bec0d98846a2d74"
+    },
+    {
+      "path": "provenance/reviewer1_problems_1_2.md",
+      "bytes": 16658,
+      "sha256": "7b2e740ca186960b4405554b8fb212d3a64891a15be6f5f4cfdd8ced7ec54f96"
+    },
+    {
+      "path": "provenance/reviewer2_problems_6_8.md",
+      "bytes": 8942,
+      "sha256": "558c5d999ae15c2c6fd90f8bf403e50832404c90461a46f5505e97ec358b30c4"
+    },
+    {
+      "path": "provenance/reviewer3_problems_9_10.md",
+      "bytes": 6824,
+      "sha256": "3dc81c128ef39702835f20f0304aba27f6621c90caebf366f62b6cce99787b64"
+    },
+    {
+      "path": "reproduction/README.md",
+      "bytes": 1651,
+      "sha256": "5a610b0c04c6148e1df5ed1ff3baad2c67600f231a3a0d228277845ab6110d1c"
+    },
+    {
+      "path": "reproduction/freeze_contract.py",
+      "bytes": 6076,
+      "sha256": "45a2ef7a75edfe38a4a4e4ac72d72ea1bfda8a06cb0e4fdfa4172725518193c4"
+    },
+    {
+      "path": "reproduction/issue_register.py",
+      "bytes": 5151,
+      "sha256": "6da4ed8335f1f688a4c61acd9b40a6d05558dc204b1b828a6eef3826c4876552"
+    },
+    {
+      "path": "reproduction/probe_original_helpers.py",
+      "bytes": 2242,
+      "sha256": "eeef4a962b6822ec0a63e1ae1babdf8ae87b565f222b5507ee29f3b86eb77ba1"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 305,
+      "sha256": "011d27192d203b8bf4b8dc9333f8471579e6d5902f1275b73f1eca6e6bbd9ff8"
+    },
+    {
+      "path": "setup_and_run.bat",
+      "bytes": 198,
+      "sha256": "6e7b91181128df32ab082bc2870c11e3b76b6907424d77bb10114036a07f2574"
+    },
+    {
+      "path": "src/analysis/dataset_stats.py",
+      "bytes": 2132,
+      "sha256": "af0739910fe8614ea70042ae832d6e6ed40643889c9b57e7dbdea4c0e7175345"
+    },
+    {
+      "path": "src/analysis/ranking_analysis.py",
+      "bytes": 5159,
+      "sha256": "33667ba2102a5bbb6ee8f9ab04b883a19f1024e5919535c0457e1d72042acfbb"
+    },
+    {
+      "path": "src/analysis/structural_analysis.py",
+      "bytes": 5201,
+      "sha256": "f9fce48405f487fccfef7479cf0cbeea120068c9a32c6102ddffc3449ce0af74"
+    },
+    {
+      "path": "src/artifact_integrity.py",
+      "bytes": 5962,
+      "sha256": "8faffa3c36445b001da02e540b479d609890fbe05df9e4f7a483ba9b164160a6"
+    },
+    {
+      "path": "src/check_progress.py",
+      "bytes": 4280,
+      "sha256": "f180c11d12fc891874a203a07821d87a228b51f34fa6f3681d617f79da03709f"
+    },
+    {
+      "path": "src/checkpoint.py",
+      "bytes": 2373,
+      "sha256": "60e214ebecc4460805ac221e209129bb229055ec6eccc987cef18017e319c0af"
+    },
+    {
+      "path": "src/coordinator.py",
+      "bytes": 9825,
+      "sha256": "a01da29c240bae160d3e96b0e504a8ca38cb988111d28c8a30be6a744ca80331"
+    },
+    {
+      "path": "src/create_workflow_diagram.py",
+      "bytes": 8480,
+      "sha256": "6c612ab3c45554d2882cfb666ff55fb2f35b46f802a18bf1e06810bd1e79ab0e"
+    },
+    {
+      "path": "src/data_loader.py",
+      "bytes": 18822,
+      "sha256": "ec7f540a3abd6408b246586128b34a26db44471000bdfef4c889b05ea0b8f8a3"
+    },
+    {
+      "path": "src/dataset_statistics.py",
+      "bytes": 26576,
+      "sha256": "1e715451dec5e91eccc6273806b52031cfc04390cac3b87c4d2c2ad0963fd10b"
+    },
+    {
+      "path": "src/device_policy.py",
+      "bytes": 1435,
+      "sha256": "0361d0b51bf940be5146e2710ab8659542ebdcc78049e5c28e3668425b3d5c71"
+    },
+    {
+      "path": "src/evaluation.py",
+      "bytes": 8223,
+      "sha256": "497f955553e9dd3c07e4365746ebdb8dc97e7cb9e2d0675b9e066b199dd20ab4"
+    },
+    {
+      "path": "src/feature_engineering.py",
+      "bytes": 14524,
+      "sha256": "7d6a58ccc8ac641fe263dc0934fd12a119b9a8217b4a177de3002dff1339ee26"
+    },
+    {
+      "path": "src/feature_selection.py",
+      "bytes": 10185,
+      "sha256": "f470ce0c7c9e9048d04ad4588d22cb47973f02e83201c726da3466c7985e11f7"
+    },
+    {
+      "path": "src/fsva.py",
+      "bytes": 14517,
+      "sha256": "2fbc8fc140221369ec22f5beda3b76e8bbe9629c4234b4b50d25ee2fc68426c3"
+    },
+    {
+      "path": "src/generate_tables.py",
+      "bytes": 15620,
+      "sha256": "ec6c79deb96bb97bb2d8357be3b696294e797aefb512ed98cb0ce48576d15638"
+    },
+    {
+      "path": "src/historical_snapshot.py",
+      "bytes": 3882,
+      "sha256": "8826c412f53996f11da4dbbfb88318c52cc08863fa388207e8a50a5e2675f45f"
+    },
+    {
+      "path": "src/model.py",
+      "bytes": 3480,
+      "sha256": "aa216094df9cbefc0f3a4cb1bec0000971502b629c3b97978e4a879cc85e85af"
+    },
+    {
+      "path": "src/operator_registry.py",
+      "bytes": 6028,
+      "sha256": "2125debcd01f5c79a0befe51501c37bb5e8fd54ffb2b892e20b3dbfcdd7d65a8"
+    },
+    {
+      "path": "src/pipeline_runner.py",
+      "bytes": 60639,
+      "sha256": "e144a05d6306448aea81bc4a564c36266a735feeb8732086f66c73658092b933"
+    },
+    {
+      "path": "src/plotting.py",
+      "bytes": 2189,
+      "sha256": "e43bc5d11a4a23b252471945dff885d884e4687e4b2aeec002387b6d4132edcc"
+    },
+    {
+      "path": "src/plotting_q1.py",
+      "bytes": 14688,
+      "sha256": "ac6d2690b809b1fe3acbe77f6ba5525eab390e14d139906fbb4a6e18cc0bc351"
+    },
+    {
+      "path": "src/prepared_inputs.py",
+      "bytes": 4944,
+      "sha256": "bd035174c876dce7ef31bfd18a6a5820149e24cf7bd865439a8b0ca65e106c9f"
+    },
+    {
+      "path": "src/preprocessing.py",
+      "bytes": 8976,
+      "sha256": "6ef0e626481f086fc65b28f8dc90f7cdb74c008c1c33221dc1dca7450a252a8f"
+    },
+    {
+      "path": "src/protocol.py",
+      "bytes": 887,
+      "sha256": "1c33e3963897aaba5e9cca5c6d304d93b8c1c272b7c9f4d7c19dae7699306cde"
+    },
+    {
+      "path": "src/provenance.py",
+      "bytes": 11780,
+      "sha256": "fdd150d32a4443e78176424c8388be19409f624e01863195ead4d7431b865ab5"
+    },
+    {
+      "path": "src/provenance_cli.py",
+      "bytes": 2343,
+      "sha256": "5cad437f934f7c1a343ee452b9c1c3bcfce90ddefe58be4ef20cc3083b96d02e"
+    },
+    {
+      "path": "src/provenance_evidence.py",
+      "bytes": 22481,
+      "sha256": "bc8cb3c85dab956ff6fa3db8e2321e02fea0a24407965d98d6ac47fa2e2ed2f4"
+    },
+    {
+      "path": "src/reporting.py",
+      "bytes": 2692,
+      "sha256": "0b39a5fb729d5844667494e67543d1a9a03e4cdcdb4cb84358f8d857e97e9737"
+    },
+    {
+      "path": "src/resource_limits.py",
+      "bytes": 612,
+      "sha256": "63c9a03b1d33c11822adbc0874d6c207df686de837a091115319468d76930cfd"
+    },
+    {
+      "path": "src/seeding.py",
+      "bytes": 4693,
+      "sha256": "1d35a29a4e08adaf2ccad77863a8bb8b6bbed6776dd614b79a0d5e1fe830ed54"
+    },
+    {
+      "path": "src/sensitivity_analysis.py",
+      "bytes": 39848,
+      "sha256": "19ced492ab1e980f8db9f4bc93418cd76cc757950ee2c52712dfde04733d45f7"
+    },
+    {
+      "path": "src/shap_explainer.py",
+      "bytes": 3259,
+      "sha256": "6a74ace48a8f099697c7a42e7ad7c283f8c4d1c38008efdd48a3df9da0316a38"
+    },
+    {
+      "path": "src/shift_generator.py",
+      "bytes": 7984,
+      "sha256": "f8ad606f2ed9761f34132f3a8d0645d418c6659c9cf0f19b67dfd2379b8e6f1b"
+    },
+    {
+      "path": "src/splitters.py",
+      "bytes": 7562,
+      "sha256": "f79158365577ecf520dd303a990fd23dcb282e20f4bd1486a67834ae7099ccf4"
+    },
+    {
+      "path": "src/stats_analysis.py",
+      "bytes": 5946,
+      "sha256": "fbff43a5ee4f6f613ca072a3728806ed21c68fe1077f10d0e54879b8c202db30"
+    },
+    {
+      "path": "src/task_manifest.py",
+      "bytes": 46238,
+      "sha256": "c4fad716597e02b7bc1b04465d578f77e1c7522c7758f3198e9d61d492087ace"
+    },
+    {
+      "path": "tests/__init__.py",
+      "bytes": 65,
+      "sha256": "9c432e020062b7839b4d0c4d7a12fbb56de73c911dd3feb4dfdd97d9430e42b3"
+    },
+    {
+      "path": "tests/test_acquisition.py",
+      "bytes": 2947,
+      "sha256": "ae6922aba7d8444f99a077a7b3ea047d1978e00ef2059013bf1ea3677102a9ef"
+    },
+    {
+      "path": "tests/test_artifact_integrity.py",
+      "bytes": 2540,
+      "sha256": "dddd93c18f74c45d7572f8a8edcea13d3811400cce8fa7b1aaf42ba74a7fc9ce"
+    },
+    {
+      "path": "tests/test_baselines_operators_fsva.py",
+      "bytes": 9334,
+      "sha256": "65ce3daee467709ab1bd4ce8d1caa2d5e424aedce174d295f54353947d509992"
+    },
+    {
+      "path": "tests/test_coordinator.py",
+      "bytes": 3285,
+      "sha256": "606a24a728c4833a7842c7fc4eb4533be49f8d1441d17311406693219adc43f6"
+    },
+    {
+      "path": "tests/test_critical_analysis.py",
+      "bytes": 3959,
+      "sha256": "4524d2a8b369c33994c14cd71c526bfe0c8dd02fbb5afe2c195891a1c7fc2bd8"
+    },
+    {
+      "path": "tests/test_critical_metrics.py",
+      "bytes": 2606,
+      "sha256": "4a524741400240043bd61244f3b0669a9bebca93196edfed02eb503a79000270"
+    },
+    {
+      "path": "tests/test_critical_recovery.py",
+      "bytes": 1832,
+      "sha256": "7a00fdf74476e9dfbf905e5bb5f857abe65c7738d1924984188d9173ecdfe671"
+    },
+    {
+      "path": "tests/test_dataset_statistics.py",
+      "bytes": 7521,
+      "sha256": "fd5965b19e78832ce5bf4ffd819b022c866214994705c9d6c637837432e3466e"
+    },
+    {
+      "path": "tests/test_dependency_dispatch.py",
+      "bytes": 1026,
+      "sha256": "e00939cdb66755e1aabe54673d79b7be26e34fb632cb844cc7fa4487ce2b9b67"
+    },
+    {
+      "path": "tests/test_durable_publication.py",
+      "bytes": 4497,
+      "sha256": "c91991b4a3b37751f753da5fa0ffeecdf7226ed45f4ff336fca66ce6623f3df0"
+    },
+    {
+      "path": "tests/test_feature_semantics.py",
+      "bytes": 3818,
+      "sha256": "2974af13d4ef81f86435777fd1887d711cd6b0799f59bbabc9977ef38f142eaf"
+    },
+    {
+      "path": "tests/test_leakage_boundaries.py",
+      "bytes": 9687,
+      "sha256": "bfc4f729f8e9f75c1d9fa9834ad1273848863a6e1518d4c51116dab90456b3d0"
+    },
+    {
+      "path": "tests/test_manifest_resources.py",
+      "bytes": 1012,
+      "sha256": "2b7f173156f4c9dbb1807161c0ed2a4f74958dda75873b6a327d5e9701bd45ca"
+    },
+    {
+      "path": "tests/test_memory_safety.py",
+      "bytes": 1600,
+      "sha256": "92cb90f04b9d69c32f55f244c696be21a8140509c58cf113adac11fb3da606dd"
+    },
+    {
+      "path": "tests/test_prefix_information.py",
+      "bytes": 4587,
+      "sha256": "b6a3dd0a9614827e98861153145b0ad0f2c9745b1f757e144ac9075ef3b40f70"
+    },
+    {
+      "path": "tests/test_prepared_execution.py",
+      "bytes": 3375,
+      "sha256": "2f609922c4b4c1ecc3875dc1bc7c6772c6f25b4a15439ad50280847c26d7f647"
+    },
+    {
+      "path": "tests/test_production_task_resume.py",
+      "bytes": 8887,
+      "sha256": "37283fefde49e3a7087a49ac5bcd366fe902077eaf0454ee3adcac67efca5464"
+    },
+    {
+      "path": "tests/test_provenance.py",
+      "bytes": 4365,
+      "sha256": "63eaea332179a9423bf47190c445253c78380ed031bb779e8cef5de4e2f33fe7"
+    },
+    {
+      "path": "tests/test_provenance_integrity.py",
+      "bytes": 6111,
+      "sha256": "4072bd50ffd0c6b61c4bc5e2486c77c045c25a2507e373e8ec4856b899501a25"
+    },
+    {
+      "path": "tests/test_reporting_contract.py",
+      "bytes": 2178,
+      "sha256": "cf8203396e5395ac0944f5b55211a7bcec3866a4984f76748aafd4ab79f435a0"
+    },
+    {
+      "path": "tests/test_runtime_helpers.py",
+      "bytes": 1255,
+      "sha256": "37e0c277ee31b12d5eac926923536c07bee28d7e270eff8183012f7f68bcd407"
+    },
+    {
+      "path": "tests/test_seed_scheme.py",
+      "bytes": 7591,
+      "sha256": "7ace90460af605a214bcd51bc2e8f38bfb729a635f5e07da882ffcc27c7b846f"
+    },
+    {
+      "path": "tests/test_sensitivity_analysis.py",
+      "bytes": 4599,
+      "sha256": "9991237806f89ede2d45b727d0179bb4ea2dc877fc269bf13bba177443024c91"
+    },
+    {
+      "path": "tests/test_sensitivity_evidence_controls.py",
+      "bytes": 1547,
+      "sha256": "4b8c9de654a2562792e09060e3181f5d26fdf7f6e7a9652a5734f0b2ea9b0d68"
+    },
+    {
+      "path": "tests/test_task_manifest.py",
+      "bytes": 9337,
+      "sha256": "ecc41be50d48cb5ba5e24d188881305d1a8075b058ef183084f1367b18cafdfd"
+    }
+  ],
+  "historical_cache_metadata_count": 14
+}

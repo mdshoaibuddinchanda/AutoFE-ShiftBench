@@ -30,16 +30,40 @@ def final_status(counts,*,stopped=False,writer_failed=False):
 
 def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,entry=task_entry,writer_target=None):
     from src.pipeline_runner import writer_process,_record_manifest_failure
+    from src.prepared_inputs import verify_unit
+    repair_descriptors={}
+    import json
+    started=time.monotonic()
+    deadline=None if config.run_wall_time_seconds is None else started+config.run_wall_time_seconds
+    def check_cancel():
+        if stop_requested() or (deadline is not None and time.monotonic() >= deadline):
+            raise TimeoutError('Run stopped during prepared-artifact verification')
+    try:
+        for row in store.completed_precompute_results(run_id):
+            check_cancel()
+            descriptor=json.loads(row['payload_json']).get('prepared_descriptor')
+            if descriptor is None: continue # controlled/legacy evidence remains explicitly unverified
+            try:
+                verify_unit(descriptor,check_cancel=check_cancel)
+            except (OSError,ValueError,KeyError) as error:
+                if isinstance(error,TimeoutError): raise
+                store.reopen_precompute_for_artifact_repair(run_id,row['scientific_task_id'],max_repairs=config.max_artifact_repairs_per_unit)
+                repair_descriptors[row['scientific_task_id']]=descriptor
+    except TimeoutError:
+        store.set_run_status(run_id,'stopped')
+        return {'status':'stopped','state_counts':store.state_counts(run_id),'attempt_counts':store.attempt_counts(run_id),
+            'model_attempts_dispatched_this_invocation':0,'stop_reason':'artifact verification deadline/signal'}
+    except BaseException:
+        store.set_run_status(run_id,'failed')
+        raise
     context=mp.get_context('spawn')
     manager=context.Manager()
     queue=manager.Queue(maxsize=max(2,config.max_workers*2))
     writer=context.Process(target=writer_target or writer_process,args=(queue,ledger,str(store.db_path),run_id))
     active={}
-    started=time.monotonic()
     dispatched=0
     stopped=False
     writer_failed=False
-    deadline=None if config.run_wall_time_seconds is None else started+config.run_wall_time_seconds
     store.resume(run_id)
     writer.start()
     try:
@@ -92,6 +116,7 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                     from src.seeding import stable_seed
                     from src.fsva import DEFAULT_PERTURBATION_MAGNITUDES
                     task={**record,'dataset_name':record['dataset'],'data_path':Path(record['data_path']),
+                        'repair_descriptor':repair_descriptors.get(record['scientific_task_id']),
                         'dense_budget_bytes':min(1024**3,int(psutil.virtual_memory().available*.4/config.max_workers)),
                         'manifest_db':str(store.db_path),'run_id':run_id,'attempt_id':attempt,
                         'task_timeout_seconds':config.task_timeout_seconds,'retry':record['attempt_count']+1 < config.max_attempts,

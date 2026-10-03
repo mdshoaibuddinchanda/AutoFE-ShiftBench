@@ -7,7 +7,7 @@ class HistoricalSnapshotUnsupported(ValueError):
 
 def completed_model_events(snapshot):
     tasks={row["scientific_task_id"]:row for row in snapshot["tasks"]}
-    durable={(row["scientific_task_id"],row["attempt_id"]):row for row in snapshot["durable_results"]}
+    durable={(row["scientific_task_id"],row["attempt_id"]):row for row in snapshot["durable_results"]+snapshot.get('superseded_results',[])}
     events=snapshot.get("task_events",[])
     first={}
     for event in events:
@@ -32,7 +32,8 @@ def at_event(snapshot,cutoff_order):
     last={row["scientific_task_id"]:row for row in events}
     claims={row["attempt_id"]:row for row in events if row["state"] == "running"}
     terminal={row["attempt_id"]:row for row in events if row["attempt_id"] and row["state"] != "running"}
-    durable=[row for row in snapshot["durable_results"] if row["attempt_id"] in terminal and terminal[row["attempt_id"]]["state"] == "completed"]
+    durable=[row for row in snapshot["durable_results"]+snapshot.get('superseded_results',[]) if row["attempt_id"] in terminal
+        and terminal[row["attempt_id"]]["state"] == "completed" and last[row['scientific_task_id']]['attempt_id'] == row['attempt_id']]
     durable_by_task={row["scientific_task_id"]:row for row in durable}
     tasks=[]
     for current in snapshot["tasks"]:

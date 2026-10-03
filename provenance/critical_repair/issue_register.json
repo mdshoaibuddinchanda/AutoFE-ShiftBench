@@ -294,18 +294,20 @@
     {
       "id": "B16",
       "title": "Concurrent artifact publication",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled exact-artifact repair, concurrent spawn ownership and negative analysis-lineage controls",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py; src/provenance_evidence.py; tests/test_prepared_execution.py",
       "original_reproducer": null,
       "required_correction": "Concurrent artifact publication",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [
-        "tests/test_prepared_execution.py"
+        "tests/test_artifact_ownership.py",
+        "tests/test_provenance_integrity.py",
+        "tests/test_prefix_information.py"
       ],
-      "status": "partially_corrected_pending_repair_and_analysis_lineage_controls",
+      "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
-        "Model artifacts now record actual split/preprocessor/feature/history/FSVA dependencies. Missing-artifact repair, concurrent creation and verified analysis edges still require controls."
+        "Damage arising after startup verification is detected by the worker; bounded dependency repair occurs on the next resume. Missing or changed original descriptor bytes cannot certify an exact repair and fail explicitly."
       ]
     },
     {
@@ -409,18 +411,20 @@
     {
       "id": "C04",
       "title": "Actual artifact lineage",
-      "evidence_level": "actual task/data/result graph regression verified; production artifact links pending B16",
+      "evidence_level": "controlled exact-artifact repair, concurrent spawn ownership and negative analysis-lineage controls",
       "path": "active lineage",
       "supporting_locations": "src/prepared_inputs.py; src/pipeline_runner.py; src/provenance_evidence.py; tests/test_prepared_execution.py",
       "original_reproducer": null,
       "required_correction": "Actual artifact lineage",
       "compatibility_impact": "real task IDs and declared dependencies; unsupported links explicit incomplete",
       "tests": [
-        "tests/test_prepared_execution.py"
+        "tests/test_artifact_ownership.py",
+        "tests/test_provenance_integrity.py",
+        "tests/test_prefix_information.py"
       ],
-      "status": "partially_corrected_pending_repair_and_analysis_lineage_controls",
+      "status": "corrected_regression_and_production_smoke_verified",
       "limitations": [
-        "Model artifacts now record actual split/preprocessor/feature/history/FSVA dependencies. Missing-artifact repair, concurrent creation and verified analysis edges still require controls."
+        "Damage arising after startup verification is detected by the worker; bounded dependency repair occurs on the next resume. Missing or changed original descriptor bytes cannot certify an exact repair and fail explicitly."
       ]
     },
     {
@@ -490,11 +494,12 @@
       "required_correction": "Bounded non-overwriting acquisition",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [
-        "tests/test_acquisition.py"
+        "tests/test_acquisition.py",
+        "tests/test_runtime_helpers.py"
       ],
-      "status": "corrected_controlled_regression_verified",
+      "status": "corrected_regression_verified",
       "limitations": [
-        "No real acquisition performed. Raw provider response bytes are not exposed by sklearn; source details/checksum and original frame identity are retained, with exported CSV bytes verified. Existing unprovenanced files are preserved and acquisition refuses certification."
+        "No actual OpenML acquisition performed. Existing P12 preserved."
       ]
     },
     {
@@ -507,11 +512,12 @@
       "required_correction": "Supported P12 launcher",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [
+        "tests/test_acquisition.py",
         "tests/test_runtime_helpers.py"
       ],
       "status": "corrected_regression_verified",
       "limitations": [
-        "GPU fits were bounded synthetic 24x3 inputs using existing 100-iteration factories; full scale VRAM and cross-kernel determinism remain unverified. CatBoost GPU may be nondeterministic. Launcher forwarding inspected; CLI execution covered later."
+        "No actual OpenML acquisition performed. Existing P12 preserved."
       ]
     },
     {
@@ -1134,28 +1140,32 @@
     {
       "id": "M02",
       "title": "Shared P12 unrelated package conflicts",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "P12 pip check exit 1",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Shared P12 unrelated package conflicts",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [],
-      "status": "pending",
-      "limitations": []
+      "status": "documented_unrelated_environment_conflicts_retained",
+      "limitations": [
+        "Tableshift missing dependencies and numpy/ray pins; OpenCV numpy>=2 and TabPFN LightGBM>=4.4 conflicts remain. AutoFE supported suite passes; unrelated packages were not changed."
+      ]
     },
     {
       "id": "M03",
       "title": "Historical manuscript grid is separate",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "manuscript and cover letter fully read; current grid recalculated",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Historical manuscript grid is separate",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
       "tests": [],
-      "status": "pending",
-      "limitations": []
+      "status": "documented_historical_scope_preserved",
+      "limitations": [
+        "Historical manuscript and publication PDFs preserved, including empirical claims not revalidated against absent real outputs."
+      ]
     },
     {
       "id": "M04",

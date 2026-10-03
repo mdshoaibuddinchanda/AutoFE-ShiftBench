@@ -127,7 +127,7 @@ def create_workflow_diagram(out_dir: str | Path = "results", dpi: int = 300) -> 
     )
     fig.text(
         0.5, 0.915,
-        "One leakage-controlled task path from data perturbation to paper evidence",
+        "Fold-local fitting; predictor-wide stress partitions are transductive",
         ha="center", va="top", color="#52616B", fontsize=12.5,
     )
 
@@ -138,8 +138,8 @@ def create_workflow_diagram(out_dir: str | Path = "results", dpi: int = 300) -> 
     top_x = [0.03, 0.275, 0.52, 0.765]
     top = [
         ("INPUT\nDATA", "OpenML tables\nfeatures + target\nconfigured tasks", BLUE, PALE_BLUE),
-        ("REPEATED\nSPLITS", "5 seeds × 5 folds\nstratified train/test\npaired task key", TEAL, PALE_TEAL),
-        ("TRAINING\nSHIFT", "clean + missingness\ncovariate + population\n14 settings; test fixed", ORANGE, PALE_ORANGE),
+        ("REPEATED\nSPLITS", "5 seeds × 5 folds\nstratified / stress splits\npaired task key", TEAL, PALE_TEAL),
+        ("TRAINING\nCORRUPTION", "noise · missing · relabel\nremoval; test unchanged\n14 conditions incl. splits", ORANGE, PALE_ORANGE),
         ("FOLD-LOCAL\nPREP", "impute · encode\nscale on train only\ncache by task key", GREEN, PALE_GREEN),
     ]
     for x, (title, body, edge, face) in zip(top_x, top):
@@ -154,7 +154,7 @@ def create_workflow_diagram(out_dir: str | Path = "results", dpi: int = 300) -> 
             bbox={"facecolor": "white", "edgecolor": "none", "pad": 2.5}, zorder=5)
     branch_y, branch_h, branch_w = 0.42, 0.17, 0.31
     _box(ax, 0.08, branch_y, branch_w, branch_h, "RAW CONTROLS",
-         "Raw · variance-ranked · MI\n20-column pre-cap\nno synthesis operators",
+         "Raw · Raw_Full · Raw_Capped\nvariance / MI controls\nno synthesis operators",
          edge=BLUE, face=PALE_BLUE)
     _box(ax, 0.61, branch_y, branch_w, branch_h, "AUTOFE SEARCH",
          "DFS depth-one arithmetic\n+/−/×/÷; selection\n100-column final cap",

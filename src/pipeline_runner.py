@@ -337,7 +337,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
                 cache_compatible = cache_compatible and all(
                     path.exists() and file_sha256(path) == verified_cache[2].get('artifacts',{}).get(role,{}).get('sha256')
                     for role,path in (('history',history_path),('fsva',fsva_path)))
-                cache_compatible = cache_compatible and verified_cache[2].get('diagnostic_status') == 'diagnostic_complete' 
+                cache_compatible = cache_compatible and verified_cache[2].get('diagnostic_status') == 'diagnostic_complete'
             if cache_compatible:
                 x_train_fe,x_test_fe,meta = verified_cache
                 if diagnostics_enabled:
@@ -555,8 +555,14 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
     x_train_prep.attrs['discrete_features']=discrete_columns
     preprocessing_path=_cache_dir_for_dataset(dataset_name)/('preprocessor_'+fingerprint({'split':split_dependency,'fold':fold,'condition':condition,'train':frame_identity(x_train_cond),'labels':array_identity(y_train_cond)})[:32]+'.pkl')
     with artifact_lock(preprocessing_path.with_suffix('.lock')):
-        if not preprocessing_path.exists():
+        preprocessing_meta=preprocessing_path.with_suffix('.json')
+        try:
+            recorded=json.loads(preprocessing_meta.read_text(encoding='utf-8'))
+            if file_sha256(preprocessing_path) != recorded['sha256']:
+                raise ValueError('Corrupt fitted preprocessor artifact')
+        except (OSError,ValueError,KeyError):
             atomic_pickle(preprocessing_path,preprocessor)
+            atomic_json(preprocessing_meta,{'sha256':file_sha256(preprocessing_path),'fit_input_identity':frame_identity(x_train_cond),'semantics':PREPROCESSING_SEMANTICS_VERSION})
 
     # Clean test set for Wasserstein distances
     x_test_clean_prep = processed_frame(
@@ -677,6 +683,11 @@ def precompute_unit(kwargs):
         unit_path=_cache_dir_for_dataset(kwargs['dataset_name'])/('unit_'+str(kwargs.get('scientific_task_id') or fingerprint(_json_safe(kwargs_copy))[:24])+'.pkl')
         first_meta=next(iter(prepared[4].values()))
         descriptor=publish_unit(unit_path,prepared,input_artifacts=first_meta['input_artifacts'])
+        if kwargs.get('repair_descriptor'):
+            from src.prepared_inputs import restore_metadata_after_exact_repair
+            if descriptor['sha256'] != kwargs['repair_descriptor']['sha256']:
+                raise ManifestConflictError('Regenerated prepared descriptor differs; preserve old evidence and require explicit incompatible recomputation')
+            restore_metadata_after_exact_repair(descriptor)
         store = _manifest_for_task(kwargs)
         if store is not None and attempt_id:
             store.commit_result(

@@ -196,7 +196,7 @@ def snapshot_manifest_ledger(
         raise SensitivityInputError("Result ledger changed during the read-only snapshot")
     run_config = json.loads(snapshot["run"]["config_json"])
     snapshot_id = hashlib.sha256(_canonical({"run_id": run_id, "ledger_sha256": after,
-        "authoritative_contents":{key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events")}}).encode("utf-8")).hexdigest()
+        "authoritative_contents":{key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events","superseded_results")}}).encode("utf-8")).hexdigest()
     snapshot["snapshot_id"] = "snapshot_" + snapshot_id[:24]
     snapshot["ledger_path"] = str(ledger)
     snapshot["ledger_sha256"] = after

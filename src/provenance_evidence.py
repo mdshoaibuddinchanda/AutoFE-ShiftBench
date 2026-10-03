@@ -14,7 +14,7 @@ from src.task_manifest import ManifestError,ManifestStore
 
 def snapshot_digest(snapshot):
     from src.provenance import canonical_sha256
-    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events") if key in snapshot})
+    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events","superseded_results") if key in snapshot})
 
 
 def _resolve(path,root):
@@ -57,10 +57,30 @@ def actual_lineage(snapshot,inventory,root):
                 artifacts=evidence.get("artifacts",[])
                 if task["stage"] == "model" and not artifacts:
                     unknown.append({"task_id":task_id,"reason":"prepared_input_artifacts_unverified"})
+                artifact_ids={}
                 for artifact in artifacts:
-                    aid="artifact_"+str(artifact.get("sha256",canonical_sha256(artifact)))
+                    aid="artifact_"+canonical_sha256({'path':relative_path(artifact.get('path',''),root),'role':artifact.get('role'),'sha256':artifact.get('sha256')})
                     nodes[aid]={"id":aid,"role":artifact.get("role","dependency_artifact"),"path":artifact.get("path"),"sha256":artifact.get("sha256"),"dependency_signature":artifact.get("dependency_signature")}
-                    edges.append({"from":aid,"to":task_id,"relationship":"verified_executed_input"})
+                    from src.artifact_integrity import file_sha256
+                    try:
+                        valid=file_sha256(_resolve(artifact['path'],root)) == artifact['sha256']
+                    except (OSError,KeyError):
+                        valid=False
+                    if not valid:
+                        unknown.append({'task_id':task_id,'artifact':artifact.get('path'),'reason':'executed_artifact_missing_or_hash_mismatch'})
+                    edges.append({"from":aid,"to":task_id,"relationship":"verified_executed_input" if valid else 'recorded_input_unverified'})
+                    artifact_ids[artifact.get('role')]=aid
+                split_artifact=artifact_ids.get('split_indices')
+                preprocessor_artifact=artifact_ids.get('fitted_preprocessor')
+                if data_id and split_artifact:
+                    edges.append({'from':data_id,'to':split_artifact,'relationship':'recorded_dataset_partition'})
+                if split_artifact and preprocessor_artifact:
+                    edges.append({'from':split_artifact,'to':preprocessor_artifact,'relationship':'training_partition_fitted_preprocessing'})
+                for role in ('selected_training_features','selected_held_out_features'):
+                    if preprocessor_artifact and role in artifact_ids:
+                        edges.append({'from':preprocessor_artifact,'to':artifact_ids[role],'relationship':'frozen_preprocessing_and_feature_mapping'})
+                    if 'candidate_history' in artifact_ids and role in artifact_ids:
+                        edges.append({'from':artifact_ids['candidate_history'],'to':artifact_ids[role],'relationship':'recorded_training_only_selection'})
     for item in inventory:
         if item.get("role") == "analysis_output":
             aid="analysis_"+str(item.get("sha256"))

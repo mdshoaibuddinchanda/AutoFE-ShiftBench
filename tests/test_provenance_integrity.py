@@ -98,3 +98,26 @@ def test_untracked_source_content_changes_code_identity(tmp_path):
 def test_external_paths_do_not_collapse_to_same_basename(tmp_path):
     from src.provenance import relative_path
     assert relative_path(tmp_path/"a/file.json",tmp_path/"repo") != relative_path(tmp_path/"b/file.json",tmp_path/"repo")
+
+
+@pytest.mark.parametrize('changed',[None,'run','ledger','tasks'])
+def test_analysis_edges_require_recorded_matching_inputs(tmp_path,changed):
+    from src.provenance_evidence import actual_lineage
+    from src.artifact_integrity import file_sha256
+    store,payload,ledger,package,kwargs=package_fixture(tmp_path)
+    output=tmp_path/'analysis'
+    output.mkdir()
+    artifact=output/'summary.csv'
+    artifact.write_text('effect\n0.1\n')
+    config={'run_id':'r','input_fingerprint_sha256':file_sha256(ledger),
+        'analysis_input_task_ids':[payload['scientific_task_id']]}
+    if changed == 'run': config['run_id']='other'
+    if changed == 'ledger': config['input_fingerprint_sha256']='0'*64
+    if changed == 'tasks': config['analysis_input_task_ids']=['unknown']
+    (output/'analysis_config.json').write_text(json.dumps(config))
+    inventory=[{'path':'results.jsonl','role':'result_ledger_export','sha256':file_sha256(ledger)},
+        {'path':'analysis/summary.csv','role':'analysis_output','sha256':file_sha256(artifact)}]
+    graph=actual_lineage(store.snapshot('r'),inventory,tmp_path)
+    edges=[edge for edge in graph['edges'] if edge['relationship']=='recorded_analysis_scientific_input']
+    assert len(edges) == (1 if changed is None else 0)
+    assert any(x['reason']=='analysis_dependency_unverified' for x in graph['unverified_dependencies']) == (changed is not None)

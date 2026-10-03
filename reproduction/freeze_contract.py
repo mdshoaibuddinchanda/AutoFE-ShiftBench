@@ -38,7 +38,7 @@ def serialise(value):
     return str(value)
 
 
-def freeze(output: Path) -> dict:
+def freeze(output: Path, *, role="pre_repair_baseline") -> dict:
     from src import pipeline_runner as runner
     from src.data_loader import load_dataset_names
     from src.dataset_statistics import AnalysisConfig
@@ -60,13 +60,13 @@ def freeze(output: Path) -> dict:
             row.update({"sha256": sha256(path), "bytes": path.stat().st_size, "rows": len(frame), "schema": {str(c): str(t) for c,t in frame.dtypes.items()}, "coordinates": list(frame.columns)})
         data.append(row)
     contract = {
-        "schema": "scientific_contract_v1", "role": "pre_repair_baseline",
+        "schema": "scientific_contract_v1", "role": role,
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "protocol": EVALUATION_PROTOCOL_VERSION, "seed_scheme": SEED_SCHEME_VERSION,
         "root_seeds": [42,123,456,789,2025], "folds": [1,2,3,4,5], "datasets": data,
         "conditions": [list(c) for c in runner.SHIFT_FAMILIES],
         "pipelines": {k: asdict(v) for k,v in runner.PIPELINE_CONFIGS.items()},
-        "estimators": {name: {"cpu": serialise(build_model(name, random_state=42, use_gpu=False)), "declared_device": "GPU" if name in runner.GPU_MODELS else "CPU"} for name in runner.CPU_MODELS + runner.GPU_MODELS},
+        "estimators": {name: {"cpu": serialise(build_model(name, random_state=42, use_gpu=False)), "gpu": serialise(build_model(name, random_state=42, use_gpu=True)) if name in runner.GPU_MODELS else None, "declared_device": "GPU" if name in runner.GPU_MODELS else "CPU"} for name in runner.CPU_MODELS + runner.GPU_MODELS},
         "precompute_tasks": len(names)*5*5*len(runner.SHIFT_FAMILIES),
         "model_tasks": len(names)*5*5*len(runner.SHIFT_FAMILIES)*len(runner.PIPELINE_NAMES)*(len(runner.CPU_MODELS)+len(runner.GPU_MODELS)),
         "diagnostics": {"enabled_default": False, "schema": FSVA_SCHEMA_VERSION, "max_rows": 128, "finite_difference_rows": 32, "epsilon": 1e-6, "magnitudes": list(DEFAULT_PERTURBATION_MAGNITUDES), "norm": "Frobenius/L2", "history": "all evaluated candidates plus excluded base events", "seed_definition": "stable_seed('fsva_diagnostic', dataset/split_policy/seed/fold/condition)"},
@@ -87,6 +87,7 @@ def freeze(output: Path) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--role", choices=['pre_repair_baseline','corrected_minimal_reference'],default='pre_repair_baseline')
     args = parser.parse_args()
-    value = freeze(args.output)
+    value = freeze(args.output,role=args.role)
     print(json.dumps({"output": str(args.output), "sha256": sha256(args.output), "precompute_tasks": value["precompute_tasks"], "model_tasks": value["model_tasks"]}))

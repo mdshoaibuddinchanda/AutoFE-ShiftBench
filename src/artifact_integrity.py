@@ -21,10 +21,12 @@ def fingerprint(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 
 
-def file_sha256(path) -> str:
+def file_sha256(path, *, check_cancel=None) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
+            if check_cancel is not None:
+                check_cancel()
             digest.update(block)
     return digest.hexdigest()
 

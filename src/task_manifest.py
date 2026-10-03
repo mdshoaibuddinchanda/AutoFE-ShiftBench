@@ -59,6 +59,7 @@ class ExecutionConfig:
     task_timeout_seconds: float | None = None
     run_wall_time_seconds: float | None = None
     max_attempts: int = 1
+    max_artifact_repairs_per_unit: int = 1
     retryable_failure_classes: tuple[str, ...] = tuple(sorted(RETRYABLE_FAILURES))
     stop_after_tasks: int | None = None
     stale_after_seconds: float = 3600.0
@@ -67,6 +68,8 @@ class ExecutionConfig:
     def __post_init__(self) -> None:
         if self.max_workers < 1 or self.max_attempts < 1:
             raise ValueError("max_workers and max_attempts must be positive")
+        if self.max_artifact_repairs_per_unit < 0:
+            raise ValueError("max_artifact_repairs_per_unit must be nonnegative")
         if self.task_timeout_seconds is not None and self.task_timeout_seconds <= 0:
             raise ValueError("task_timeout_seconds must be positive")
         if self.run_wall_time_seconds is not None and self.run_wall_time_seconds <= 0:
@@ -311,6 +314,12 @@ class ManifestStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_task_events_run ON task_events(run_id,event_order);
                 CREATE INDEX IF NOT EXISTS idx_tasks_ready ON tasks(run_id,state,stage);
+                CREATE TABLE IF NOT EXISTS superseded_results (
+                    run_id TEXT NOT NULL, scientific_task_id TEXT NOT NULL,
+                    attempt_id TEXT NOT NULL, payload_hash TEXT NOT NULL,
+                    payload_json TEXT NOT NULL, result_ref TEXT, durable_at TEXT NOT NULL,
+                    PRIMARY KEY(run_id,scientific_task_id,attempt_id)
+                );
                 """
             )
 
@@ -418,6 +427,27 @@ class ManifestStore:
             raise ManifestConflictError('Dependency payload is corrupt')
         return payload
 
+    def reopen_precompute_for_artifact_repair(self,run_id,task_id,*,max_repairs=1):
+        """Archive old evidence; bounded maintenance attempts never erase history."""
+        with self._connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            task=connection.execute('SELECT stage,state FROM tasks WHERE run_id=? AND scientific_task_id=?',(run_id,task_id)).fetchone()
+            if task is None or task['stage'] != 'precompute' or task['state'] != 'completed':
+                raise ManifestConflictError('Only completed precompute can enter artifact repair')
+            repairs=connection.execute("SELECT COUNT(*) FROM task_events WHERE run_id=? AND scientific_task_id=? AND outcome_reason='artifact_repair'",(run_id,task_id)).fetchone()[0]
+            if repairs >= max_repairs:
+                raise ManifestConflictError('Declared artifact repair limit exhausted')
+            connection.execute('INSERT OR IGNORE INTO superseded_results SELECT * FROM durable_results WHERE run_id=? AND scientific_task_id=?',(run_id,task_id))
+            connection.execute('DELETE FROM durable_results WHERE run_id=? AND scientific_task_id=?',(run_id,task_id))
+            connection.execute("UPDATE tasks SET state='pending',active_attempt_id=NULL,result_ref=NULL,outcome_reason='artifact_repair',updated_at=? WHERE run_id=? AND scientific_task_id=?",(_now(),run_id,task_id))
+            self._event(connection,run_id,task_id,'pending',reason='artifact_repair')
+
+    def completed_precompute_results(self,run_id):
+        with self._connect() as connection:
+            return [dict(row) for row in connection.execute("""SELECT r.* FROM durable_results r JOIN tasks t
+                ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id
+                WHERE r.run_id=? AND t.stage='precompute' AND t.state='completed'""",(run_id,)).fetchall()]
+
     def snapshot(self, run_id: str) -> dict[str, Any]:
         """Read one consistent SQLite snapshot for analysis and provenance.
 
@@ -436,8 +466,10 @@ class ManifestStore:
             durable_results = connection.execute("SELECT * FROM durable_results WHERE run_id = ? ORDER BY scientific_task_id", (run_id,)).fetchall()
             try:
                 events=connection.execute("SELECT * FROM task_events WHERE run_id=? ORDER BY event_order",(run_id,)).fetchall()
+                superseded=connection.execute('SELECT * FROM superseded_results WHERE run_id=? ORDER BY scientific_task_id,attempt_id',(run_id,)).fetchall()
             except sqlite3.OperationalError:
                 events=[]
+                superseded=[]
         return {
             "captured_at": captured_at,
             "run": dict(run),
@@ -445,6 +477,7 @@ class ManifestStore:
             "attempts": [dict(row) for row in attempts],
             "durable_results": [dict(row) for row in durable_results],
             "task_events":[dict(row) for row in events],
+            "superseded_results":[dict(row) for row in superseded],
         }
 
     def claim_task(self, run_id: str, task_id: str, *, worker_id: str = "unknown", timeout_seconds: float | None = None) -> str | None:
