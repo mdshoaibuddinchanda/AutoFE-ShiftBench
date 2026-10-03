@@ -1,0 +1,176 @@
+{
+  "schema": "native_thread_equivalence_probe_v1",
+  "synthetic_shape": [
+    192,
+    24
+  ],
+  "results": [
+    {
+      "model": "logistic_regression",
+      "seconds_threads_8": 0.04451340006198734,
+      "seconds_threads_1": 0.002292799996212125,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "random_forest",
+      "seconds_threads_8": 0.12981690000742674,
+      "seconds_threads_1": 0.12938619998749346,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "extra_trees",
+      "seconds_threads_8": 0.09104140009731054,
+      "seconds_threads_1": 0.08476270001847297,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "linear_svm",
+      "seconds_threads_8": 0.05619229993317276,
+      "seconds_threads_1": 0.020559699973091483,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "knn",
+      "seconds_threads_8": 0.03238180000334978,
+      "seconds_threads_1": 0.0016581000527366996,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "gaussian_nb",
+      "seconds_threads_8": 0.001283499994315207,
+      "seconds_threads_1": 0.0011947000166401267,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "mlp",
+      "seconds_threads_8": 0.026475199963897467,
+      "seconds_threads_1": 0.021442399942316115,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    },
+    {
+      "model": "lightgbm",
+      "seconds_threads_8": 0.0631350000621751,
+      "seconds_threads_1": 0.04743320005945861,
+      "prediction_exact": true,
+      "probability_exact": true,
+      "maximum_probability_difference": 0.0
+    }
+  ],
+  "restored_threadpools": [
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\numpy.libs\\libopenblas64__v0.3.23-293-gc2f4bdbb-gcc_10_3_0-2bde3a66a51006b2b53eb373ff767a3f.dll",
+      "version": "0.3.23.dev",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    },
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 8,
+      "prefix": "vcomp",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\sklearn\\.libs\\vcomp140.dll",
+      "version": null
+    },
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 8,
+      "prefix": "libopenblas",
+      "filepath": "D:\\Conda\\p12\\Lib\\site-packages\\scipy.libs\\libopenblas_v0.3.27--3aa239bc726cfb0bd8e5330d8d4c15c6.dll",
+      "version": "0.3.27",
+      "threading_layer": "pthreads",
+      "architecture": "SkylakeX"
+    }
+  ],
+  "policy": "Do not enable changed native reduction threads globally unless exact required outputs are supported.",
+  "larger_fixture": {
+    "shape": [
+      1024,
+      96
+    ],
+    "results": [
+      {
+        "model": "logistic_regression",
+        "seconds_threads_8": 0.059338799910619855,
+        "seconds_threads_1": 0.006266699987463653,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "random_forest",
+        "seconds_threads_8": 0.7725748000666499,
+        "seconds_threads_1": 0.7435833000345156,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "extra_trees",
+        "seconds_threads_8": 0.27616090001538396,
+        "seconds_threads_1": 0.30953109997790307,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "linear_svm",
+        "seconds_threads_8": 0.039985899929888546,
+        "seconds_threads_1": 0.03788139997050166,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "knn",
+        "seconds_threads_8": 0.061574499937705696,
+        "seconds_threads_1": 0.019593299948610365,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "gaussian_nb",
+        "seconds_threads_8": 0.004121499950997531,
+        "seconds_threads_1": 0.003436199971474707,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "mlp",
+        "seconds_threads_8": 0.12593889993149787,
+        "seconds_threads_1": 0.05959979991894215,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      },
+      {
+        "model": "lightgbm",
+        "seconds_threads_8": 2.0068697000388056,
+        "seconds_threads_1": 1.9735737000592053,
+        "prediction_exact": true,
+        "probability_exact": true,
+        "maximum_probability_difference": 0.0
+      }
+    ]
+  }
+}

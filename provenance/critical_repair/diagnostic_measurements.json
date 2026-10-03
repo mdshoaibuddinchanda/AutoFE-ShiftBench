@@ -1,0 +1,64 @@
+{
+  "reference": [
+    {
+      "seconds": 3.2081661999691278,
+      "sampled_peak_rss_bytes": 130772992,
+      "rows": 160,
+      "inputs": 128,
+      "outputs": 96,
+      "jacobian_rows": 128,
+      "finite_difference_rows": 32,
+      "magnitudes": [
+        0.001,
+        0.01,
+        0.05
+      ]
+    },
+    {
+      "seconds": 3.0560701999347657,
+      "sampled_peak_rss_bytes": 129642496,
+      "rows": 160,
+      "inputs": 128,
+      "outputs": 96,
+      "jacobian_rows": 128,
+      "finite_difference_rows": 32,
+      "magnitudes": [
+        0.001,
+        0.01,
+        0.05
+      ]
+    }
+  ],
+  "optimized": [
+    {
+      "seconds": 0.32895019999705255,
+      "sampled_peak_rss_bytes": 86761472,
+      "rows": 160,
+      "inputs": 128,
+      "outputs": 96,
+      "jacobian_rows": 128,
+      "finite_difference_rows": 32,
+      "magnitudes": [
+        0.001,
+        0.01,
+        0.05
+      ]
+    },
+    {
+      "seconds": 0.36191600002348423,
+      "sampled_peak_rss_bytes": 87060480,
+      "rows": 160,
+      "inputs": 128,
+      "outputs": 96,
+      "jacobian_rows": 128,
+      "finite_difference_rows": 32,
+      "magnitudes": [
+        0.001,
+        0.01,
+        0.05
+      ]
+    }
+  ],
+  "equivalence": "exact fields/statuses preserved; only prefrozen reduction tolerance permitted",
+  "tolerated_differences": []
+}

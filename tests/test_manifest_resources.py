@@ -28,3 +28,12 @@ def test_readonly_existing_store_rejects_writes(tmp_path):
     assert len(reader.snapshot("r")["tasks"]) == 2
     with pytest.raises(sqlite3.OperationalError):
         reader.set_run_status("r","changed")
+def test_existing_worker_store_never_initializes_or_creates(tmp_path,monkeypatch):
+    from src.task_manifest import ManifestStore
+    import pytest
+    path=tmp_path/'manifest.db'
+    ManifestStore(path)
+    monkeypatch.setattr(ManifestStore,'_init_schema',lambda *a:pytest.fail('worker schema initialization'))
+    existing=ManifestStore(path,initialize=False)
+    with existing._connect() as connection:connection.execute('SELECT 1 FROM runs LIMIT 0')
+    with pytest.raises(FileNotFoundError):ManifestStore(tmp_path/'absent.db',initialize=False)

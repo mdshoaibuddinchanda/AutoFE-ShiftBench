@@ -627,7 +627,7 @@ def apply_training_condition(
 
 def _manifest_for_task(task: dict[str, Any]) -> ManifestStore | None:
     path = task.get("manifest_db")
-    return ManifestStore(path) if path else None
+    return ManifestStore(path,initialize=False) if path else None
 
 
 def _claim_manifest_task(task: dict[str, Any], *, worker_id: str) -> str | None:
@@ -901,8 +901,8 @@ def dispatch_training_tasks(*args,**kwargs):
 
 def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None):
     """Transactionally commit task/attempt/result, then export an idempotent row."""
-    init_db()
-    store = ManifestStore(manifest_db) if manifest_db and run_id else None
+    store = ManifestStore(manifest_db,initialize=False) if manifest_db and run_id else None
+    if store is None: init_db()
     Path(results_path).parent.mkdir(parents=True,exist_ok=True)
     if store is not None:
         store.export_durable_results(str(run_id),results_path)
@@ -921,7 +921,7 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
                 f.write(json.dumps(res, allow_nan=False) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
-            log_run(
+            if store is None: log_run(
                 res["dataset"], res["seed"], res["fold"],
                 res["condition"], res["pipeline"], res["model"],
                 res["split_policy"],

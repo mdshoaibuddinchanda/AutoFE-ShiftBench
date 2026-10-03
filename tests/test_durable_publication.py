@@ -96,3 +96,35 @@ def test_late_stale_worker_cannot_commit_after_takeover(tmp_path):
     with pytest.raises(ManifestConflictError):
         store.commit_result("r",payload["scientific_task_id"],payload["attempt_id"],payload)
     assert store.get_task("r",payload["scientific_task_id"])["active_attempt_id"] == second
+
+
+def test_export_streams_without_materializing_manifest_and_preserves_other_runs(tmp_path,monkeypatch):
+    store,records=fixture(tmp_path,precompute=False)
+    payload=result(store,records)
+    store.commit_result('r',payload['scientific_task_id'],payload['attempt_id'],payload)
+    other={'run_id':'other','scientific_task_id':'unrelated','roc_auc':.3}
+    ledger=tmp_path/'results.jsonl'
+    ledger.write_text(json.dumps(other)+'\n'+json.dumps(payload)+'\n'+json.dumps(payload)+'\n')
+    monkeypatch.setattr(store,'snapshot',lambda *a,**kw:pytest.fail('full manifest materialized'))
+    report=store.export_durable_results('r',ledger)
+    assert report=={'rows_added':0,'malformed_lines':0,'duplicates_removed':1}
+    assert [json.loads(line) for line in ledger.read_text().splitlines()]==[other,payload]
+
+
+def test_export_publication_failure_keeps_original_and_independently_reconstructs(tmp_path,monkeypatch):
+    store,records=fixture(tmp_path,precompute=False)
+    payload=result(store,records)
+    store.commit_result('r',payload['scientific_task_id'],payload['attempt_id'],payload)
+    ledger=tmp_path/'results.jsonl';original=b'{"truncated":'
+    ledger.write_bytes(original)
+    from src import task_manifest
+    replace=task_manifest.os.replace
+    def interrupted(source,target):
+        if target==ledger:raise OSError('injected before atomic publication')
+        return replace(source,target)
+    with monkeypatch.context() as context:
+        context.setattr(task_manifest.os,'replace',interrupted)
+        with pytest.raises(OSError):store.export_durable_results('r',ledger)
+    assert ledger.read_bytes()==original
+    assert store.export_durable_results('r',ledger)['rows_added']==1
+    assert json.loads(ledger.read_text())==payload

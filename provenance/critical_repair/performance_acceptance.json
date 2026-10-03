@@ -1,0 +1,11 @@
+{
+  "schema": "performance_field_acceptance_v1",
+  "corrected_reference_source": "913285b",
+  "declared_before_diagnostic_reduction_implementation": true,
+  "exact": ["all discrete identities and decisions", "RNG and sampled rows/directions", "values and predictions", "candidate scores and ties", "validity and nonsmooth counts", "finite_difference.max_absolute_error", "finite_difference.status", "inference decisions"],
+  "rearranged_reductions": {
+    "float64_norms": {"rtol": 1e-12, "atol": 1e-12},
+    "finite_difference.mean_absolute_error": {"rtol": 1e-12, "atol": 1e-15}
+  },
+  "justification": "Streaming removes analytically zero coordinates and groups the same finite nonzero errors before dividing by the unchanged rows*outputs*inputs denominator. Only summation grouping changes; maximum error and validation threshold remain exact. Nonfinite inputs retain the original bounded tensor implementation."
+}

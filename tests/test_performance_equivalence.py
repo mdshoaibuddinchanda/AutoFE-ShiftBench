@@ -68,3 +68,14 @@ def test_sorted_cliff_delta_preserves_pairwise_definition(x,y):
         expected=float(np.sign(np.asarray(x,dtype=float)[:,None]-np.asarray(y,dtype=float)[None,:]).mean()) if len(x) and len(y) else np.nan
     actual=cliffs_delta(x,y)
     assert actual==expected or np.isnan(actual) and np.isnan(expected)
+
+
+@pytest.mark.parametrize('n',[1,2,3,8,16])
+def test_vector_exact_signs_preserve_enumeration_order_and_dtype(n):
+    import itertools
+    from src.dataset_statistics import _exact_signs
+    expected=np.asarray(list(itertools.product((-1.,1.),repeat=n)),dtype=float)
+    actual=_exact_signs(n)
+    np.testing.assert_array_equal(actual,expected,strict=True)
+    assert actual is _exact_signs(n)
+    assert not actual.flags.writeable

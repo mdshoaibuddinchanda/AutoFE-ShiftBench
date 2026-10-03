@@ -19,6 +19,7 @@ from src.operator_registry import (
     expression_from_dict,
     expression_operators,
     expression_to_string,
+    expression_columns,
     raw_expression,
 )
 
@@ -105,6 +106,31 @@ def _summary(jacobian: np.ndarray, *, status: dict[str, Any], method: str = "exa
     }
 
 
+def _stream_summary(frame,expressions):
+    """Retain all rows/outputs/coordinates without an outputs x inputs tensor."""
+    rows,inputs=len(frame),len(frame.columns)
+    require_bytes(rows*(inputs*8*5+len(expressions)*8*3),purpose='streamed exact Jacobian workspace')
+    norms=np.empty((rows,len(expressions)),dtype=float)
+    status=Counter()
+    for index,expression in enumerate(expressions):
+        if expression[0]=='raw':
+            values=frame[str(expression[1])].to_numpy(dtype=float)
+            norms[:,index]=1.
+            status.update({'protected_count':0,'nonsmooth_count':0,'nonfinite_count':int(np.count_nonzero(~np.isfinite(values)))})
+        else:
+            _,jac,counts=_derivative(expression,frame)
+            norms[:,index]=np.linalg.norm(jac,axis=1)
+            status.update(counts)
+    fro=float(np.sqrt(np.sum(norms*norms)))
+    summary={'matrix_norm':'frobenius','norm_method':'exact','measurement_scope':'exact_on_sampled_rows',
+        'frobenius_norm':fro,'dimension_adjusted_frobenius':float(fro/np.sqrt(max(len(expressions),1))),
+        'mean_output_l2':float(np.mean(norms)) if norms.size else 0.,'max_output_l2':float(np.max(norms)) if norms.size else 0.,
+        'n_rows':rows,'n_outputs':len(expressions),'n_inputs':inputs,'status':dict(status)}
+    per_output=[{'candidate_id':candidate_id(expr),'expression':expression_to_string(expr),
+        'mean_l2':float(np.mean(norms[:,index])) if rows else 0.} for index,expr in enumerate(expressions)]
+    return summary,per_output
+
+
 def compute_jacobian_diagnostic(
     base_inputs: pd.DataFrame,
     expressions: Iterable[Expression],
@@ -118,14 +144,7 @@ def compute_jacobian_diagnostic(
     expressions = list(expressions)
     if raw_control_expressions is not None:
         raw_control_expressions=list(raw_control_expressions)
-    require_bytes(len(sampled)*len(base_inputs.columns)*(len(expressions)+len(raw_control_expressions or []))*8*3,purpose='exact Jacobian diagnostic workspace')
-    jacobians: list[np.ndarray] = []
-    statuses = Counter()
-    for expression in expressions:
-        _values, jac, status = _derivative(expression, sampled)
-        jacobians.append(jac)
-        statuses.update(status)
-    jacobian = np.stack(jacobians, axis=1) if jacobians else np.zeros((len(sampled), 0, len(base_inputs.columns)))
+    selected,per_output=_stream_summary(sampled,expressions)
     result = {
         "schema_version": FSVA_SCHEMA_VERSION,
         "diagnostic_status": "diagnostic_complete" if expressions else "unsupported",
@@ -137,26 +156,12 @@ def compute_jacobian_diagnostic(
             "estimator_predictions",
         ],
         "sample_identity": {"random_state": int(random_state), "max_rows": int(max_rows)},
-        "selected": _summary(jacobian, status=dict(statuses)),
-        "per_output": [
-            {
-                "candidate_id": candidate_id(expression),
-                "expression": expression_to_string(expression),
-                "mean_l2": float(np.mean(np.linalg.norm(jacobians[index], axis=1))) if len(jacobians[index]) else 0.0,
-            }
-            for index, expression in enumerate(expressions)
-        ],
+        "selected": selected,
+        "per_output": per_output,
     }
     if raw_control_expressions is not None:
         raw_expressions = list(raw_control_expressions)
-        raw_jacobians: list[np.ndarray] = []
-        raw_statuses = Counter()
-        for expression in raw_expressions:
-            _values, jac, status = _derivative(expression, sampled)
-            raw_jacobians.append(jac)
-            raw_statuses.update(status)
-        raw_jacobian = np.stack(raw_jacobians, axis=1) if raw_jacobians else np.zeros((len(sampled), 0, len(base_inputs.columns)))
-        result["raw_control"] = _summary(raw_jacobian, status=dict(raw_statuses))
+        result["raw_control"] = _stream_summary(sampled,raw_expressions)[0]
     return result
 
 
@@ -166,7 +171,18 @@ def _evaluate_mapping(
     outputs: list[np.ndarray] = []
     status = Counter()
     for expression in expressions:
-        values, _jac, expression_status = _derivative(expression, frame)
+        if expression[0]=='raw':
+            values=frame[str(expression[1])].to_numpy(dtype=float)
+            expression_status={'protected_count':0,'nonsmooth_count':0,'nonfinite_count':int(np.count_nonzero(~np.isfinite(values)))}
+        else:
+            # Derivative validity remains part of the executed mapping contract.
+            # Drop only provably irrelevant coordinates on finite wide inputs.
+            dependencies=set(expression_columns(expression))
+            relevant=[column for column in frame if column in dependencies]
+            working=frame
+            if len(frame.columns)>=64 and len(relevant)<len(frame.columns) and np.isfinite(frame.to_numpy(dtype=float)).all():
+                working=frame[relevant]
+            values, _jac, expression_status = _derivative(expression, working)
         outputs.append(values)
         status.update(expression_status)
     values = np.stack(outputs, axis=1) if outputs else np.zeros((len(frame), 0))
@@ -237,7 +253,7 @@ def compute_empirical_amplification(
     }
 
 
-def validate_jacobian_finite_difference(
+def _tensor_finite_difference(
     base_inputs: pd.DataFrame,
     expressions: Iterable[Expression],
     *,
@@ -248,6 +264,7 @@ def validate_jacobian_finite_difference(
     """Compare analytic derivatives with bounded central finite differences."""
     sampled = _sample_rows(base_inputs, max_rows, random_state)
     expressions = list(expressions)
+    require_bytes(len(sampled)*len(expressions)*len(sampled.columns)*8*4,purpose='nonfinite-input finite-difference tensor fallback')
     analytic: list[np.ndarray] = []
     nonsmooth = 0
     for expression in expressions:
@@ -274,6 +291,36 @@ def validate_jacobian_finite_difference(
         "nonsmooth_count": nonsmooth,
         "status": "validated" if max_error <= max(1e-4, epsilon * 1000) else "tolerance_exceeded",
     }
+
+
+def validate_jacobian_finite_difference(base_inputs,expressions,*,epsilon=1e-6,max_rows=32,random_state=0):
+    sampled=_sample_rows(base_inputs,max_rows,random_state)
+    expressions=list(expressions)
+    if not np.isfinite(sampled.to_numpy(dtype=float)).all():
+        return _tensor_finite_difference(base_inputs,expressions,epsilon=epsilon,max_rows=max_rows,random_state=random_state)
+    require_bytes(len(sampled)*(len(expressions)+len(sampled.columns))*8*5,purpose='exact dependency-aware finite differences')
+    errors=np.zeros((len(sampled),len(expressions)),dtype=float)
+    max_error=0.
+    nonsmooth=0
+    for index,expression in enumerate(expressions):
+        dependencies=set(expression_columns(expression))
+        columns=[column for column in sampled if column in dependencies]
+        working=sampled[columns]
+        _,analytic,status=_derivative(expression,working)
+        nonsmooth+=int(status.get('nonsmooth_count',0))
+        for position,column in enumerate(columns):
+            plus,minus=working.copy(),working.copy()
+            plus[column]+=epsilon
+            minus[column]-=epsilon
+            # Same central directions, magnitudes and arithmetic as the reference.
+            finite=(_evaluate_mapping([expression],plus)[:,0]-_evaluate_mapping([expression],minus)[:,0])/(2.*epsilon)
+            error=np.abs(analytic[:,position]-finite)
+            errors[:,index]+=error
+            if error.size: max_error=max(max_error,float(np.max(error)))
+    count=len(sampled)*len(expressions)*len(sampled.columns)
+    return {'method':'central_finite_difference','epsilon':float(epsilon),'max_absolute_error':max_error,
+        'mean_absolute_error':float(np.sum(errors)/count) if count else 0.,'nonsmooth_count':nonsmooth,
+        'status':'validated' if max_error<=max(1e-4,epsilon*1000) else 'tolerance_exceeded'}
 
 
 def selection_stability(histories: Iterable[dict[str, Any]]) -> dict[str, Any]:

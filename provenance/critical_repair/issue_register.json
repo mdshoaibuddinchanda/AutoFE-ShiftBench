@@ -859,41 +859,68 @@
     {
       "id": "E11",
       "title": "Value-only perturbation evaluation",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Value-only perturbation evaluation",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "E12",
       "title": "Stream sparse Jacobian summaries",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Stream sparse Jacobian summaries",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "E13",
       "title": "Dependency-aware finite differences",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Dependency-aware finite differences",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "E14",
@@ -963,28 +990,46 @@
     {
       "id": "E19",
       "title": "Batched manifest queries",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Batched manifest queries",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "E20",
       "title": "Durable persistence batching",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Durable persistence batching",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "E21",
@@ -1099,15 +1144,24 @@
     {
       "id": "R05",
       "title": "Exact sign enumeration and batched resampling",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original tensor/ledger oracle, bounded wide-memory fixture and retained corrected-reference comparisons",
       "path": "active_or_latent_to_verify",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Exact sign enumeration and batched resampling",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_diagnostic_streaming.py",
+        "tests/test_durable_publication.py",
+        "tests/test_manifest_resources.py",
+        "tests/test_coordinator.py",
+        "tests/test_prepared_execution.py",
+        "tests/test_performance_equivalence.py"
+      ],
+      "status": "implemented_regression_and_synthetic_equivalence_verified",
+      "limitations": [
+        "Native numerical reduction norm tolerance and finite-difference mean summation tolerance declared before implementation; discrete statuses/maximum error remain exact. Monte Carlo batching and sensitivity seed-family reuse deferred because kernel/stream equivalence is not established. Writer append still fsyncs every result."
+      ]
     },
     {
       "id": "R06",

@@ -65,6 +65,7 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
     stopped=False
     writer_failed=False
     store.resume(run_id)
+    run_config=store.run_config(run_id)
     writer.start()
     try:
         while True:
@@ -75,8 +76,9 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
             if stop_requested() or (deadline is not None and now >= deadline):
                 stopped=True
                 break # hard run deadline/signal; attempts stay explicitly recoverable
+            states=store.task_states(run_id,active)
             for task_id,(process,task,launched,exited_at) in list(active.items()):
-                state=store.get_task(run_id,task_id)
+                state={'state':states[task_id]}
                 timed_out=config.task_timeout_seconds is not None and now-launched >= config.task_timeout_seconds
                 if timed_out and state['state'] == 'running':
                     if process.is_alive():
@@ -112,7 +114,6 @@ def execute_manifest(store,run_id,ledger,config,*,stop_requested=lambda:False,en
                     if gpu and gpu_active: continue
                     attempt=store.claim_task(run_id,record['scientific_task_id'],worker_id='supervised-parent',timeout_seconds=config.task_timeout_seconds)
                     if attempt is None: continue
-                    run_config=store.run_config(run_id)
                     from src.seeding import stable_seed
                     from src.fsva import DEFAULT_PERTURBATION_MAGNITUDES
                     task={**record,'dataset_name':record['dataset'],'data_path':Path(record['data_path']),

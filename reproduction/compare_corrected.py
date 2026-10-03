@@ -28,8 +28,8 @@ def equal(reference,actual,path='root',tolerated=None):
     elif isinstance(reference,float) and np.isnan(reference):
         assert np.isnan(actual),path
     elif reference != actual:
-        if path.rsplit('.',1)[-1] in NORMS:
-            assert np.isclose(reference,actual,rtol=1e-12,atol=1e-12,equal_nan=True),(path,reference,actual)
+        if path.rsplit('.',1)[-1] in NORMS or path.rsplit('.',1)[-1]=='mean_absolute_error':
+            assert np.isclose(reference,actual,rtol=1e-12,atol=1e-15 if path.rsplit('.',1)[-1]=='mean_absolute_error' else 1e-12,equal_nan=True),(path,reference,actual)
             tolerated.append({'path':path,'reference':reference,'actual':actual,'absolute_difference':abs(reference-actual)})
         else: raise AssertionError((path,reference,actual))
     return tolerated
@@ -60,7 +60,7 @@ def main():
     opt=json.loads((args.optimized/'measurements.json').read_text())
     assert ref['data_sha256']==opt['data_sha256']
     assert ref['fixture']==opt['fixture']
-    model_fields=('scientific_task_id','dataset','split_policy','seed','fold','condition','severity','pipeline','pipeline_identity','model','status','selection_seed','split_seed','corruption_seed','estimator_seed','diagnostic_status','metric_semantics_version','metric_statuses','accuracy','balanced_accuracy','precision','recall','f1','f1_macro','mcc','roc_auc','pr_auc','log_loss','brier_score','n_original','n_generated','n_selected','candidate_count','actual_estimator_input_dimension','selected_feature_identities','training_distribution_distance','held_out_distribution_distance','device_evidence')
+    model_fields=('scientific_task_id','dataset','split_policy','seed','fold','condition','severity','pipeline','pipeline_identity','model','status','selection_seed','split_seed','corruption_seed','estimator_seed','diagnostic_status','metric_semantics_version','metric_status','model_seed','distance_sample_seed','n_train','n_test','n_retained','raw_candidate_count','generated_candidate_count','retained_raw_count','retained_generated_count','eligible_base_feature_count','selector_identity','condition_identity','condition_semantics_version','distribution_semantics_version','distance_status','distance_scope','mi_semantics_version','operator_registry_version','operator_semantics_version','operator_set_id','cap_policy_version','seed_scheme_version','evaluation_protocol_version','brier_normalization','f1_averaging','train_auc','test_auc','accuracy','balanced_accuracy','precision','recall','f1','f1_macro','mcc','roc_auc','pr_auc','log_loss','brier_score','n_original','n_generated','n_selected','candidate_count','actual_estimator_input_dimension','selected_feature_identities','training_distribution_distance','held_out_distribution_distance','device_evidence')
     def model_rows(path):
         if not path.exists(): return None
         rows=[json.loads(line) for line in path.read_text().splitlines()]

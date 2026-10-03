@@ -1,0 +1,115 @@
+{
+  "schema": "corrected_equivalence_v1",
+  "checks": [
+    {
+      "repeat": "repeat_0",
+      "artifact": "science.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "candidate_scale.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "analysis.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_0",
+      "artifact": "diagnostics.json",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "science.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "candidate_scale.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "analysis.pkl",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "repeat": "repeat_1",
+      "artifact": "diagnostics.json",
+      "status": "scientific_equivalence_verified"
+    },
+    {
+      "artifact": "production.jsonl",
+      "actual_model_rows": 4,
+      "status": "scientific_equivalence_verified"
+    }
+  ],
+  "same_data_and_configuration": true,
+  "norm_differences_within_prefrozen_tolerance": [
+    {
+      "path": "repeat_0/science.pkl.pipelines.AutoFE_Baseline.diagnostics.derivative_validation.mean_absolute_error",
+      "reference": 3.731755317548465e-05,
+      "actual": 3.731755317548466e-05,
+      "absolute_difference": 1.3552527156068805e-20
+    },
+    {
+      "path": "repeat_0/science.pkl.pipelines.AutoFE_Baseline.diagnostics.jacobian.selected.dimension_adjusted_frobenius",
+      "reference": 163870.75774067864,
+      "actual": 163870.75774067861,
+      "absolute_difference": 2.9103830456733704e-11
+    },
+    {
+      "path": "repeat_0/science.pkl.pipelines.AutoFE_Baseline.diagnostics.jacobian.selected.frobenius_norm",
+      "reference": 1638707.5774067864,
+      "actual": 1638707.5774067861,
+      "absolute_difference": 2.3283064365386963e-10
+    },
+    {
+      "path": "repeat_0/diagnostics.json.jacobian.selected.dimension_adjusted_frobenius",
+      "reference": 6129371.506043664,
+      "actual": 6129371.506043665,
+      "absolute_difference": 9.313225746154785e-10
+    },
+    {
+      "path": "repeat_0/diagnostics.json.jacobian.selected.frobenius_norm",
+      "reference": 61293715.06043664,
+      "actual": 61293715.06043665,
+      "absolute_difference": 7.450580596923828e-09
+    },
+    {
+      "path": "repeat_1/science.pkl.pipelines.AutoFE_Baseline.diagnostics.derivative_validation.mean_absolute_error",
+      "reference": 3.731755317548465e-05,
+      "actual": 3.731755317548466e-05,
+      "absolute_difference": 1.3552527156068805e-20
+    },
+    {
+      "path": "repeat_1/science.pkl.pipelines.AutoFE_Baseline.diagnostics.jacobian.selected.dimension_adjusted_frobenius",
+      "reference": 163870.75774067864,
+      "actual": 163870.75774067861,
+      "absolute_difference": 2.9103830456733704e-11
+    },
+    {
+      "path": "repeat_1/science.pkl.pipelines.AutoFE_Baseline.diagnostics.jacobian.selected.frobenius_norm",
+      "reference": 1638707.5774067864,
+      "actual": 1638707.5774067861,
+      "absolute_difference": 2.3283064365386963e-10
+    },
+    {
+      "path": "repeat_1/diagnostics.json.jacobian.selected.dimension_adjusted_frobenius",
+      "reference": 6129371.506043664,
+      "actual": 6129371.506043665,
+      "absolute_difference": 9.313225746154785e-10
+    },
+    {
+      "path": "repeat_1/diagnostics.json.jacobian.selected.frobenius_norm",
+      "reference": 61293715.06043664,
+      "actual": 61293715.06043665,
+      "absolute_difference": 7.450580596923828e-09
+    }
+  ],
+  "exact_fields": "all selected matrix values/dtypes/order/attrs, labels, candidate universes/scores/ties/history, seeds, sampled inputs, statuses, analysis tables/config and split indices",
+  "physical_artifacts": "Prepared descriptor inventory omits unrequested pipelines. Timing/RSS fields and content-addressed file hashes can differ; each execution verifies its actual artifacts. Required scientific dependency signatures and identities remain compared."
+}

@@ -12,6 +12,7 @@ import hashlib
 import itertools
 import json
 import math
+from functools import lru_cache
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -297,6 +298,15 @@ def _bootstrap_dataset_mean(values: np.ndarray, config: AnalysisConfig, *, strat
     }
 
 
+@lru_cache(maxsize=3)
+def _exact_signs(n):
+    if not 1<=n<=16:raise ValueError('Exact sign enumeration supports1..16nonzero datasets')
+    bits=(np.arange(2**n,dtype=np.uint64)[:,None]>>np.arange(n-1,-1,-1,dtype=np.uint64))&1
+    signs=bits.astype(float)*2.-1.
+    signs.flags.writeable=False
+    return signs
+
+
 def _sign_flip_test(values: np.ndarray, config: AnalysisConfig, *, stratum_label: str, fingerprint: str) -> dict[str, Any]:
     finite = values[np.isfinite(values)]
     nonzero = finite[np.abs(finite) > 0.0]
@@ -311,7 +321,7 @@ def _sign_flip_test(values: np.ndarray, config: AnalysisConfig, *, stratum_label
     n = len(values_for_test)
     denominator = len(finite)
     if n <= 16:
-        signs = np.asarray(list(itertools.product((-1.0, 1.0), repeat=n)), dtype=float)
+        signs = _exact_signs(n)
         # Keep zero differences in the dataset-level mean denominator.  They
         # are omitted from the sign enumeration because their sign is
         # immaterial, but they remain part of the independent dataset sample.

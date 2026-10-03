@@ -15,6 +15,8 @@ import sqlite3
 import time
 import queue as queue_module
 import traceback as traceback_module
+import tempfile
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -217,14 +219,28 @@ def build_task_records(
     return records
 
 
+def _atomic_copy(source,target):
+    descriptor,name=tempfile.mkstemp(prefix=Path(target).name+'.copy_',dir=Path(target).parent)
+    temp=Path(name)
+    try:
+        with os.fdopen(descriptor,'wb') as output,Path(source).open('rb') as original:
+            shutil.copyfileobj(original,output,length=1024*1024)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temp,target)
+    finally:
+        if temp.exists():temp.unlink()
+
+
 class ManifestStore:
     """SQLite-backed manifest and append-only attempt state machine."""
 
-    def __init__(self, db_path: str | Path, *, manifest_path: str | Path | None = None, read_only: bool = False) -> None:
+    def __init__(self, db_path: str | Path, *, manifest_path: str | Path | None = None, read_only: bool = False, initialize: bool = True) -> None:
         self.db_path = Path(db_path)
         self.read_only = read_only
+        self.initialize = initialize
         self.manifest_path = None if manifest_path is None else Path(manifest_path)
-        if read_only:
+        if read_only or not initialize:
             if not self.db_path.is_file():
                 raise FileNotFoundError(self.db_path)
         else:
@@ -232,8 +248,9 @@ class ManifestStore:
             self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        target = self.db_path.resolve().as_uri()+"?mode=ro" if self.read_only else str(self.db_path)
-        connection = sqlite3.connect(target, timeout=30.0, uri=self.read_only, factory=_ClosingConnection)
+        existing_only=self.read_only or not self.initialize
+        target = self.db_path.resolve().as_uri()+("?mode=ro" if self.read_only else "?mode=rw") if existing_only else str(self.db_path)
+        connection = sqlite3.connect(target, timeout=30.0, uri=existing_only, factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
         return connection
@@ -448,6 +465,13 @@ class ManifestStore:
                 ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id
                 WHERE r.run_id=? AND t.stage='precompute' AND t.state='completed'""",(run_id,)).fetchall()]
 
+    def task_states(self,run_id,task_ids):
+        ids=list(task_ids)
+        if not ids:return {}
+        with self._connect() as connection:
+            return {row['scientific_task_id']:row['state'] for row in connection.execute(
+                'SELECT scientific_task_id,state FROM tasks WHERE run_id=? AND scientific_task_id IN ('+','.join('?' for _ in ids)+')',[run_id,*ids])}
+
     def snapshot(self, run_id: str) -> dict[str, Any]:
         """Read one consistent SQLite snapshot for analysis and provenance.
 
@@ -586,54 +610,61 @@ class ManifestStore:
         """
         path = Path(ledger_path)
         with artifact_lock(path.with_suffix(path.suffix+".lock")):
-            snapshot = self.snapshot(run_id)
-            tasks = {t["scientific_task_id"]:t for t in snapshot["tasks"]}
-            authoritative = {}
-            for row in snapshot["durable_results"]:
-                task = tasks.get(row["scientific_task_id"])
-                if task is None or task["stage"] != "model":
-                    continue
-                payload = json.loads(row["payload_json"])
-                payload.setdefault("run_id",run_id)
-                payload.setdefault("scientific_task_id",row["scientific_task_id"])
-                payload.setdefault("attempt_id",row["attempt_id"])
-                authoritative[row["scientific_task_id"]] = payload
-            rows,seen = [],{}
-            malformed,duplicates = 0,0
-            lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-            nonempty = [i for i,line in enumerate(lines) if line.strip()]
-            for index,line in enumerate(lines):
-                if not line.strip():
-                    continue
-                try:
-                    payload=json.loads(line)
-                    if not isinstance(payload,dict):
-                        raise ManifestConflictError("Non-object ledger record")
-                except json.JSONDecodeError:
-                    if index != nonempty[-1] or line.rstrip().endswith("}"):
-                        raise ManifestConflictError("Malformed nontruncated ledger evidence")
-                    malformed += 1
-                    continue
-                if payload.get("run_id") != run_id:
-                    rows.append(payload)
-                    continue
-                task_id=payload.get("scientific_task_id")
-                if task_id not in authoritative or _canonical(payload) != _canonical(authoritative[task_id]):
-                    raise ManifestConflictError("Ledger payload conflicts with authoritative result")
-                if task_id in seen:
-                    duplicates += 1
-                    continue
-                seen[task_id]=payload
-                rows.append(payload)
-            missing=sorted(set(authoritative)-set(seen))
-            rows.extend(authoritative[task_id] for task_id in missing)
-            if missing or malformed or duplicates:
-                if path.exists():
-                    backup=path.with_name(path.name+".recovery_"+file_sha256(path)[:16])
-                    if not backup.exists():
-                        atomic_bytes(backup,path.read_bytes())
-                atomic_bytes(path,("".join(_canonical(row)+"\n" for row in rows)).encode("utf-8"))
-            return {"rows_added":len(missing),"malformed_lines":malformed,"duplicates_removed":duplicates}
+            path.parent.mkdir(parents=True,exist_ok=True)
+            descriptor,temp_name=tempfile.mkstemp(prefix=path.name+'.export_',dir=path.parent)
+            temp=Path(temp_name)
+            missing,malformed,duplicates=0,0,0
+            try:
+                with os.fdopen(descriptor,'w',encoding='utf-8',newline='\n') as output, self._connect() as connection:
+                    connection.execute('PRAGMA temp_store=FILE')
+                    connection.execute('CREATE TEMP TABLE export_seen (scientific_task_id TEXT PRIMARY KEY)')
+                    connection.execute('BEGIN')
+                    def canonical_payload(row):
+                        value=json.loads(row['payload_json'])
+                        value.setdefault('run_id',run_id)
+                        value.setdefault('scientific_task_id',row['scientific_task_id'])
+                        value.setdefault('attempt_id',row['attempt_id'])
+                        return _canonical(value)
+                    if path.exists():
+                        with path.open(encoding='utf-8') as source:
+                            for line in source:
+                                if not line.strip():continue
+                                if malformed:
+                                    raise ManifestConflictError('Malformed nontruncated ledger evidence')
+                                try:
+                                    payload=json.loads(line)
+                                except json.JSONDecodeError:
+                                    if line.rstrip().endswith('}'):
+                                        raise ManifestConflictError('Malformed nontruncated ledger evidence')
+                                    malformed+=1
+                                    continue
+                                if not isinstance(payload,dict):raise ManifestConflictError('Non-object ledger record')
+                                encoded=_canonical(payload)
+                                if payload.get('run_id')==run_id:
+                                    task_id=payload.get('scientific_task_id')
+                                    row=connection.execute("SELECT r.* FROM durable_results r JOIN tasks t ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id WHERE r.run_id=? AND r.scientific_task_id=? AND t.stage='model'",(run_id,task_id)).fetchone()
+                                    if row is None or encoded!=canonical_payload(row):
+                                        raise ManifestConflictError('Ledger payload conflicts with authoritative result')
+                                    inserted=connection.execute('INSERT OR IGNORE INTO export_seen VALUES (?)',(task_id,)).rowcount
+                                    if not inserted:
+                                        duplicates+=1
+                                        continue
+                                output.write(encoded+'\n')
+                    for row in connection.execute("SELECT r.* FROM durable_results r JOIN tasks t ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id LEFT JOIN export_seen s ON r.scientific_task_id=s.scientific_task_id WHERE r.run_id=? AND t.stage='model' AND s.scientific_task_id IS NULL ORDER BY r.scientific_task_id",(run_id,)):
+                        output.write(canonical_payload(row)+'\n')
+                        missing+=1
+                    if missing or malformed or duplicates:
+                        output.flush()
+                        os.fsync(output.fileno())
+                if missing or malformed or duplicates:
+                    if path.exists():
+                        backup=path.with_name(path.name+'.recovery_'+file_sha256(path)[:16])
+                        if not backup.exists():
+                            _atomic_copy(path,backup)
+                    os.replace(temp,path)
+            finally:
+                if temp.exists():temp.unlink()
+            return {'rows_added':missing,'malformed_lines':malformed,'duplicates_removed':duplicates}
 
     def recover_stale_attempts(self, run_id: str, *, stale_after_seconds: float, retry: bool = True) -> int:
         cutoff = time.time() - stale_after_seconds
