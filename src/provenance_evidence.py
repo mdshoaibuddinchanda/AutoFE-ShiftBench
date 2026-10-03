@@ -14,7 +14,7 @@ from src.task_manifest import ManifestError,ManifestStore
 
 def snapshot_digest(snapshot):
     from src.provenance import canonical_sha256
-    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results")})
+    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events") if key in snapshot})
 
 
 def _resolve(path,root):

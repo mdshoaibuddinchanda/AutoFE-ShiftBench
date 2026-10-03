@@ -181,3 +181,9 @@ Integrated affected analysis plus production-resume checks: 19 passed,
 13 warnings, 12.51 s. The B06 prefix controls still fail as expected before
 that repair: final bounds 0.125 instead of [-0.4625,0.5375], and changing only
 future metrics changes the prefix interval to 0.5275. These failures are retained.
+
+## B06 / C14: logical information boundaries
+
+Task creation, claim, failure, completion and recovery now record transactional logical events. Prefix analysis reconstructs states and durable payload visibility at the selected commit event. Legacy manifests with incomplete history are explicitly unsupported. Future metric changes leave prefix summaries, bounds, membership and cutoff evidence unchanged. Common eligibility includes unresolved outcomes; completeness is contrast/stratum specific; unknown eligibility cannot qualify a dataset as complete. Leave-one-out is descriptive and matched blocks are explicitly a primary-selection alias.
+
+Analysis resampling inputs are canonical scientific records, excluding runtime, export order and run labels; the fingerprint is persisted. This is a versioned scientific correction before the corrected reference, retaining existing root and purpose streams. Current affected suite: 23 passed in 5.47 s. Initial added test failures were incorrect test attribute names, corrected to the actual bundle schema.

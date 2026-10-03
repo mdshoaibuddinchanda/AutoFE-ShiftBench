@@ -275,7 +275,9 @@ def _bootstrap_dataset_mean(values: np.ndarray, config: AnalysisConfig, *, strat
         return {"status": "too_few_datasets", "n_datasets": n, "ci_lower": None, "ci_upper": None, "bootstrap_resamples": 0}
     if config.bootstrap_resamples <= 0:
         return {"status": "bootstrap_disabled", "n_datasets": n, "ci_lower": None, "ci_upper": None, "bootstrap_resamples": 0}
-    seed = stable_seed("analysis_dataset_bootstrap", {"config": config.to_dict(), "stratum": stratum_label, "input_fingerprint": fingerprint})
+    random_config=config.to_dict()
+    random_config.pop("run_id",None)
+    seed = stable_seed("analysis_dataset_bootstrap", {"config": random_config, "stratum": stratum_label, "input_fingerprint": fingerprint})
     rng = np.random.default_rng(seed)
     indices = rng.integers(0, n, size=(config.bootstrap_resamples, n))
     means = values[indices].mean(axis=1)
@@ -312,7 +314,9 @@ def _sign_flip_test(values: np.ndarray, config: AnalysisConfig, *, stratum_label
         return {"status": "complete", "p_value": p_value, "n_datasets": len(finite), "zero_differences": int(len(finite) - n), "observed_mean": observed, "method": "sign_flip_exact", "resamples": int(len(null_means)), "exchangeability_assumption": "symmetric_dataset_level_differences"}
     if config.permutation_resamples <= 0:
         return {"status": "permutation_disabled", "p_value": None, "n_datasets": len(finite), "zero_differences": int(len(finite) - n), "observed_mean": observed, "method": "sign_flip_monte_carlo", "resamples": 0}
-    seed = stable_seed("analysis_dataset_sign_flip", {"config": config.to_dict(), "stratum": stratum_label, "input_fingerprint": fingerprint})
+    random_config=config.to_dict()
+    random_config.pop("run_id",None)
+    seed = stable_seed("analysis_dataset_sign_flip", {"config": random_config, "stratum": stratum_label, "input_fingerprint": fingerprint})
     rng = np.random.default_rng(seed)
     signs = rng.choice(np.array([-1.0, 1.0]), size=(config.permutation_resamples, n))
     null_means = signs @ values_for_test / denominator
@@ -350,6 +354,10 @@ def analyze_ledger(
     _validate_protocol(records, config)
     _check_duplicate_successes(records, config)
     _validate_pipeline_semantics(records, config)
+    scientific_rows=[{**{field:row.get(field) for field in config.task_fields},
+        **{field:row.get(field) for field in ("pipeline","pipeline_identity","dataset_fingerprint","metric_semantics_version","status")},
+        "metric":_finite_metric(row,config.metric)[1]} for row in records if row.get("pipeline") in {config.pipeline_a,config.pipeline_b}]
+    resampling_fingerprint=hashlib.sha256(_canonical_json(sorted(scientific_rows,key=_canonical_json)).encode()).hexdigest()
 
     exclusions: list[dict[str, Any]] = list(parse_exclusions)
     selected_rows: list[dict[str, Any]] = []
@@ -437,8 +445,8 @@ def analyze_ledger(
                 "task_ids": json.dumps(dataset_frame["task_id"].tolist()),
             })
         values = paired.groupby("dataset")["difference_b_minus_a"].mean().to_numpy(dtype=float)
-        bootstrap = _bootstrap_dataset_mean(values, config, stratum_label=stratum, fingerprint=fingerprint)
-        test = _sign_flip_test(values, config, stratum_label=stratum, fingerprint=fingerprint)
+        bootstrap = _bootstrap_dataset_mean(values, config, stratum_label=stratum, fingerprint=resampling_fingerprint)
+        test = _sign_flip_test(values, config, stratum_label=stratum, fingerprint=resampling_fingerprint)
         summary_rows.append({
             "stratum": stratum,
             "metric": config.metric,
@@ -478,6 +486,8 @@ def analyze_ledger(
 
     bundle = AnalysisBundle(
         config={**config.to_dict(), "schema_version": ANALYSIS_SCHEMA_VERSION, "input_ledger": str(path), "input_fingerprint_sha256": fingerprint,
+            "resampling_fingerprint_sha256":resampling_fingerprint,
+            "resampling_input_scope":"canonical scientific records; excludes runtime, export order, run labels and timestamps",
             "analysis_status":"supported_observed_pairs" if not pair_frame.empty else "empty_or_unsupported_observed_universe"},
         input_fingerprint=fingerprint,
         task_pairs=pair_frame,

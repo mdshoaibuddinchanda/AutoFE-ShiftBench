@@ -24,7 +24,7 @@ from src.seeding import SEED_SCHEME_VERSION
 from src.artifact_integrity import artifact_lock, atomic_bytes, dataset_identity, file_sha256
 
 
-MANIFEST_SCHEMA_VERSION = "task_manifest_v1"
+MANIFEST_SCHEMA_VERSION = "task_manifest_logical_history_v2"
 TASK_IDENTITY_VERSION = "scientific_task_identity_data_v2"
 ATTEMPT_SCHEMA_VERSION = "attempt_history_v1"
 TASK_STATES = ("pending", "running", "completed", "failed", "timeout", "skipped")
@@ -299,8 +299,19 @@ class ManifestStore:
                     payload_json TEXT NOT NULL, created_at TEXT NOT NULL,
                     PRIMARY KEY (run_id, anchor_id)
                 );
+                CREATE TABLE IF NOT EXISTS task_events (
+                    event_order INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL, scientific_task_id TEXT NOT NULL,
+                    state TEXT NOT NULL, attempt_id TEXT, outcome_reason TEXT,
+                    recorded_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_task_events_run ON task_events(run_id,event_order);
                 """
             )
+
+    def _event(self,connection,run_id,task_id,state,attempt_id=None,reason=None):
+        cursor=connection.execute("INSERT INTO task_events (run_id,scientific_task_id,state,attempt_id,outcome_reason,recorded_at) VALUES (?,?,?,?,?,?)",(run_id,task_id,state,attempt_id,reason,_now()))
+        return cursor.lastrowid
 
     def create_run(self, run_id: str, config: Mapping[str, Any], records: Iterable[Mapping[str, Any]], *, manifest_path: str | Path | None = None) -> int:
         records = [dict(record) for record in records]
@@ -331,6 +342,7 @@ class ManifestStore:
                     "INSERT INTO tasks (run_id, scientific_task_id, task_kind, stage, payload_json, state, planned_skip_reason, outcome_reason, attempt_count, active_attempt_id, result_ref, checkpoint_identity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, ?, ?, ?)",
                     (run_id, task_id, record.get("task_kind", "model"), record.get("stage", "model"), _canonical(record), state, record.get("planned_skip_reason"), record.get("planned_skip_reason"), record.get("checkpoint_identity"), now, now),
                 )
+                self._event(connection,run_id,task_id,state,reason=record.get("planned_skip_reason"))
         target = Path(manifest_path or self.manifest_path) if (manifest_path or self.manifest_path) else None
         if target is not None and not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -394,12 +406,17 @@ class ManifestStore:
             tasks = connection.execute("SELECT * FROM tasks WHERE run_id = ? ORDER BY scientific_task_id", (run_id,)).fetchall()
             attempts = connection.execute("SELECT * FROM attempts WHERE run_id = ? ORDER BY attempt_id", (run_id,)).fetchall()
             durable_results = connection.execute("SELECT * FROM durable_results WHERE run_id = ? ORDER BY scientific_task_id", (run_id,)).fetchall()
+            try:
+                events=connection.execute("SELECT * FROM task_events WHERE run_id=? ORDER BY event_order",(run_id,)).fetchall()
+            except sqlite3.OperationalError:
+                events=[]
         return {
             "captured_at": captured_at,
             "run": dict(run),
             "tasks": [dict(row) for row in tasks],
             "attempts": [dict(row) for row in attempts],
             "durable_results": [dict(row) for row in durable_results],
+            "task_events":[dict(row) for row in events],
         }
 
     def claim_task(self, run_id: str, task_id: str, *, worker_id: str = "unknown", timeout_seconds: float | None = None) -> str | None:
@@ -415,6 +432,7 @@ class ManifestStore:
             attempt_id = attempt_id_for(run_id, task_id, attempt_number)
             connection.execute("UPDATE tasks SET state = 'running', attempt_count = ?, active_attempt_id = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (attempt_number, attempt_id, now, run_id, task_id))
             connection.execute("INSERT INTO attempts (run_id, attempt_id, scientific_task_id, attempt_number, stage, state, worker_id, started_at, timeout_seconds) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?)", (run_id, attempt_id, task_id, attempt_number, row["stage"], worker_id, now, timeout_seconds))
+            self._event(connection,run_id,task_id,"running",attempt_id)
             return attempt_id
 
     def _finish_attempt(self, connection: sqlite3.Connection, run_id: str, attempt_id: str, state: str, *, outcome: str | None = None, exception_type: str | None = None, exception_message: str | None = None, traceback_text: str | None = None, result_ref: str | None = None) -> None:
@@ -448,11 +466,14 @@ class ManifestStore:
             retry_allowed = retry and failure_class in RETRYABLE_FAILURES and int(row["attempt_count"]) < max_attempts
             next_state = "pending" if retry_allowed else attempt_state
             connection.execute("UPDATE tasks SET state = ?, outcome_reason = ?, active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (next_state, failure_class, _now(), run_id, task_id))
+            self._event(connection,run_id,task_id,next_state,attempt_id,failure_class)
             return next_state
 
     def mark_skipped(self, run_id: str, task_id: str, *, reason: str) -> None:
         with self._connect() as connection:
-            connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = ?, active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ? AND state IN ('pending','failed','timeout')", (reason, _now(), run_id, task_id))
+            changed=connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = ?, active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ? AND state IN ('pending','failed','timeout')", (reason, _now(), run_id, task_id)).rowcount
+            if changed:
+                self._event(connection,run_id,task_id,"skipped",reason=reason)
 
     def propagate_dependency_failure(self, run_id: str, dependency_task_id: str, *, reason: str = "dependency_failure") -> int:
         changed = 0
@@ -464,8 +485,10 @@ class ManifestStore:
             for row in rows:
                 payload = json.loads(row["payload_json"])
                 if dependency_task_id in payload.get("depends_on", []):
-                    connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (reason, _now(), run_id, row["scientific_task_id"]))
-                    changed += 1
+                    updated=connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ? AND state='pending'", (reason, _now(), run_id, row["scientific_task_id"])).rowcount
+                    if updated:
+                        self._event(connection,run_id,row["scientific_task_id"],"skipped",reason=reason)
+                        changed += 1
         return changed
 
     def commit_result(self, run_id: str, task_id: str, attempt_id: str, result: Mapping[str, Any], *, result_ref: str | None = None) -> bool:
@@ -487,6 +510,7 @@ class ManifestStore:
             connection.execute("INSERT INTO durable_results VALUES (?, ?, ?, ?, ?, ?, ?)", (run_id, task_id, attempt_id, payload_hash, encoded, result_ref, _now()))
             self._finish_attempt(connection, run_id, attempt_id, "completed", outcome="success", result_ref=result_ref)
             connection.execute("UPDATE tasks SET state = 'completed', outcome_reason = 'success', active_attempt_id = NULL, result_ref = ?, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (result_ref, _now(), run_id, task_id))
+            self._event(connection,run_id,task_id,"completed",attempt_id,"success")
             return True
 
     def export_durable_results(self, run_id: str, ledger_path: str | Path) -> dict[str, int]:
@@ -559,17 +583,21 @@ class ManifestStore:
             for row in rows:
                 started = datetime.fromisoformat(row["started_at"]).timestamp()
                 if started <= cutoff:
-                    task = connection.execute("SELECT attempt_count, stage FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, row["scientific_task_id"])).fetchone()
+                    task = connection.execute("SELECT attempt_count, stage, active_attempt_id FROM tasks WHERE run_id = ? AND scientific_task_id = ?", (run_id, row["scientific_task_id"])).fetchone()
                     self._finish_attempt(connection, run_id, row["attempt_id"], "failed", outcome="coordinator_crash")
+                    if task is None or task["active_attempt_id"] != row["attempt_id"]:
+                        continue
                     retry_allowed = retry and task is not None and int(task["attempt_count"]) < max_attempts
                     next_state = "pending" if retry_allowed else "failed"
                     connection.execute("UPDATE tasks SET state = ?, outcome_reason = 'coordinator_crash', active_attempt_id = NULL, updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (next_state, _now(), run_id, row["scientific_task_id"]))
+                    self._event(connection,run_id,row["scientific_task_id"],next_state,row["attempt_id"],"coordinator_crash")
                     if next_state == "failed" and task is not None and task["stage"] == "precompute":
                         dependents = connection.execute("SELECT scientific_task_id, payload_json FROM tasks WHERE run_id = ? AND state = 'pending'", (run_id,)).fetchall()
                         for dependent in dependents:
                             payload = json.loads(dependent["payload_json"])
                             if row["scientific_task_id"] in payload.get("depends_on", []):
                                 connection.execute("UPDATE tasks SET state = 'skipped', outcome_reason = 'dependency_failure', updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (_now(), run_id, dependent["scientific_task_id"]))
+                                self._event(connection,run_id,dependent["scientific_task_id"],"skipped",reason="dependency_failure")
                     recovered += 1
         return recovered
 
@@ -633,6 +661,7 @@ class ManifestStore:
             rows = connection.execute("SELECT scientific_task_id FROM tasks WHERE run_id = ? AND state = 'completed' AND NOT EXISTS (SELECT 1 FROM durable_results WHERE durable_results.run_id = tasks.run_id AND durable_results.scientific_task_id = tasks.scientific_task_id)", (run_id,)).fetchall()
             for row in rows:
                 connection.execute("UPDATE tasks SET state = 'pending', outcome_reason = 'missing_durable_result', updated_at = ? WHERE run_id = ? AND scientific_task_id = ?", (_now(), run_id, row["scientific_task_id"]))
+                self._event(connection,run_id,row["scientific_task_id"],"pending",reason="missing_durable_result")
         return {"valid_results_committed": valid, "malformed_lines": malformed, "conflicts": conflicts, "state_counts": self.state_counts(run_id)}
 
 

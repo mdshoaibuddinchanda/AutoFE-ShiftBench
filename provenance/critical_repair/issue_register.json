@@ -97,15 +97,20 @@
     {
       "id": "B06",
       "title": "Stop-prefix information boundary",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original prefix controls failed; corrected 23-test affected suite passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "sensitivity_analysis.py",
+      "supporting_locations": "src/historical_snapshot.py; src/sensitivity_analysis.py; src/task_manifest.py; tests/test_prefix_information.py",
       "original_reproducer": null,
       "required_correction": "Stop-prefix information boundary",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_prefix_information.py",
+        "tests/test_sensitivity_analysis.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Legacy manifests without complete transactional history have unsupported stop-prefix analyses."
+      ]
     },
     {
       "id": "B07",
@@ -483,15 +488,20 @@
     {
       "id": "C14",
       "title": "Sensitivity regime scope",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "original prefix controls failed; corrected 23-test affected suite passed",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "src/historical_snapshot.py; src/sensitivity_analysis.py; src/task_manifest.py; tests/test_prefix_information.py",
       "original_reproducer": null,
       "required_correction": "Sensitivity regime scope",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_prefix_information.py",
+        "tests/test_sensitivity_analysis.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Legacy manifests without complete transactional history have unsupported stop-prefix analyses."
+      ]
     },
     {
       "id": "C15",
