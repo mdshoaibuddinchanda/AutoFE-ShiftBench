@@ -281,7 +281,14 @@ def selection_stability(histories: Iterable[dict[str, Any]]) -> dict[str, Any]:
     availability = Counter()
     frequencies = Counter()
     for history in histories:
-        for candidate in history.get("candidate_history", []):
+        if 'selection_history' in history and 'candidate_history' in history:
+            raise ValueError('Ambiguous selection and legacy candidate history keys')
+        events=history.get('selection_history',history.get('candidate_history'))
+        if events is None:
+            raise ValueError('Candidate availability requires real selection history')
+        if len({event['candidate_id'] for event in events}) != len(events):
+            raise ValueError('Duplicate candidates in selection history')
+        for candidate in events:
             availability[candidate["candidate_id"]] += int(candidate.get("eligible", False))
             frequencies[candidate["candidate_id"]] += int(candidate.get("selected", False))
     return {

@@ -31,6 +31,8 @@ from src.operator_registry import (
 
 CAP_POLICY_VERSION = "post_candidate_topk_v1"
 BASE_FEATURE_POLICY_VERSION = "training_variance_topk_v1"
+MI_SEMANTICS_VERSION = "declared_discrete_provenance_v2"
+CANDIDATE_GENERATION_VERSION = "unique_depth_expression_trees_v2"
 
 
 @dataclass(slots=True)
@@ -50,6 +52,12 @@ class DFSConfig:
     display_identity: str | None = None
 
     def __post_init__(self) -> None:
+        for name in ('max_features','max_base_features'):
+            value=getattr(self,name)
+            if value is not None and (not isinstance(value,int) or value <= 0):
+                raise ValueError(f'{name} must be a positive integer or None')
+        if not isinstance(self.depth,int) or self.depth < 0:
+            raise ValueError('depth must be a nonnegative integer')
         if self.trans_primitives is None:
             self.trans_primitives = list(OPERATOR_SET_REGISTRY[self.operator_set_id])
         else:
@@ -113,6 +121,7 @@ def _generate_expressions(columns: list[str], operator_set_id: str, depth: int) 
                 for left in left_pool:
                     for right in right_pool:
                         generated.append(op_expression(operator, left, right))
+        generated=list({candidate_id(expr):expr for expr in generated if expression_depth(expr) == current_depth}.values())
         generated.sort(key=candidate_id)
         by_depth[current_depth] = generated
         expressions.extend(generated)
@@ -139,7 +148,8 @@ def _score_candidates(matrix: pd.DataFrame, y_train: np.ndarray | None, cfg: DFS
     if method == "mi":
         if y_train is None:
             raise ValueError("y_train is required for MI selection.")
-        scores = mutual_info_classif(cleaned, y_train, random_state=cfg.random_seed)
+        discrete=set(matrix.attrs.get('discrete_features',[]))
+        scores = mutual_info_classif(cleaned, y_train, discrete_features=[col in discrete for col in matrix.columns], random_state=cfg.random_seed)
         return {column: float(score) for column, score in zip(matrix.columns, scores)}
     if method == "random":
         rng = np.random.default_rng(cfg.random_seed)
@@ -196,6 +206,8 @@ def expand_features_with_dfs(
 
     train_matrix = pd.DataFrame(train_values, index=train_base.index)
     test_matrix = pd.DataFrame(test_values, index=test_base.index)
+    discrete_base=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if pd.api.types.is_bool_dtype(x_train[col])}
+    train_matrix.attrs['discrete_features']=[fid for fid,expr in expression_by_id.items() if set(expression_columns(expr)).issubset(discrete_base)]
     scores = _score_candidates(train_matrix, y_train, cfg)
     ranked = sorted(train_matrix.columns, key=lambda fid: (-(scores[fid] if scores[fid] is not None and np.isfinite(scores[fid]) else -np.inf), fid))
     selected = ranked if cfg.max_features is None else ranked[: cfg.max_features]
@@ -257,6 +269,9 @@ def expand_features_with_dfs(
     raw_selected = len(selected) - generated_selected
     metadata: dict[str, Any] = {
         "operator_registry_version": OPERATOR_REGISTRY_VERSION,
+        "mi_semantics_version":MI_SEMANTICS_VERSION,
+        "candidate_generation_version":CANDIDATE_GENERATION_VERSION,
+        "discrete_base_features":sorted(discrete_base),
         "operator_semantics_version": OPERATOR_SEMANTICS_VERSION,
         "operator_set_id": cfg.operator_set_id,
         "operator_set": list(validate_operator_set(cfg.operator_set_id)),

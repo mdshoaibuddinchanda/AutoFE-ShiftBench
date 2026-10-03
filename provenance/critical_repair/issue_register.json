@@ -168,41 +168,62 @@
     {
       "id": "B10",
       "title": "Distribution measurement coordinates",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "evaluation.py,pipeline_runner.py",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "Distribution measurement coordinates",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "B11",
       "title": "Feature counts",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "pipeline_runner.py,feature_engineering.py",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "Feature counts",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "B12",
       "title": "Class-prior condition semantics",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "shift_generator.py,paper/manuscript.tex",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "Class-prior condition semantics",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "B13",
@@ -365,28 +386,42 @@
     {
       "id": "C05",
       "title": "Stability history schema",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "Stability history schema",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "C06",
       "title": "MI discrete-feature provenance",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "MI discrete-feature provenance",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "C07",
@@ -532,15 +567,22 @@
     {
       "id": "C17",
       "title": "Depth duplicates zero severity and cap validation",
-      "evidence_level": "supplied_audit; pending checkout regression",
+      "evidence_level": "controlled original defects and corrected 25-test affected suite",
       "path": "active_or_latent_to_verify",
-      "supporting_locations": "supplied audit and named modules; precise test evidence pending",
+      "supporting_locations": "tests/test_feature_semantics.py; src/feature_engineering.py; src/fsva.py; src/evaluation.py; src/pipeline_runner.py; src/shift_generator.py; src/feature_selection.py; src/data_loader.py",
       "original_reproducer": null,
       "required_correction": "Depth duplicates zero severity and cap validation",
       "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "tests": [
+        "tests/test_feature_semantics.py",
+        "tests/test_baselines_operators_fsva.py",
+        "tests/test_leakage_boundaries.py",
+        "tests/test_production_task_resume.py"
+      ],
+      "status": "corrected_regression_verified",
+      "limitations": [
+        "Historical MI selections, distribution measurements, feature-count metadata and stability summaries need recomputation. Historical relabeling arrays remain unchanged and accurately identified; no new prior-shift condition was added."
+      ]
     },
     {
       "id": "C18",

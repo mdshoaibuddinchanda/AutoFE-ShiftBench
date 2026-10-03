@@ -101,17 +101,21 @@ def _compute_mi_scores(
 ) -> pd.Series:
     """Compute feature importance scores from mutual information."""
     x_encoded = _encode_feature_frame(x_train)
+    discrete=set(x_train.attrs.get('discrete_features',[])) | {col for col in x_train if not pd.api.types.is_numeric_dtype(x_train[col]) or pd.api.types.is_bool_dtype(x_train[col])}
+    mask=[col in discrete for col in x_train]
     if task == "classification":
         score_values = mutual_info_classif(
             x_encoded,
             y_train,
             random_state=random_state,
+            discrete_features=mask,
         )
     else:
         score_values = mutual_info_regression(
             x_encoded,
             y_train,
             random_state=random_state,
+            discrete_features=mask,
         )
 
     return pd.Series(score_values, index=x_train.columns, dtype=float)

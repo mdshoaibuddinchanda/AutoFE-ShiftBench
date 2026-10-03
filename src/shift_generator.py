@@ -5,6 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+CONDITION_SEMANTICS_VERSION='training_corruption_historical_relabel_v2'
+CONDITION_IDENTITIES={'class_prior_shift':'majority_half_relabel_training_v1'}
+
 
 def _apply_gaussian_noise(
     x: pd.DataFrame,
@@ -88,10 +91,9 @@ def _apply_class_prior_shift(
     rng: np.random.Generator,
 ) -> pd.Series:
     """
-    Class Prior Shift.
-    Resample the labels to artificially change the class distribution.
-    For simplicity, we randomly drop 50% of the majority class.
-    Since we only perturb training data, this creates a mismatch with the test data prior.
+    Historical compatibility operation: relabel half of the majority class.
+    This is training label corruption; it does not preserve class-conditional
+    predictor distributions and is not a class-prior-shift construction.
     """
     shifted_y = y.copy()
     counts = shifted_y.value_counts()
@@ -171,7 +173,9 @@ def _apply_feature_removal(
     Drops the top `fraction` of features (simulated by dropping highest variance features).
     """
     shifted = x.copy()
-    n_drop = max(1, int(len(shifted.columns) * fraction))
+    if not 0 <= fraction <= 1:
+        raise ValueError('Feature removal fraction must be in [0,1]')
+    n_drop = 0 if fraction == 0 else max(1, int(len(shifted.columns) * fraction))
     
     if n_drop >= len(shifted.columns):
         n_drop = len(shifted.columns) - 1 # Keep at least one feature

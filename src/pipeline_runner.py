@@ -50,6 +50,7 @@ from src.evaluation import (
 from src.feature_engineering import (
     BASE_FEATURE_POLICY_VERSION,
     CAP_POLICY_VERSION,
+    MI_SEMANTICS_VERSION,CANDIDATE_GENERATION_VERSION,
     expand_features_with_dfs,
     DFSConfig,
 )
@@ -75,7 +76,7 @@ from src.seeding import (
     split_seed,
     stable_seed,
 )
-from src.shift_generator import apply_perturbation
+from src.shift_generator import apply_perturbation,CONDITION_SEMANTICS_VERSION,CONDITION_IDENTITIES
 from src.splitters import SplitInfeasibleError, assert_fold_integrity, get_splits
 from src.shap_explainer import compute_shap_values
 from src.task_manifest import (
@@ -240,7 +241,7 @@ def _pipeline_cache_paths(dataset_name: str, pipeline_name: str,
         d = d / dependency
         d.mkdir(parents=True,exist_ok=True)
     cfg = PIPELINE_CONFIGS[pipeline_name]
-    token = pipeline_identity_token(pipeline_name)
+    token = pipeline_name+'__'+fingerprint(pipeline_identity_token(pipeline_name))[:24]
     base = f"{token}_s{seed}_f{fold}_{condition}"
     return (
         d / f"{base}_train.pkl",
@@ -261,6 +262,7 @@ def pipeline_identity_token(pipeline_name: str) -> str:
             cfg.baseline_kind or "autofe",
             CAP_POLICY_VERSION,
             BASE_FEATURE_POLICY_VERSION,
+            MI_SEMANTICS_VERSION,CANDIDATE_GENERATION_VERSION,
             f"cap{cfg.max_features if cfg.max_features is not None else 'all'}",
             f"base{cfg.max_base_features if cfg.max_base_features is not None else 'all'}",
             f"sel{cfg.selection_method}",
@@ -316,6 +318,7 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
         dependency = fingerprint({"train": frame_identity(x_train), "test": frame_identity(x_test),
             "labels": array_identity(y_train), "data_identity": data_identity,
+            "discrete_features":x_train.attrs.get('discrete_features',[]),
             "pipeline_spec": asdict(cfg_copy), "protocol": EVALUATION_PROTOCOL_VERSION,
             "seed_scheme": SEED_SCHEME_VERSION, "preprocessing": PREPROCESSING_SEMANTICS_VERSION})
         train_cache, test_cache, meta_cache, history_path, fsva_path = _diagnostic_paths(
@@ -341,9 +344,9 @@ def _run_pipeline_generation(x_train, x_test, y_train,
 
             meta = {
                 **dfs_meta,
-                "num_original": x_train.shape[1],
-                "num_generated": dfs_meta.get("n_generated", 0),
-                "num_selected": dfs_meta.get("n_retained", x_train_fe.shape[1]),
+                "num_original": dfs_meta["num_original"],
+                "num_generated": dfs_meta["num_generated"],
+                "num_selected": dfs_meta["num_selected"],
                 "generation_time_s": gen_time,
                 "ram_used_mb": dfs_meta.get("ram_used_mb", 0),
                 "feature_metadata": dfs_meta.get("feature_metadata", []),
@@ -534,6 +537,9 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         _to_dense_array(preprocessor.transform(x_test_cond)),
         columns=preprocessor.get_feature_names_out(),
     )
+    discrete_columns=list(preprocessor.get_feature_names_out()[preprocessor.output_indices_.get('cat',slice(0,0))])
+    discrete_columns += [col for col in x_train_prep if col in x_train_cond and pd.api.types.is_bool_dtype(x_train_cond[col])]
+    x_train_prep.attrs['discrete_features']=discrete_columns
 
     # Clean test set for Wasserstein distances
     x_test_clean_prep = pd.DataFrame(
@@ -549,6 +555,14 @@ def get_data_splits(data_path, dataset_name, seed, fold, condition,
         data_identity=data_signature,
     )
     for pipeline_name, meta in res_meta.items():
+        from src.operator_registry import expression_from_dict
+        from src.feature_engineering import _evaluate_expression
+        selected_exprs=[expression_from_dict(item['expression']) for item in meta['selected_feature_expressions']]
+        clean_train=pd.DataFrame(_to_dense_array(preprocessor.transform(x_train)),columns=preprocessor.get_feature_names_out())
+        map_clean=lambda frame:pd.DataFrame({fid:_evaluate_expression(expr,frame)[0] for fid,expr in zip(meta['selected_feature_identities'],selected_exprs)},index=frame.index)
+        distance_state=distance_sample_seed(dataset_name,split_policy,seed,fold,condition)
+        meta['training_distribution_distance']=compute_distribution_distance(map_clean(clean_train),res_pipelines[pipeline_name][0],random_state=distance_state)
+        meta['held_out_distribution_distance']=compute_distribution_distance(map_clean(x_test_clean_prep),res_pipelines[pipeline_name][1],random_state=distance_state)
         meta["split_seed"] = split_seed(dataset_name, split_policy, seed, n_splits=5)
         meta["corruption_seed"] = derived_corruption_seed
         meta["seed_scheme_version"] = SEED_SCHEME_VERSION
@@ -726,14 +740,7 @@ def train_unit(kwargs):
         distance_seed = distance_sample_seed(
             dataset_name, split_policy, seed, fold, condition,
         )
-        dist_metrics = compute_distribution_distance(
-            x_test_clean,
-            pipelines[pipeline_name][1],
-            random_state=distance_seed,
-        )
-        if condition == "clean":
-            dist_metrics["wasserstein"] = 0.0
-            dist_metrics["ks_stat"] = 0.0
+        dist_metrics = meta['training_distribution_distance']
 
         res = {
             "evaluation_protocol_version": EVALUATION_PROTOCOL_VERSION,
@@ -746,6 +753,9 @@ def train_unit(kwargs):
             "seed": seed,
             "fold": fold,
             "condition": condition,
+            "shift_family":kwargs['shift_family'],"severity":kwargs['severity'],
+            "condition_semantics_version":CONDITION_SEMANTICS_VERSION,
+            "condition_identity":CONDITION_IDENTITIES.get(kwargs['shift_family'],kwargs['shift_family']),
             "pipeline": pipeline_name,
             "pipeline_identity": pipeline_identity,
             "model": model_type,
@@ -791,6 +801,11 @@ def train_unit(kwargs):
             "ram_used_mb": meta.get("ram_used_mb", 0),
             "wasserstein": dist_metrics["wasserstein"],
             "ks_stat": dist_metrics["ks_stat"],
+            "distance_status":dist_metrics['distance_status'],
+            "distribution_semantics_version":dist_metrics['distribution_semantics_version'],
+            "distance_scope":"clean_vs_corrupted_training; same fitted preprocessor and selected mapping",
+            "held_out_distribution_distance":meta['held_out_distribution_distance'],
+            "mi_semantics_version":meta['mi_semantics_version'],
             "train_auc": metrics_train.get("roc_auc", np.nan),
             "test_auc": metrics_test.get("roc_auc", np.nan),
             **metrics_test,

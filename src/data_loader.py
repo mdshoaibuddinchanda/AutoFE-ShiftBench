@@ -219,7 +219,9 @@ def compute_meta_features(
                 
         t_encoded = LabelEncoder().fit_transform(t_sample.astype(str))
         mi_seed = stable_seed("dataset_metadata_mutual_information", metadata_identity)
-        ami_scores = mutual_info_classif(f_numeric, t_encoded, random_state=mi_seed)
+        discrete=[not pd.api.types.is_numeric_dtype(f_sample[col]) or pd.api.types.is_bool_dtype(f_sample[col]) for col in f_sample]
+        ami_scores = mutual_info_classif(f_numeric, t_encoded, discrete_features=discrete, random_state=mi_seed)
+        meta['mi_semantics_version']='declared_discrete_provenance_v2'
         meta["average_mutual_information"] = float(np.mean(ami_scores))
     except Exception as e:
         print(f"Skipping AMI: {e}")

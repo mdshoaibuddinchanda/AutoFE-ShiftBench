@@ -111,25 +111,35 @@ def compute_classification_metrics(
 
 from scipy.stats import wasserstein_distance, ks_2samp
 
+DISTRIBUTION_SEMANTICS_VERSION='frozen_mapping_training_corruption_distance_v2'
+
 def compute_distribution_distance(
     x_clean: pd.DataFrame,
     x_shifted: pd.DataFrame,
     max_samples: int = 5000,
     random_state: int = 42,
 ) -> dict[str, float]:
-    """Compute average Wasserstein and KS distance between clean and shifted test sets."""
+    """Compare identical numeric coordinates under one frozen fitted mapping.
+
+    Callers declare training corruption or held-out input scope. Independently
+    selected/generated coordinate systems are unsupported.
+    """
+    status={'distribution_semantics_version':DISTRIBUTION_SEMANTICS_VERSION}
     if x_clean.empty or x_shifted.empty:
-        return {'wasserstein': np.nan, 'ks_stat': np.nan}
+        return {**status,'distance_status':'unsupported_empty_inputs','wasserstein': None, 'ks_stat': None}
+    if list(x_clean.columns) != list(x_shifted.columns):
+        return {**status,'distance_status':'unsupported_coordinate_mismatch','wasserstein':None,'ks_stat':None}
 
     # Sample rows to keep compute feasible
     if len(x_clean) > max_samples:
         x_clean = x_clean.sample(n=max_samples, random_state=random_state)
+    if len(x_shifted) > max_samples:
         x_shifted = x_shifted.sample(n=max_samples, random_state=random_state)
 
     # Ensure we only compare common numeric columns
     cols = [c for c in x_clean.columns if c in x_shifted.columns and pd.api.types.is_numeric_dtype(x_clean[c])]
     if not cols:
-        return {'wasserstein': np.nan, 'ks_stat': np.nan}
+        return {**status,'distance_status':'unsupported_no_numeric_coordinates','wasserstein':None,'ks_stat':None}
 
     w_dists = []
     ks_dists = []
@@ -145,6 +155,7 @@ def compute_distribution_distance(
                 pass
 
     return {
+        **status,'distance_status':'complete' if len(w_dists) == len(cols) else 'incomplete_numeric_coordinates',
         'wasserstein': float(np.mean(w_dists)) if w_dists else np.nan,
         'ks_stat': float(np.mean(ks_dists)) if ks_dists else np.nan,
     }
