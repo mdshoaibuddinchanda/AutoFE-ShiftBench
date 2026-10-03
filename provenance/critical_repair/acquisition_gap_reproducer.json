@@ -1,0 +1,6 @@
+{
+  "executed_source_commit": "913285b",
+  "incomplete_existing_metadata_accepted": "reports\\final_validation\\original_metadata_gap\\mock.csv",
+  "corrected_negative_control": "tests/test_acquisition.py::test_existing_ambiguous_metadata_is_preserved_and_rejected",
+  "real_acquisition": false
+}

@@ -61,3 +61,27 @@ def test_repository_entry_point_delegates_without_acquisition(monkeypatch):
     monkeypatch.setattr(data_loader,'download_datasets_from_list',lambda *a,**k:(_ for _ in ()).throw(AssertionError('implicit acquisition')))
     main.main()
     assert calls == ['runner']
+
+
+def test_existing_ambiguous_metadata_is_preserved_and_rejected(tmp_path,monkeypatch):
+    path=tmp_path/'mock.csv';path.write_bytes(b'x,target\n1,a\n2,b\n')
+    (tmp_path/'mock_meta.json').write_text('{}')
+    monkeypatch.setattr(loader,'_fetch_openml_with_fallbacks',lambda *a,**k:pytest.fail('existing bytes overwritten'))
+    original=path.read_bytes()
+    with pytest.raises(ValueError,match='incomplete source'):loader.download_openml_dataset('mock',tmp_path)
+    assert path.read_bytes()==original
+
+
+def test_existing_population_policy_must_match_requested_seed(tmp_path,monkeypatch):
+    monkeypatch.setattr(loader,'_fetch_openml_with_fallbacks',lambda *a,**k:(fixture(),'999'))
+    monkeypatch.setattr(loader,'compute_meta_features',lambda *a,**k:{})
+    path=loader.download_openml_dataset('mock',tmp_path,max_rows=12,random_state=42)
+    original=path.read_bytes()
+    with pytest.raises(ValueError,match='row policy'):loader.download_openml_dataset('mock',tmp_path,max_rows=12,random_state=43)
+    assert path.read_bytes()==original
+
+
+def test_conflicting_duplicate_requests_rejected_before_acquisition(tmp_path,monkeypatch):
+    config=tmp_path/'datasets.yaml';config.write_text('datasets:\n - {name: a, data_id: 1}\n - {name: a, data_id: 2}\n')
+    monkeypatch.setattr(loader,'download_openml_dataset',lambda *a,**k:pytest.fail('ambiguous request fetched'))
+    with pytest.raises(ValueError,match='Conflicting exact'):loader.download_datasets_from_list(config,tmp_path,selected_datasets=['a'])

@@ -270,12 +270,15 @@ def download_openml_dataset(
         if meta_path.exists():
             previous=json.loads(meta_path.read_text(encoding='utf-8'))
             source=previous.get('source_provenance',{})
+            saved=previous.get('dataset_identity')
+            row_selection=previous.get('row_selection',{})
+            if not source.get('data_id') or not source.get('version') or not source.get('original_source_frame_fingerprint') or not saved or not previous.get('target_column') or row_selection.get('policy') != 'pandas_sample_without_replacement_if_over_cap_v1':
+                raise ValueError('Existing dataset has incomplete source/target/row identity; preserved without certification')
             if data_id is not None and str(source.get('data_id')) != str(data_id):
                 raise ValueError('Existing dataset has a different source identity; choose a new version path')
-            if source and ((data_id is None and int(source['version']) != version) or previous.get('row_selection',{}).get('max_rows') != max_rows):
+            if ((data_id is None and int(source['version']) != version) or row_selection.get('max_rows') != max_rows or row_selection.get('random_state') != random_state):
                 raise ValueError('Existing dataset version/row policy differs; choose a new version path')
-            saved=previous.get('dataset_identity')
-            if saved and saved['fingerprint'] != identify_dataset(output_path)['fingerprint']:
+            if saved['fingerprint'] != identify_dataset(output_path)['fingerprint']:
                 raise ValueError('Existing dataset bytes do not match recorded provenance')
         else:
             raise ValueError('Existing dataset lacks source metadata; preserved without reacquisition')
@@ -380,7 +383,14 @@ def download_datasets_from_list(
         raise ValueError(f'Unknown selected datasets: {sorted(unknown)}')
     dataset_names=[name for name in dict.fromkeys(dataset_names) if name in selected_datasets]
     declared=yaml.safe_load(Path(dataset_list_path).read_text(encoding='utf-8'))['datasets']
-    requests={item['name']:item for item in declared if isinstance(item,dict)}
+    requests={}
+    for item in declared:
+        name=item['name'] if isinstance(item,dict) else item
+        if name not in dataset_names:continue
+        request={'name':name,'data_id':item.get('data_id') if isinstance(item,dict) else None,'version':int(item.get('version',1)) if isinstance(item,dict) else 1}
+        if name in requests and requests[name]!=request:
+            raise ValueError('Conflicting exact acquisition requests for '+name)
+        requests[name]=request
 
     saved_paths: dict[str, Path] = {}
     failures={}
