@@ -187,7 +187,7 @@ def snapshot_manifest_ledger(
     """Capture a stable SQLite snapshot and verify the ledger did not change."""
     ledger = Path(ledger_path)
     before = _sha256(ledger)
-    store = ManifestStore(manifest_db)
+    store = ManifestStore(manifest_db,read_only=True)
     snapshot = store.snapshot(run_id)
     ledger_rows, ledger_exclusions = _read_ledger(ledger, run_id)
     after = _sha256(ledger)

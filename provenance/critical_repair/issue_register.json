@@ -242,15 +242,21 @@
     {
       "id": "B18",
       "title": "SQLite resource lifetime",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
-      "supporting_locations": "task_manifest.py",
-      "original_reproducer": null,
+      "evidence_level": "original failing lifetime regression; Windows move/delete and read-only tests pass",
+      "path": "active manifest connections",
+      "supporting_locations": "src/task_manifest.py _ClosingConnection/ManifestStore",
+      "original_reproducer": "context-exited sqlite connection remained usable",
       "required_correction": "SQLite resource lifetime",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
-      "limitations": []
+      "compatibility_impact": "process-local resource lifetime; no scientific change",
+      "tests": [
+        "tests/test_manifest_resources.py",
+        "tests/test_task_manifest.py",
+        "tests/test_sensitivity_analysis.py: 15 passed, 4.15s"
+      ],
+      "status": "corrected_verified",
+      "limitations": [
+        "Historical native crash cause unestablished"
+      ]
     },
     {
       "id": "C01",
@@ -281,14 +287,16 @@
     {
       "id": "C03",
       "title": "Read-only verification",
-      "evidence_level": "supplied_audit; pending checkout regression",
-      "path": "active_or_latent_to_verify",
+      "evidence_level": "read-only store and sensitivity verified; provenance caller pending B05",
+      "path": "active sensitivity and provenance inspection",
       "supporting_locations": "supplied audit and named modules; precise test evidence pending",
       "original_reproducer": null,
       "required_correction": "Read-only verification",
-      "compatibility_impact": "scientific correction or equivalent optimization to adjudicate",
-      "tests": [],
-      "status": "pending",
+      "compatibility_impact": "inspection must not create files",
+      "tests": [
+        "tests/test_manifest_resources.py"
+      ],
+      "status": "partially_corrected",
       "limitations": []
     },
     {

@@ -40,6 +40,16 @@ class ManifestConflictError(ManifestError):
     """Raised for duplicate claims, incompatible identities, or stale writers."""
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """Commit/rollback and deterministically close this process-owned handle."""
+
+    def __exit__(self, *args):
+        try:
+            return super().__exit__(*args)
+        finally:
+            self.close()
+
+
 @dataclass(frozen=True)
 class ExecutionConfig:
     """Declared stopping and retry controls persisted with a run."""
@@ -203,14 +213,20 @@ def build_task_records(
 class ManifestStore:
     """SQLite-backed manifest and append-only attempt state machine."""
 
-    def __init__(self, db_path: str | Path, *, manifest_path: str | Path | None = None) -> None:
+    def __init__(self, db_path: str | Path, *, manifest_path: str | Path | None = None, read_only: bool = False) -> None:
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
         self.manifest_path = None if manifest_path is None else Path(manifest_path)
-        self._init_schema()
+        if read_only:
+            if not self.db_path.is_file():
+                raise FileNotFoundError(self.db_path)
+        else:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path, timeout=30.0)
+        target = self.db_path.resolve().as_uri()+"?mode=ro" if self.read_only else str(self.db_path)
+        connection = sqlite3.connect(target, timeout=30.0, uri=self.read_only, factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
         return connection

@@ -90,3 +90,18 @@ only after a terminal outcome and the store refuses propagation from pending
 or running dependencies. A successful retry leaves models executable; failed
 attempts remain recorded. Terminal propagation is idempotent. Affected recovery
 and manifest tests: 12 passed, 13 warnings, 2.76 s. No scientific inputs change.
+
+## B18 / C03 foundation: SQLite ownership
+
+Original resource checks failed: a context-exited connection remained usable,
+and no read-only store mode existed. Connections now close in a `finally` after
+transaction exit, on both success and exception. A read-only store uses SQLite
+URI `mode=ro`, verifies file presence first, and never initializes schema.
+Sensitivity uses this mode; provenance integration follows in B05.
+Windows tests reopen/rename/delete after closure and reject writes through a
+read-only connection. Resource, manifest and sensitivity suite: 15 passed,
+13 warnings, 4.15 s. This is not evidence that the historical native access
+violation's cause has been established.
+
+References: Python 3.12 sqlite3 connection-context behavior and
+https://www.sqlite.org/uri.html (read-only mode).
