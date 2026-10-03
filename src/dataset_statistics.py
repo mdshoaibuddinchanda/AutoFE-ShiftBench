@@ -80,6 +80,7 @@ class AnalysisConfig:
     expected_seed_scheme_version: str = SEED_SCHEME_VERSION
     min_datasets: int = 2
     run_id: str | None = None
+    datasets: tuple[str,...] | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 < self.confidence_level < 1.0:
@@ -298,6 +299,8 @@ def _sign_flip_test(values: np.ndarray, config: AnalysisConfig, *, stratum_label
     nonzero = finite[np.abs(finite) > 0.0]
     if len(finite) < config.min_datasets:
         return {"status": "too_few_datasets", "p_value": None, "n_datasets": len(finite), "zero_differences": int(len(finite) - len(nonzero))}
+    if config.permutation_resamples <= 0:
+        return {'status':'permutation_disabled','p_value':None,'n_datasets':len(finite),'zero_differences':int(len(finite)-len(nonzero)),'method':'disabled','resamples':0}
     observed = float(np.mean(finite))
     if len(nonzero) == 0:
         return {"status": "all_zero_effect", "p_value": 1.0, "n_datasets": len(finite), "zero_differences": int(len(finite)), "observed_mean": observed, "method": "sign_flip_exact"}
@@ -349,6 +352,8 @@ def analyze_ledger(
         config=replace(config,run_id=str(next(iter(run_ids))))
     if config.run_id is not None:
         records=[row for row in records if row.get("run_id") == config.run_id]
+    if config.datasets is not None:
+        records=[row for row in records if row.get('dataset') in config.datasets]
     if not records:
         parse_exclusions.append({"reason":"empty_selected_run_ledger","detail":"Intended task universe is unavailable without a manifest; no zero outcome is imputed"})
     _validate_protocol(records, config)
@@ -420,6 +425,8 @@ def analyze_ledger(
             "pair_status": pair_status,
             "source_line_a": None if left is None else left.get("source_line"),
             "source_line_b": None if right is None else right.get("source_line"),
+            "scientific_task_id_a":None if left is None else left.get('scientific_task_id'),
+            "scientific_task_id_b":None if right is None else right.get('scientific_task_id'),
         })
 
     pair_frame = pd.DataFrame(task_pair_rows)
@@ -488,6 +495,7 @@ def analyze_ledger(
         config={**config.to_dict(), "schema_version": ANALYSIS_SCHEMA_VERSION, "input_ledger": str(path), "input_fingerprint_sha256": fingerprint,
             "resampling_fingerprint_sha256":resampling_fingerprint,
             "resampling_input_scope":"canonical scientific records; excludes runtime, export order, run labels and timestamps",
+            "analysis_input_task_ids":sorted({row['scientific_task_id'] for row in records if row.get('scientific_task_id') and row.get('pipeline') in {config.pipeline_a,config.pipeline_b}}),
             "analysis_status":"supported_observed_pairs" if not pair_frame.empty else "empty_or_unsupported_observed_universe"},
         input_fingerprint=fingerprint,
         task_pairs=pair_frame,

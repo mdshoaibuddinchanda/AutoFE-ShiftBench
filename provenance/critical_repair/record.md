@@ -61,9 +61,10 @@ corrected coordinate mapping; all-pipeline precompute is not evidence of
 all-pipeline model fits.
 
 API references verified against installed sklearn 1.5.2:
-- https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.log_loss.html
-- https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.brier_score_loss.html
-- https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.roc_auc_score.html
+
+- <https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.log_loss.html>
+- <https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.brier_score_loss.html>
+- <https://scikit-learn.org/1.5/modules/generated/sklearn.metrics.roc_auc_score.html>
 
 ## B02: data and cache compatibility
 
@@ -104,7 +105,7 @@ read-only connection. Resource, manifest and sensitivity suite: 15 passed,
 violation's cause has been established.
 
 References: Python 3.12 sqlite3 connection-context behavior and
-https://www.sqlite.org/uri.html (read-only mode).
+<https://www.sqlite.org/uri.html> (read-only mode).
 
 ## B04: transactional authority and idempotent export
 
@@ -204,7 +205,7 @@ Archived controls (reproduction/probe_original_helpers.py):4 MiB successful resu
 
 Launcher uses conda run -n P12 and forwards arguments without installing packages or implicit downloading. Production no longer imports unused SHAP; retained helper handles0.45 ndarray class axis. Timeout helper drains before join and closes process/queue handles. Actual synthetic24x3 fits of the existing100-iteration GPU factories succeeded on XGBoost2.0.3 cuda:0 and CatBoost1.2.5 GPU. Actual fitted device is verified and silent CPU fallback rejected; input float32 policy is historical and preserved. Corrected helper/acquisition/seed suite:11 passed,5 subtests,6.40 s (an initial fixture int32-vs-CSV-int64 assertion was corrected to declared CSV parsing).
 
-Official version references: https://scikit-learn.org/1.5/modules/generated/sklearn.datasets.fetch_openml.html ; https://shap.readthedocs.io/en/stable/release_notes.html (0.45 entry); https://xgboost.readthedocs.io/en/release_2.0.0/gpu/index.html . Installed sklearn1.5.2,SHAP0.45.0,XGB2.0.3,CatBoost1.2.5. GPU reductions/cross-hardware determinism are not promised.
+Official version references: <https://scikit-learn.org/1.5/modules/generated/sklearn.datasets.fetch_openml.html> ; <https://shap.readthedocs.io/en/stable/release_notes.html> (0.45 entry); <https://xgboost.readthedocs.io/en/release_2.0.0/gpu/index.html> . Installed sklearn1.5.2,SHAP0.45.0,XGB2.0.3,CatBoost1.2.5. GPU reductions/cross-hardware determinism are not promised.
 
 ## B13-B17: bounded production ownership and supervision
 
@@ -215,3 +216,11 @@ Single-owner OS locks cover generation and complete diagnostic publication. Meta
 Exact one-hot category vocabulary/dtype is preserved in sparse form; dense/candidate/Jacobian allocations have explicit byte budgets (per-worker budget uses current available memory/concurrency). Infeasible exact work returns a resource outcome without reducing rows, categories, precision or candidates.2000-category fixture has2000 nonzeros instead of4million dense cells; dense conversion refuses a1MB budget. Sparse/dense selections and full histories match on the controlled fixture.
 
 Affected scheduler controls after timeout propagation correction:9 passed,7.94 s. Integrated production/memory/scheduler:9 passed,21.45 s. Real worker smoke:2precompute+8model tasks=10intended/completed attempts; clean and Gaussian training corruption, Raw and AutoFE_Baseline, logistic and GaussianNB; all histories/FSVA retained, zero held-out mapping distance, nonzero generated counts,8unique durable model rows. Empty-ledger resume reconstructs fromSQLite and launches0model attempts. This is eight actual model executions, distinct from all14pipelines precomputed as the minimally optimized preparation path.
+
+## B09/C12-C16/M01: active reporting contract
+
+Archived table2 fixture rendered4unavailable conditions as0.0000. Corrected cells displayNA(status), current condition names and training-only measurement meanings. MacroF1 has its own field/averaging. Active figures3/4/5/8/10 now render the declared paired dataset summaries and intervals/Holm tests, keeping strata separate; figure8is not an invalid pooled Nemenyi test. Descriptive runtime/complexity/heatmap panels remain descriptive. Report inputs select the same run and dataset scope as statistics; figure/table configurations link ledger/task IDs. No hard-coded22-dataset scope or favorable caption is selected by default. Generated captions describe actual scope, exclusions and supported analyses.
+
+Legacy pooled table5/6 are opt-in historical appendices; approximate-CD ranking and unpaired structural CLIs are explicitly retired. Empty plotting helper raisesunsupported rather than silently passing. The notebook uses actual Raw/AutoFE identities and canonical analysis schema, retaining600DPI PNG/TIFF/PDF defaults and configurable output flags. Resampling CLI flags are forwarded;0sign-flip resamples explicitly disables even exact enumeration. The existing denominator regression now requests100resamples to test an enabled exact test; its original0setting relied on the flag defect. Invalid escape labels use raw strings. Identical export duplicate controls and adverse hashed-ID chronological ordering now pass.
+
+Affected reporting/dataset/sensitivity/provenance suite:27passed,13upstreamMatplotlib/Pyparsing warnings,13.05s. Initial control failures were an empty-frame test accessor and the existing denominator test relying on disabled flags, both corrected explicitly. No manuscript/PDF asset was edited and no real findings generated.

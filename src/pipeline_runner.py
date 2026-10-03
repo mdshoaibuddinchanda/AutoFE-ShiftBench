@@ -870,87 +870,12 @@ def _train_process_entry(task: dict[str, Any], result_queue) -> None:
     train_unit(task)
 
 
-def run_bounded_train_task(task: dict[str, Any], result_queue, *, timeout_seconds: float) -> str:
-    """Run one training worker in a killable process for explicit timeouts."""
-    store = _manifest_for_task(task)
-    if store is not None and task.get("run_id") and task.get("scientific_task_id") and not task.get("attempt_id"):
-        task["attempt_id"] = store.claim_task(
-            str(task["run_id"]), str(task["scientific_task_id"]),
-            worker_id=f"bounded-parent:{os.getpid()}", timeout_seconds=timeout_seconds,
-        )
-    if task.get("manifest_db") and not task.get("attempt_id"):
-        return "skipped"
-    context = multiprocessing.get_context("spawn")
-    process = context.Process(target=_train_process_entry, args=(task, result_queue))
-    process.start()
-    process.join(timeout_seconds)
-    if process.is_alive():
-        process.terminate()
-        process.join(5)
-        if process.is_alive():
-            process.kill()
-            process.join(5)
-        _record_manifest_failure(task, task.get("attempt_id"), failure_class="timeout", retry=task.get("retry", False))
-        return "timeout"
-    if process.exitcode != 0:
-        _record_manifest_failure(task, task.get("attempt_id"), failure_class="worker_exception", retry=task.get("retry", False))
-        return "failed"
-    return "completed"
+def run_bounded_train_task(*args,**kwargs):
+    raise NotImplementedError('Standalone blocking dispatcher retired; use supervised src.coordinator.execute_manifest')
 
 
-def dispatch_training_tasks(cpu_tasks: list[dict[str, Any]], gpu_tasks: list[dict[str, Any]], queue, execution_config: ExecutionConfig) -> None:
-    """Dispatch one bounded attempt batch under the declared execution policy."""
-    if not (cpu_tasks or gpu_tasks):
-        return
-    if execution_config.task_timeout_seconds is not None:
-        for bounded_task in cpu_tasks + gpu_tasks:
-            if _stop_requested:
-                break
-            run_bounded_train_task(
-                bounded_task, queue,
-                timeout_seconds=execution_config.task_timeout_seconds,
-            )
-        return
-    cpu_pool = multiprocessing.Pool(
-        execution_config.max_workers, initializer=init_worker, initargs=(queue,),
-        maxtasksperchild=MAX_TASKS_PER_CHILD,
-    )
-    gpu_pool = multiprocessing.Pool(
-        N_GPU_WORKERS, initializer=init_worker, initargs=(queue,),
-        maxtasksperchild=MAX_TASKS_PER_CHILD,
-    )
-    try:
-        cpu_res = cpu_pool.map_async(train_unit, cpu_tasks)
-        gpu_res = gpu_pool.map_async(train_unit, gpu_tasks)
-        cpu_res.wait()
-        gpu_res.wait()
-    finally:
-        cpu_pool.close()
-        cpu_pool.join()
-        gpu_pool.close()
-        gpu_pool.join()
-
-
-def _wait_for_manifest_tasks(
-    store: ManifestStore,
-    run_id: str,
-    task_ids: list[str],
-    *,
-    timeout_seconds: float = 120.0,
-) -> None:
-    """Wait for the writer to fence/commit an attempt batch before retrying."""
-    if not task_ids:
-        return
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        states = [store.get_task(run_id, task_id) for task_id in task_ids]
-        if not any(task is not None and task.get("state") == "running" for task in states):
-            return
-        if time.monotonic() >= deadline:
-            # Leave still-running attempts visible for coordinator recovery;
-            # never dispatch a second attempt while ownership is unresolved.
-            return
-        time.sleep(0.05)
+def dispatch_training_tasks(*args,**kwargs):
+    raise NotImplementedError('Dataset-barrier pool dispatcher retired; use supervised src.coordinator.execute_manifest')
 
 def writer_process(queue, results_path, manifest_db: str | Path | None = None, run_id: str | None = None):
     """Transactionally commit task/attempt/result, then export an idempotent row."""

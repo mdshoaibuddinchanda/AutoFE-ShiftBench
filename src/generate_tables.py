@@ -8,46 +8,45 @@ import scipy.stats as ss
 
 from src.dataset_statistics import AnalysisInputError, AnalysisConfig, run_dataset_level_analysis
 from src.protocol import results_ledger_path
+from src.reporting import report_inputs,dataset_descriptive,caption
 
 
 def _load_data(results_path=results_ledger_path()):
-    path = Path(results_path)
-    if not path.exists():
-        return pd.DataFrame()
-    records = []
-    with open(path, "r") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
-    df = pd.DataFrame(records)
-    if "status" in df.columns:
-        df = df[df["status"] == "success"].copy()
-    return df
+    return report_inputs(results_path)[0] if Path(results_path).exists() else pd.DataFrame()
+
+
+def _cell(value,digits=4):
+    return 'NA (unavailable)' if pd.isna(value) else f'{float(value):.{digits}f}'
 
 def generate_table_1_predictive_performance(df: pd.DataFrame):
     if df.empty or "roc_auc" not in df.columns: return "*(No data)*\n"
+    for metric in ('accuracy','f1_macro'):
+        if metric not in df: df[metric]=np.nan
+    df=dataset_descriptive(df,["pipeline"],["roc_auc","accuracy","f1_macro"])
     grouped = df.groupby("pipeline").agg({
         "roc_auc": "mean",
         "accuracy": "mean",
-        "f1": "mean"
+        "f1_macro": "mean"
     }).reset_index().sort_values("roc_auc", ascending=False)
     
     out = "## Table 1: Overall Predictive Performance\n\n"
-    out += "| Rank | Pipeline | Mean ROC-AUC | Mean Accuracy | Mean F1-Score |\n"
+    out += "| Rank | Pipeline | Mean ROC-AUC | Mean Accuracy | Mean macro F1 (explicit averaging) |\n"
     out += "| :---: | :--- | :---: | :---: | :---: |\n"
     
     for idx, row in enumerate(grouped.itertuples(), 1):
         roc_str = f"**{row.roc_auc:.4f}**" if idx == 1 else f"{row.roc_auc:.4f}"
         acc_str = f"**{row.accuracy:.4f}**" if row.accuracy == grouped["accuracy"].max() else f"{row.accuracy:.4f}"
-        f1_str = f"**{row.f1:.4f}**" if row.f1 == grouped["f1"].max() else f"{row.f1:.4f}"
+        f1_str = f"**{row.f1_macro:.4f}**" if row.f1_macro == grouped["f1_macro"].max() else _cell(row.f1_macro)
         out += f"| {idx} | {row.pipeline} | {roc_str} | {acc_str} | {f1_str} |\n"
     return out
 
 def generate_table_2_robustness(df: pd.DataFrame):
     if df.empty or "roc_auc" not in df.columns: return "*(No data)*\n"
-    out = "## Table 2: Robustness Under Distribution Shift\n\n"
+    out = "## Table 2: Observed Dataset Means Under Training Conditions\n\n"
     
-    shifts = ["clean", "missing_0.1", "missing_0.3", "gaussian_0.1", "gaussian_0.3"]
+    from src.pipeline_runner import SHIFT_FAMILIES
+    shifts=[fam if severity == 0 else f"{fam}_{severity}" for fam,severity in SHIFT_FAMILIES]
+    df=dataset_descriptive(df,["pipeline","condition"],["roc_auc"])
     preferred = [
         "Raw", "Raw_Full", "Raw_Capped", "AutoFE_Baseline",
         "AutoFE_AddSub", "AutoFE_AddSubDiv", "AutoFE_NoDivision",
@@ -64,13 +63,14 @@ def generate_table_2_robustness(df: pd.DataFrame):
         row_str = f"| {shift} | "
         for p in pipelines:
             val = df[(df["condition"] == shift) & (df["pipeline"] == p)]["roc_auc"].mean()
-            if np.isnan(val): val = 0
-            row_str += f"{val:.4f} | "
+            row_str += _cell(val)+" | "
         out += row_str + "\n"
     return out
 
 def generate_table_3_computational_cost(df: pd.DataFrame):
     if df.empty or "train_time_s" not in df.columns: return "*(No data)*\n"
+    for metric in ('autofe_gen_time_s','infer_time_s'):
+        if metric not in df: df[metric]=np.nan
     out = "## Table 3: Computational Cost & Efficiency (Median Seconds)\n\n"
     grouped = df.groupby("pipeline").agg({
         "autofe_gen_time_s": "median",
@@ -101,14 +101,14 @@ def generate_table_4_memory_and_features(df: pd.DataFrame):
             
     grouped = df.groupby("pipeline").agg(agg_dict).reset_index()
     
-    out += "| Pipeline | Peak RAM (MB) | Original Features | Generated Features | Retained Features |\n"
+    out += "| Pipeline | Maximum recorded RSS delta (MB) | Original Features | Generated Features | Retained Features |\n"
     out += "| :--- | :---: | :---: | :---: | :---: |\n"
     
     for row in grouped.itertuples():
-        n_orig = getattr(row, "n_original", 0)
-        n_gen = getattr(row, "n_generated", 0)
-        n_ret = getattr(row, "n_retained", 0)
-        out += f"| {row.pipeline} | {row.ram_used_mb:.1f} | {n_orig:.1f} | {n_gen:.1f} | {n_ret:.1f} |\n"
+        n_orig = getattr(row, "n_original", np.nan)
+        n_gen = getattr(row, "n_generated", np.nan)
+        n_ret = getattr(row, "n_retained", np.nan)
+        out += f"| {row.pipeline} | {row.ram_used_mb:.1f} | {_cell(n_orig,1)} | {_cell(n_gen,1)} | {_cell(n_ret,1)} |\n"
     return out
 
 def generate_table_5_statistical_tests(df: pd.DataFrame):
@@ -198,7 +198,7 @@ def generate_table_7_win_tie_loss(df: pd.DataFrame):
 def generate_table_8_feature_stability(df: pd.DataFrame):
     if df.empty or "wasserstein" not in df.columns: return "*(No data)*\n"
     out = "## Table 8: Feature Distribution Stability (Shifted Data)\n\n"
-    out += "*Measures how much the generated feature distributions diverge under domain shift.*\n\n"
+    out += "*Clean versus corrupted training rows under one frozen fitted preprocessing and selected mapping; deployment shift is not measured.*\n\n"
     
     shift_df = df[df["condition"] != "clean"].copy()
     if shift_df.empty: return "*(No shift data available)*\n"
@@ -244,7 +244,7 @@ def generate_table_10_robustness_score(df: pd.DataFrame):
     if shift_df.empty: return "*(No shift data available)*\n"
     
     merged = pd.merge(shift_df, clean_df, on=["dataset", "seed", "fold", "pipeline", "model"], suffixes=("_shift", "_clean"))
-    merged["robustness_score"] = merged["roc_auc_shift"] / merged["roc_auc_clean"]
+    merged["robustness_score"] = merged["roc_auc_shift"] / merged["roc_auc_clean"].replace(0,np.nan)
     
     grouped = merged.groupby("pipeline")["robustness_score"].mean().reset_index().sort_values("robustness_score", ascending=False)
     
@@ -271,38 +271,34 @@ def generate_table_11_dataset_level_inference(summaries: pd.DataFrame):
         out += f"| {row.stratum} | {int(row.n_datasets)} | {int(row.n_paired_tasks)} | {fmt(row.estimate_b_minus_a)} | {fmt(row.ci_lower)} | {fmt(row.ci_upper)} | {fmt(row.p_value)} | {fmt(row.p_value_adjusted_holm)} | {decision} |\n"
     return out
 
-def generate_all_tables():
-    df = _load_data()
-    out_dir = Path("reports/tables")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "q1_tables_v2.md"
-    corrected_summaries = pd.DataFrame()
-    if Path(results_ledger_path()).exists():
-        try:
-            corrected_summaries = run_dataset_level_analysis(
-                results_ledger_path(),
-                output_dir=out_dir / "dataset_level",
-                config=AnalysisConfig(),
-            ).summaries
-        except AnalysisInputError as exc:
-            corrected_summaries = pd.DataFrame()
-            print(f"Corrected dataset-level analysis unavailable: {exc}")
-    
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("# Q1 Journal Tables (Advanced Statistics)\n\n")
-        f.write(generate_table_1_predictive_performance(df) + "\n\n")
-        f.write(generate_table_2_robustness(df) + "\n\n")
-        f.write(generate_table_3_computational_cost(df) + "\n\n")
-        f.write(generate_table_4_memory_and_features(df) + "\n\n")
-        f.write(generate_table_5_statistical_tests(df) + "\n\n")
-        f.write(generate_table_6_friedman_test(df) + "\n\n")
-        f.write(generate_table_7_win_tie_loss(df) + "\n\n")
-        f.write(generate_table_8_feature_stability(df) + "\n\n")
-        f.write(generate_table_9_overfitting_gap(df) + "\n\n")
-        f.write(generate_table_10_robustness_score(df) + "\n\n")
-        f.write(generate_table_11_dataset_level_inference(corrected_summaries) + "\n\n")
-        
-    print(f"Generated 11 tables (including the corrected dataset-level Table 11) in {out_path.absolute()}")
+def generate_all_tables(results_path=results_ledger_path(),*,analysis_config=None,datasets=None,output_dir="reports/tables",include_legacy_exploratory=False):
+    out_dir=Path(output_dir)
+    out_dir.mkdir(parents=True,exist_ok=True)
+    df,bundle=report_inputs(results_path,config=analysis_config,datasets=datasets,output_dir=out_dir/'dataset_level')
+    out_path=out_dir/'q1_tables_v2.md'
+    (out_dir/'table_report_config.json').write_text(json.dumps({**bundle.config,'report_schema':'dataset_unit_reports_v2',
+        'analysis_input_task_ids':sorted(df['scientific_task_id'].dropna().unique()) if 'scientific_task_id' in df else []},sort_keys=True),encoding='utf-8')
+    with out_path.open('w',encoding='utf-8') as handle:
+        handle.write('# Corrected dataset-unit reports\n\n'+caption(bundle)+'\n\n')
+        if not df.empty:
+            # Descriptive cost/complexity panels remain explicitly descriptive.
+            for function in (generate_table_1_predictive_performance,generate_table_2_robustness,generate_table_3_computational_cost,
+                generate_table_4_memory_and_features,generate_table_7_win_tie_loss,generate_table_8_feature_stability,
+                generate_table_9_overfitting_gap,generate_table_10_robustness_score):
+                handle.write(function(df.copy())+'\n\n')
+        handle.write(generate_table_11_dataset_level_inference(bundle.summaries))
+        if include_legacy_exploratory:
+            handle.write('\n\n# Explicit historical exploratory appendices\n\n')
+            handle.write(generate_table_5_statistical_tests(df)+'\n'+generate_table_6_friedman_test(df))
+    return out_path
 
-if __name__ == "__main__":
-    generate_all_tables()
+
+if __name__ == '__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--ledger',type=Path,default=results_ledger_path())
+    parser.add_argument('--run-id')
+    parser.add_argument('--bootstrap-resamples',type=int,default=2000)
+    parser.add_argument('--permutation-resamples',type=int,default=5000)
+    args=parser.parse_args()
+    generate_all_tables(args.ledger,analysis_config=AnalysisConfig(run_id=args.run_id,bootstrap_resamples=args.bootstrap_resamples,permutation_resamples=args.permutation_resamples))

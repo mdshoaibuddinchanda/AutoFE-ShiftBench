@@ -54,7 +54,7 @@ def plot_cd_diagram(ranks, cd, title="Critical Difference Diagram"):
     plt.savefig(out_dir / "cd_diagram.png", dpi=300)
     print("CD diagram saved to reports/figures/cd_diagram.png")
 
-def main():
+def legacy_exploratory_main():
     df = load_results()
     if df.empty:
         print("No results found.")
@@ -123,6 +123,9 @@ def main():
     print(f"Critical Difference (approx alpha=0.05): {cd:.4f}")
     
     plot_cd_diagram(avg_ranks, cd)
+
+def main():
+    raise RuntimeError("Legacy pooled ranks and approximate q=3.2 CD are retired for corrected runs; use src.stats_analysis or src.plotting_q1.")
 
 if __name__ == "__main__":
     main()

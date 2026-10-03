@@ -64,8 +64,8 @@ def plot_domain_analysis(df_joined):
     
     plt.figure(figsize=(10, 6))
     domain_gains.plot(kind="barh", color="skyblue")
-    plt.title("Average AutoFE Robustness Gain ($\Delta$ F1) by Domain")
-    plt.xlabel("Average $\Delta$ F1 (AutoFE - Raw)")
+    plt.title(r"Average AutoFE Robustness Gain ($\Delta$ F1) by Domain")
+    plt.xlabel(r"Average $\Delta$ F1 (AutoFE - Raw)")
     plt.tight_layout()
     
     out_dir = Path("reports/figures")
@@ -107,7 +107,7 @@ def plot_shap_analysis(X, y):
     
     print("SHAP analysis plots saved to reports/figures/")
 
-def main():
+def legacy_exploratory_main():
     df_results, df_meta = load_data()
     if df_results.empty or df_meta.empty:
         print("Insufficient data for structural analysis.")
@@ -141,6 +141,9 @@ def main():
         plot_shap_analysis(X, y)
     else:
         print(f"Not enough datasets ({len(X)}) to train SHAP Random Forest. Need >= 5.")
+
+def main():
+    raise RuntimeError("Unpaired legacy structural association is retired for corrected runs; build from dataset_contrasts with verified metadata.")
 
 if __name__ == "__main__":
     main()

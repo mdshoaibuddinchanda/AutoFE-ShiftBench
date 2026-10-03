@@ -105,7 +105,7 @@ class DatasetStatisticsTests(unittest.TestCase):
     def test_sign_flip_keeps_zero_datasets_in_mean_denominator(self) -> None:
         result = _sign_flip_test(
             np.asarray([0.0, 1.0, 2.0]),
-            AnalysisConfig(bootstrap_resamples=0, permutation_resamples=0),
+            AnalysisConfig(bootstrap_resamples=0, permutation_resamples=100),
             stratum_label="test",
             fingerprint="fixture",
         )

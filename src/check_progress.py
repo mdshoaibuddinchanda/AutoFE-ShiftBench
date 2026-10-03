@@ -32,7 +32,7 @@ def check_progress():
     manifest_dbs = sorted(manifest_dir.glob("*.db"), key=lambda path: path.stat().st_mtime, reverse=True) if manifest_dir.exists() else []
     if manifest_dbs:
         manifest_db = manifest_dbs[0]
-        store = ManifestStore(manifest_db)
+        store = ManifestStore(manifest_db,read_only=True)
         with store._connect() as connection:
             run_row = connection.execute("SELECT run_id, status, updated_at FROM runs ORDER BY updated_at DESC LIMIT 1").fetchone()
         if run_row is not None:
@@ -66,7 +66,7 @@ def check_progress():
         ds_dir = current_cache_root / ds
         if ds_dir.exists():
             # Count _train.pkl files (one per pipeline/unit combo)
-            cached = sum(1 for _ in ds_dir.glob("*_train.pkl"))
+            cached = sum(1 for _ in ds_dir.rglob("*_train.pkl"))
         else:
             cached = 0
 

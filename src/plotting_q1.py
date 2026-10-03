@@ -18,6 +18,7 @@ import scipy.stats as ss
 
 from src.dataset_statistics import AnalysisConfig, AnalysisInputError, run_dataset_level_analysis
 from src.protocol import results_ledger_path
+from src.reporting import report_inputs,summaries,dataset_descriptive,caption
 
 
 # The primary paper scope is the 22 datasets for which the run produced a
@@ -139,26 +140,35 @@ def _save_figure(fig, out_dir: Path, stem: str, dpi: int = 300):
 
 def _load_data(
     results_path=results_ledger_path(),
-    datasets: Iterable[str] | None = PRIMARY_DATASETS,
+    datasets: Iterable[str] | None = None,
 ):
-    path = Path(results_path)
-    if not path.exists():
-        return pd.DataFrame()
-    records = []
-    with open(path, "r") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
-    df = pd.DataFrame(records)
-    if "status" in df.columns:
-        df = df[df["status"] == "success"].copy()
-    if datasets is not None and "dataset" in df.columns:
-        df = df[df["dataset"].isin(set(datasets))].copy()
-    return df
+    return report_inputs(results_path,datasets=datasets)[0] if Path(results_path).exists() else pd.DataFrame()
+
+
+def _contrast_panel(df,out_dir,stem,title,dpi=300,condition=None):
+    table=summaries(df)
+    if condition and not table.empty:
+        table=table[table['stratum'].str.contains(condition,regex=False)]
+    if table.empty:
+        (out_dir/(stem+'_unsupported.txt')).write_text('No supported corrected contrast rows in declared scope.',encoding='utf-8')
+        return
+    fig,ax=plt.subplots(figsize=(12,max(5,len(table)*.35)),constrained_layout=True)
+    for i,row in enumerate(table.itertuples()):
+        value=row.estimate_b_minus_a
+        if pd.notna(value):
+            ax.plot(value,i,'o',color='#3498DB')
+        if pd.notna(row.ci_lower) and pd.notna(row.ci_upper):
+            ax.hlines(i,row.ci_lower,row.ci_upper,color='#2C3E50',linewidth=2)
+    ax.set_yticks(range(len(table)),[textwrap.fill(str(row.stratum),70) for row in table.itertuples()])
+    ax.axvline(0,color='grey',linestyle='--')
+    ax.set_xlabel('Dataset-equal paired ROC-AUC difference (B - A); dataset bootstrap CI')
+    ax.set_title(title+'; declared strata kept separate')
+    _save_figure(fig,out_dir,stem,dpi)
+
 
 def plot_fig2_dataset_diversity(out_dir: Path, datasets: Iterable[str] = PRIMARY_DATASETS, dpi: int = 300):
     set_q1_publication_style()
-    domain_counts = pd.Series({d: DOMAIN_BY_DATASET[d] for d in datasets}).value_counts()
+    domain_counts = pd.Series({d: DOMAIN_BY_DATASET.get(d,"Other") for d in datasets}).value_counts()
     domains = domain_counts.to_dict()
     df_dom = pd.DataFrame(list(domains.items()), columns=["Domain", "Count"]).sort_values("Count", ascending=False)
 
@@ -172,78 +182,13 @@ def plot_fig2_dataset_diversity(out_dir: Path, datasets: Iterable[str] = PRIMARY
     _save_figure(fig, out_dir, "Figure_2_Dataset_Diversity", dpi)
 
 def plot_fig3_pipeline_ranking(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
-    if df.empty or "roc_auc" not in df.columns: return
-    set_q1_publication_style()
-    
-    pipeline_order = df.groupby("pipeline")["roc_auc"].mean().sort_values(ascending=False).index
-    
-    fig, ax = plt.subplots(figsize=(10.5, 5.5), constrained_layout=True)
-    sns.barplot(
-        data=df, x="pipeline", y="roc_auc", 
-        order=pipeline_order,
-        estimator=np.mean, errorbar=("ci", 95),
-        color="#2C3E50", alpha=0.9, ax=ax
-    )
-    ax.set_title("Figure 3: Overall Pipeline Ranking (Mean ROC-AUC)", weight="bold", pad=15)
-    ax.set_ylabel("ROC-AUC")
-    ax.set_xlabel("")
-    ax.set_xticks(range(len(pipeline_order)))
-    ax.set_xticklabels([textwrap.fill(str(x), 20) for x in pipeline_order], rotation=25, ha="right")
-    ax.set_ylim(0.5, 1.0)
-    ax.bar_label(ax.containers[0], fmt="%.3f", fontsize=14, padding=5, color="#1f2937")
-    _set_print_text(ax, tick=14, label=17, title=21)
-    _save_figure(fig, out_dir, "Figure_3_Pipeline_Ranking", dpi)
+    _contrast_panel(df,out_dir,'Figure_3_Pipeline_Ranking','Primary paired pipeline contrast',dpi)
 
 def plot_fig4_model_ranking(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
-    if df.empty or "roc_auc" not in df.columns: return
-    set_q1_publication_style()
-    
-    model_means = df.groupby("model")["roc_auc"].mean().sort_values(ascending=False).index
-    
-    fig, ax = plt.subplots(figsize=(8.5, 6.5), constrained_layout=True)
-    sns.barplot(
-        data=df, y="model", x="roc_auc", 
-        order=model_means,
-        estimator=np.mean, errorbar=("ci", 95),
-        color="#95A5A6", ax=ax
-    )
-    ax.set_title("Figure 4: Classifier Robustness Ranking", weight="bold", pad=15)
-    ax.set_xlabel("Mean ROC-AUC across shifts and pipelines")
-    ax.set_ylabel("")
-    ax.set_xlim(0.5, 1.0)
-    ax.bar_label(ax.containers[0], fmt="%.3f", fontsize=14, padding=5, color="#1f2937")
-    _set_print_text(ax, tick=15, label=17, title=21)
-    _save_figure(fig, out_dir, "Figure_4_Model_Ranking", dpi)
+    _contrast_panel(df,out_dir,'Figure_4_Model_Ranking','Paired contrasts by estimator and condition',dpi)
 
 def plot_fig5_robustness_shift(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
-    if df.empty or "roc_auc" not in df.columns: return
-    set_q1_publication_style()
-    
-    shift_df = df[df["condition"].str.startswith("missing_") | (df["condition"] == "clean")].copy()
-    if shift_df.empty: return
-    
-    shift_df["severity"] = shift_df["condition"].apply(
-        lambda x: 0.0 if x == "clean" else float(x.split("_")[-1])
-    )
-    pipelines_to_plot = ["Raw", "AutoFE_Baseline", "AutoFE_NoMultiply"]
-    shift_df = shift_df[shift_df["pipeline"].isin(pipelines_to_plot)]
-    
-    fig, ax = plt.subplots(figsize=(9.5, 5.8), constrained_layout=True)
-    sns.lineplot(
-        data=shift_df, x="severity", y="roc_auc", hue="pipeline",
-        style="pipeline", markers=True, dashes=False, linewidth=2, markersize=8, ax=ax
-    )
-    ax.set_xlabel("Missing value fraction")
-    ax.set_ylabel("ROC-AUC")
-    # A frameless legend keeps the line trajectories visible and avoids an
-    # opaque patch obscuring the Raw/AutoFE curves at their crossings.
-    ax.legend(
-        title="", loc="lower center", bbox_to_anchor=(0.5, 1.01),
-        ncol=3, frameon=False, handlelength=2.4, columnspacing=1.0,
-    )
-    ax.set_title("Figure 5: Performance Degradation under Missing Values", weight="bold", pad=38)
-    _set_print_text(ax, tick=14, label=17, title=21, legend=15)
-    _save_figure(fig, out_dir, "Figure_5_Robustness_Shift", dpi)
+    _contrast_panel(df,out_dir,'Figure_5_Robustness_Shift','Training missingness contrast',dpi,condition='missing_values')
 
 def plot_fig6_runtime_memory(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     if df.empty or "train_time_s" not in df.columns: return
@@ -289,65 +234,16 @@ def plot_fig7_feature_complexity(df: pd.DataFrame, out_dir: Path, dpi: int = 300
     _save_figure(fig, out_dir, "Figure_7_Feature_Complexity", dpi)
 
 def plot_fig8_cd_diagram(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
-    if df.empty or "roc_auc" not in df.columns: return
-    set_q1_publication_style()
-    
-    # Aggregate to dataset-fold level so models are averaged out for the test
-    agg = df.groupby(["dataset", "seed", "fold", "condition", "pipeline"])["roc_auc"].mean().reset_index()
-    
-    # Pivot so each row is a task, each col is a pipeline
-    pivot = agg.pivot(index=["dataset", "seed", "fold", "condition"], columns="pipeline", values="roc_auc").dropna()
-    
-    if len(pivot) < 10: return # not enough data
-    
-    # Nemenyi critical difference plot requires scikit-posthocs
-    avg_ranks = pivot.rank(axis=1, ascending=False).mean()
-    
-    # Compute the Nemenyi matrix directly.  This avoids a blank panel with
-    # older scikit-posthocs releases whose deprecated NumPy aliases and
-    # studentized-range wrapper are incompatible with modern environments.
-    from statsmodels.stats.libqsturng import psturng
-
-    rank_matrix = pivot.rank(axis=1, method="average", ascending=False)
-    mean_ranks = rank_matrix.mean(axis=0).to_numpy(dtype=float)
-    k = len(mean_ranks)
-    n = len(rank_matrix)
-    p_values_array = np.ones((k, k), dtype=float)
-    standard_error = np.sqrt(k * (k + 1.0) / (6.0 * n))
-    for i in range(k):
-        for j in range(i + 1, k):
-            q_value = np.sqrt(2.0) * abs(mean_ranks[i] - mean_ranks[j]) / standard_error
-            p_value = float(np.asarray(psturng(q_value, k, np.inf)).reshape(-1)[0])
-            p_values_array[i, j] = p_value
-            p_values_array[j, i] = p_value
-    p_values = pd.DataFrame(p_values_array, index=pivot.columns, columns=pivot.columns)
-    
-    fig, ax = plt.subplots(figsize=(10, 8), constrained_layout=True)
-    sns.heatmap(
-        p_values,
-        annot=True,
-        fmt=".3g",
-        vmin=0,
-        vmax=1,
-        cmap="RdYlGn_r",
-        square=True,
-        linewidths=0.5,
-        linecolor="white",
-        annot_kws={"size": 20, "weight": "bold"},
-        cbar_kws={"label": "Nemenyi p-value"},
-        ax=ax,
-    )
-    ax.set_title("Figure 8: Nemenyi Post-hoc P-value Heatmap", weight="bold", pad=15)
-    ax.set_xlabel("Pipeline")
-    ax.set_ylabel("Pipeline")
-    ax.tick_params(axis="x", rotation=35)
-    ax.tick_params(axis="y", rotation=0)
-    _set_print_text(ax, tick=17, label=19, title=22)
-    cbar = ax.collections[0].colorbar
-    if cbar is not None:
-        cbar.ax.tick_params(labelsize=13)
-        cbar.set_label("Nemenyi p-value", fontsize=16)
-    _save_figure(fig, out_dir, "Figure_8_CD_Diagram", dpi)
+    table=summaries(df)
+    if table.empty: return
+    matrix=table.set_index('stratum')[['p_value_adjusted_holm']]
+    if matrix.notna().any().any():
+        fig,ax=plt.subplots(figsize=(7,max(5,len(matrix)*.35)),constrained_layout=True)
+        sns.heatmap(matrix,annot=True,fmt='.3g',vmin=0,vmax=1,ax=ax,cbar_kws={'label':'Holm adjusted p'})
+        ax.set_title('Declared dataset sign-flip family; unsupported cells missing')
+        _save_figure(fig,out_dir,'Figure_8_CD_Diagram',dpi)
+    else:
+        (out_dir/'Figure_8_CD_Diagram_unsupported.txt').write_text('No supported adjusted p values; no CD or Nemenyi inference.',encoding='utf-8')
 
 def plot_fig9_heatmap(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     if df.empty or "roc_auc" not in df.columns: return
@@ -378,59 +274,27 @@ def plot_fig9_heatmap(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
     _save_figure(fig, out_dir, "Figure_9_Heatmap", dpi)
 
 def plot_fig10_ablation(df: pd.DataFrame, out_dir: Path, dpi: int = 300):
-    if df.empty or "roc_auc" not in df.columns: return
-    set_q1_publication_style()
-    
-    ablation_pl = [p for p in ABLATION_PIPELINES if p in df["pipeline"].unique()]
-    adf = df[df["pipeline"].isin(ablation_pl)].copy()
-    if adf.empty: return
-    
-    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
-    sns.barplot(
-        data=adf, x="pipeline", y="roc_auc",
-        order=ablation_pl, hue="pipeline", palette="viridis", legend=False,
-        errorbar=("ci", 95), ax=ax
-    )
-    ax.set_title("Figure 10: Ablation Study of Feature Generation/Selection", weight="bold", pad=15)
-    ax.set_ylabel("Mean ROC-AUC")
-    ax.set_xlabel("")
-    ax.set_ylim(0.5, 1.0)
-    ax.set_xticks(range(len(ablation_pl)))
-    ax.set_xticklabels([textwrap.fill(str(x), 20) for x in ablation_pl], rotation=25, ha="right")
-    # Seaborn creates one BarContainer per hue level.  Label every container,
-    # not only the first (Raw) bar, so the ablation comparison is numerically
-    # self-contained in the printed figure.
-    for container in ax.containers:
-        if getattr(container, "patches", None):
-            ax.bar_label(container, fmt="%.3f", fontsize=14, padding=5, color="#1f2937")
-    _set_print_text(ax, tick=14, label=17, title=21)
-    _save_figure(fig, out_dir, "Figure_10_Ablation_Study", dpi)
-
+    _contrast_panel(df,out_dir,'Figure_10_Ablation_Study','Configured paired contrast (ablation requires explicit pipeline_b)',dpi)
 
 def generate_all(
     results_path=results_ledger_path(),
     out_dir="reports/figures/q1_paper_regenerated",
-    datasets: Iterable[str] | None = PRIMARY_DATASETS,
+    datasets: Iterable[str] | None = None,
     dpi: int = 300,
+    analysis_config: AnalysisConfig | None = None,
 ):
-    df = _load_data(results_path, datasets=datasets)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Keep publication figures traceable to the corrected dataset-level
-    # contract.  Existing exploratory figures still operate on their declared
-    # plotting rows, while confirmatory summaries are written separately.
-    if Path(results_path).exists():
-        try:
-            run_dataset_level_analysis(
-                results_path,
-                output_dir=out_dir / "dataset_level_analysis",
-                config=AnalysisConfig(),
-            )
-        except AnalysisInputError as exc:
-            (out_dir / "dataset_level_analysis_unavailable.txt").write_text(str(exc), encoding="utf-8")
-
-    plot_fig2_dataset_diversity(out_dir, datasets=datasets or PRIMARY_DATASETS, dpi=dpi)
+    df,bundle=report_inputs(results_path,config=analysis_config,datasets=datasets,output_dir=out_dir/'dataset_level_analysis')
+    (out_dir/'figure_captions.md').write_text(caption(bundle),encoding='utf-8')
+    actual_datasets=sorted(df['dataset'].unique()) if not df.empty else []
+    figure_config={**bundle.config,'report_schema':'dataset_unit_reports_v2','dpi':dpi,'formats':['png','pdf'],
+        'analysis_input_task_ids':sorted(df['scientific_task_id'].dropna().unique()) if 'scientific_task_id' in df else []}
+    (out_dir/'figure_config.json').write_text(json.dumps(figure_config,sort_keys=True),encoding='utf-8')
+    if not actual_datasets:
+        (out_dir/'unsupported.txt').write_text('No valid selected run records; no empirical figures generated.',encoding='utf-8')
+        return bundle
+    plot_fig2_dataset_diversity(out_dir, datasets=actual_datasets, dpi=dpi)
     plot_fig3_pipeline_ranking(df, out_dir, dpi=dpi)
     plot_fig4_model_ranking(df, out_dir, dpi=dpi)
     plot_fig5_robustness_shift(df, out_dir, dpi=dpi)
@@ -439,7 +303,19 @@ def generate_all(
     plot_fig8_cd_diagram(df, out_dir, dpi=dpi)
     plot_fig9_heatmap(df, out_dir, dpi=dpi)
     plot_fig10_ablation(df, out_dir, dpi=dpi)
-    print(f"Generated Figures 2-10 for {len(set(datasets or PRIMARY_DATASETS))} datasets in {out_dir.absolute()}")
+    print(f"Generated Figures 2-10 for {len(actual_datasets)} datasets in {out_dir.absolute()}")
+    return bundle
 
 if __name__ == "__main__":
-    generate_all()
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--ledger',type=Path,default=results_ledger_path())
+    parser.add_argument('--run-id')
+    parser.add_argument('--datasets')
+    parser.add_argument('--output-dir',default='reports/figures/q1_paper_regenerated')
+    parser.add_argument('--bootstrap-resamples',type=int,default=2000)
+    parser.add_argument('--permutation-resamples',type=int,default=5000)
+    parser.add_argument('--dpi',type=int,default=300)
+    args=parser.parse_args()
+    generate_all(args.ledger,args.output_dir,datasets=None if args.datasets is None else args.datasets.split(','),dpi=args.dpi,
+        analysis_config=AnalysisConfig(run_id=args.run_id,bootstrap_resamples=args.bootstrap_resamples,permutation_resamples=args.permutation_resamples))

@@ -65,9 +65,25 @@ def actual_lineage(snapshot,inventory,root):
         if item.get("role") == "analysis_output":
             aid="analysis_"+str(item.get("sha256"))
             nodes[aid]={"id":aid,"role":"analysis_output",**item}
-            for result_node in list(nodes.values()):
-                if result_node.get("role") == "durable_model_result":
-                    edges.append({"from":result_node["id"],"to":aid,"relationship":"declared_run_analysis_input"})
+            directory=_resolve(item['path'],root).parent
+            config_path=next((directory/name for name in ('analysis_config.json','figure_config.json','table_report_config.json') if (directory/name).exists()),directory/'analysis_config.json')
+            try:
+                config=json.loads(config_path.read_text(encoding='utf-8'))
+                if config.get('run_id') != snapshot['run']['run_id'] or not config.get('input_fingerprint_sha256'):
+                    raise ValueError('Analysis run/input fingerprint is unverified')
+                ledger_hashes={entry.get('sha256') for entry in inventory if entry.get('role') == 'result_ledger_export'}
+                if config['input_fingerprint_sha256'] not in ledger_hashes:
+                    raise ValueError('Analysis input ledger does not match the verified executed export')
+                expected_ids=set(config.get('analysis_input_task_ids',[]))
+                if not expected_ids or not expected_ids.issubset(results):
+                    raise ValueError('Analysis executed input task IDs are unavailable')
+                for tid in sorted(expected_ids):
+                    result_id='result_'+results[tid]['payload_hash']
+                    edges.append({'from':result_id,'to':aid,'relationship':'recorded_analysis_scientific_input'})
+                nodes[aid]['analysis_config_sha256']=canonical_sha256(config)
+                nodes[aid]['input_ledger_sha256']=config['input_fingerprint_sha256']
+            except (OSError,ValueError,KeyError,TypeError) as error:
+                unknown.append({'artifact':item['path'],'reason':'analysis_dependency_unverified','detail':str(error)})
     return {"schema_version":LINEAGE_SCHEMA_VERSION,"nodes":list(nodes.values()),"edges":edges,
         "status":"incomplete" if unknown or snapshot is None else "valid","unverified_dependencies":unknown,
         "snapshot_sha256":None if snapshot is None else snapshot_digest(snapshot)}

@@ -74,6 +74,9 @@ def run_wilcoxon_analysis(
     alpha: float = 0.05,
     pipeline_a: str = "Raw",
     pipeline_b: str = "AutoFE_Baseline",
+    bootstrap_resamples: int = 2000,
+    permutation_resamples: int = 5000,
+    run_id: str | None = None,
 ) -> pd.DataFrame:
     """Run the active dataset-cluster analysis and persist its summaries.
 
@@ -86,7 +89,7 @@ def run_wilcoxon_analysis(
     bundle = run_dataset_level_analysis(
         input_path,
         output_dir=out_path.parent / "dataset_level",
-        config=AnalysisConfig(alpha=alpha, pipeline_a=pipeline_a, pipeline_b=pipeline_b),
+        config=AnalysisConfig(alpha=alpha, pipeline_a=pipeline_a, pipeline_b=pipeline_b,bootstrap_resamples=bootstrap_resamples,permutation_resamples=permutation_resamples,run_id=run_id),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     bundle.summaries.to_csv(out_path, index=False)
@@ -129,4 +132,4 @@ if __name__ == "__main__":
         )
         print(json.dumps({"snapshot_id": result.snapshot["snapshot_id"], "output_dir": str(args.output_dir), "summary_rows": len(result.summaries), "coverage_rows": len(result.coverage_tasks)}, sort_keys=True))
     else:
-        run_wilcoxon_analysis(args.ledger, args.output, pipeline_a=args.pipeline_a, pipeline_b=args.pipeline_b)
+        run_wilcoxon_analysis(args.ledger, args.output, pipeline_a=args.pipeline_a, pipeline_b=args.pipeline_b,bootstrap_resamples=args.bootstrap_resamples,permutation_resamples=args.permutation_resamples,run_id=args.run_id)
