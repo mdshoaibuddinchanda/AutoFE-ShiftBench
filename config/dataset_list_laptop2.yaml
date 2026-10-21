@@ -1,0 +1,10 @@
+# AutoFE-ShiftBench: Dataset partition for Laptop 2
+# Contains large/heavyweight datasets to run concurrently with Laptop 1
+
+datasets:
+  - adult
+  - bank-marketing
+  - electricity
+  - aps_failure
+  - covertype
+  - airlines

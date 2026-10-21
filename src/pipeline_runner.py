@@ -1036,6 +1036,7 @@ def main() -> None:
     parser.add_argument("--max-attempts", type=int, default=1)
     parser.add_argument("--stop-after-tasks", type=int, default=None)
     parser.add_argument("--stale-after-seconds", type=float, default=3600.0, help="Recover running attempts older than this on resume")
+    parser.add_argument("--dataset-list", type=str, default="config/dataset_list.yaml", help="Path to YAML dataset configuration")
     args = parser.parse_args()
     import math
     if not math.isfinite(args.cache_max_gib) or args.cache_max_gib <= 0:
@@ -1070,7 +1071,7 @@ def main() -> None:
     results_path = args.results_path or results_ledger_path()
 
     # ---- Load experiment grid ----
-    datasets = load_dataset_names("config/dataset_list.yaml")
+    datasets = load_dataset_names(args.dataset_list)
     if args.max_datasets:
         datasets = datasets[:args.max_datasets]
 
