@@ -269,9 +269,9 @@ class ManifestStore:
     def _connect(self) -> sqlite3.Connection:
         existing_only=self.read_only or not self.initialize
         target = self.db_path.resolve().as_uri()+("?mode=ro" if self.read_only else "?mode=rw") if existing_only else str(self.db_path)
-        connection = sqlite3.connect(target, timeout=30.0, uri=existing_only, factory=_ClosingConnection)
+        connection = sqlite3.connect(target, timeout=120.0, uri=existing_only, factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA busy_timeout=120000")
         return connection
 
     def _init_schema(self) -> None:
