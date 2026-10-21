@@ -298,7 +298,7 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
             if budget_reached and not active:
                 stopped=True
                 break
-            if not budget_reached and not graceful_requested and len(active) < config.max_workers and psutil.virtual_memory().percent < 85:
+            if not budget_reached and not graceful_requested and len(active) < config.max_workers and psutil.virtual_memory().percent < 90:
                 gpu_active=any(task['stage']=='model' and task.get('model') in ('xgboost','catboost') for _,task,_,_ in active.values())
                 for record in store.ready_tasks(run_id,limit=max(64,config.max_workers*2),unit_id=current_unit if rolling else None):
                     if len(active) >= config.max_workers: break
@@ -312,7 +312,7 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                     from src.fsva import DEFAULT_PERTURBATION_MAGNITUDES
                     task={**record,'dataset_name':record['dataset'],'data_path':Path(record['data_path']),
                         'repair_descriptor':repair_descriptors.get(record['scientific_task_id']),
-                        'dense_budget_bytes':min(config.dense_budget_bytes,int(psutil.virtual_memory().available*.4/config.max_workers)),
+                        'dense_budget_bytes':min(config.dense_budget_bytes,int(max(1024**3, psutil.virtual_memory().available*.75/max(1, config.max_workers)))),
                         'manifest_db':str(store.db_path),'run_id':run_id,'attempt_id':attempt,
                         'task_timeout_seconds':config.task_timeout_seconds,'retry':record['attempt_count']+1 < config.max_attempts,
                         'diagnostics_enabled':run_config.get('diagnostics_enabled',False),
@@ -355,7 +355,7 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                         if all(row['state'] == 'completed' for row in store.unit_snapshot(run_id, current_unit)):
                             continue
                     break
-                if psutil.virtual_memory().percent >= 85:
+                if psutil.virtual_memory().percent >= 92 and psutil.virtual_memory().available < 1.5 * 1024**3:
                     # Resource backpressure cannot become an unbounded wait.
                     stopped=True
                     break

@@ -21,9 +21,25 @@ def fingerprint(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 
 
+def _long_path(path: str | Path) -> Path:
+    p = Path(path)
+    if os.name == "nt":
+        p_str = str(p)
+        if not p_str.startswith("\\\\?\\"):
+            try:
+                resolved = p.resolve()
+                r_str = str(resolved)
+                if len(r_str) >= 240:
+                    return Path("\\\\?\\" + r_str)
+                return resolved
+            except OSError:
+                pass
+    return p
+
+
 def file_sha256(path, *, check_cancel=None) -> str:
     digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
+    with _long_path(path).open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             if check_cancel is not None:
                 check_cancel()
@@ -88,7 +104,7 @@ def dataset_identity(path, *, frame=None) -> dict:
 @contextmanager
 def artifact_lock(path, *, timeout_seconds=60.0):
     """OS lock is released even if its owning worker exits; no stale lock lease."""
-    path = Path(path)
+    path = _long_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = path.open("a+b")
     handle.seek(0,2)
@@ -132,7 +148,7 @@ def atomic_bytes(path, payload: bytes):
 
 
 def _atomic_bytes(path, payload: bytes):
-    path = Path(path)
+    path = _long_path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
     descriptor,name = tempfile.mkstemp(prefix=".publish_",dir=path.parent)
     try:
@@ -157,7 +173,7 @@ def atomic_pickle(path,value):
 def validate_feature_cache(train_path,test_path,meta_path,dependency):
     """No reader accepts existence, incomplete publication, or corrupted bytes."""
     try:
-        metadata = json.loads(Path(meta_path).read_text(encoding="utf-8"))
+        metadata = json.loads(_long_path(meta_path).read_text(encoding="utf-8"))
         if metadata.get("cache_schema") != CACHE_SCHEMA_VERSION or metadata.get("dependency_signature") != dependency:
             return None
         for role,path in (("train",train_path),("test",test_path)):

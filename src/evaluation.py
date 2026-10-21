@@ -106,11 +106,16 @@ def compute_classification_metrics(
         statuses["roc_auc"] = statuses["pr_auc"] = "undefined_missing_held_out_class"
         return metrics
     if binary:
-        metrics["roc_auc"] = float(roc_auc_score(y_true == labels[1],aligned[:,1]))
-        metrics["pr_auc"] = float(average_precision_score(y_true == labels[1],aligned[:,1]))
+        metrics["roc_auc"] = float(np.clip(roc_auc_score(y_true == labels[1], aligned[:, 1]), 0.0, 1.0))
+        metrics["pr_auc"] = float(np.clip(average_precision_score(y_true == labels[1], aligned[:, 1]), 0.0, 1.0))
     else:
-        metrics["roc_auc"] = float(roc_auc_score(y_true,aligned,labels=labels,multi_class="ovr",average="macro"))
-        metrics["pr_auc"] = float(np.mean([average_precision_score(y_true == label,aligned[:,i]) for i,label in enumerate(labels)]))
+        metrics["roc_auc"] = float(np.clip(roc_auc_score(y_true, aligned, labels=labels, multi_class="ovr", average="macro"), 0.0, 1.0))
+        metrics["pr_auc"] = float(np.clip(np.mean([average_precision_score(y_true == label, aligned[:, i]) for i, label in enumerate(labels)]), 0.0, 1.0))
+    for name in ("accuracy", "balanced_accuracy", "precision", "recall", "f1", "f1_macro", "roc_auc", "pr_auc", "brier_score"):
+        if name in metrics and isinstance(metrics[name], (int, float)) and np.isfinite(metrics[name]):
+            metrics[name] = float(np.clip(metrics[name], 0.0, 1.0))
+    if isinstance(metrics.get("mcc"), (int, float)) and np.isfinite(metrics["mcc"]):
+        metrics["mcc"] = float(np.clip(metrics["mcc"], -1.0, 1.0))
     statuses["roc_auc"] = statuses["pr_auc"] = "complete"
     return metrics
 

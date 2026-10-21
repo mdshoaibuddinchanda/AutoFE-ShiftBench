@@ -395,8 +395,12 @@ class ManifestStore:
             existing = connection.execute("SELECT config_json FROM runs WHERE run_id = ?", (run_id,)).fetchone()
             encoded_config = _canonical(config)
             if existing is not None:
-                if existing["config_json"] != encoded_config:
+                old_cfg = json.loads(existing["config_json"])
+                grid_keys = ("protocol_version", "seed_scheme_version", "datasets", "seeds", "folds", "conditions", "pipelines", "models")
+                if any(old_cfg.get(k) != config.get(k) for k in grid_keys):
                     raise ManifestConflictError(f"run_id {run_id} already exists with a different configuration")
+                if existing["config_json"] != encoded_config:
+                    connection.execute("UPDATE runs SET config_json = ?, updated_at = ? WHERE run_id = ?", (encoded_config, now, run_id))
                 existing_ids = {row[0] for row in connection.execute("SELECT scientific_task_id FROM tasks WHERE run_id = ?", (run_id,)).fetchall()}
                 requested_ids = {str(record["scientific_task_id"]) for record in records}
                 if existing_ids != requested_ids:

@@ -15,4 +15,9 @@ def predict_labels_and_probabilities(model,values):
         return model.predict(values),probabilities
     # Logistic/NB/raw-margin GPU rules are retained, including near-tie behavior.
     labels=model.predict(values)
-    return labels,model.predict_proba(values) if hasattr(model,'predict_proba') else None
+    proba = model.predict_proba(values) if hasattr(model,'predict_proba') else None
+    if isinstance(proba, np.ndarray) and proba.ndim == 2:
+        row_sums = proba.sum(axis=1, keepdims=True)
+        if np.all(np.abs(row_sums - 1.0) < 1e-4) and np.all(proba >= 0):
+            proba = proba / row_sums
+    return labels, proba

@@ -690,6 +690,8 @@ def _manifest_result_fields(task: dict[str, Any], attempt_id: str | None) -> dic
 
 def precompute_unit(kwargs):
     """Phase 1 worker: generate splits and every configured pipeline cache."""
+    if "dataset_name" not in kwargs and "dataset" in kwargs:
+        kwargs["dataset_name"] = kwargs["dataset"]
     attempt_id = _claim_manifest_task(kwargs, worker_id=f"precompute:{os.getpid()}")
     if kwargs.get("manifest_db") and kwargs.get("scientific_task_id") and attempt_id is None:
         return kwargs.get("dataset_name")

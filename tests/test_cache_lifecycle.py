@@ -41,7 +41,11 @@ def prepare_and_commit(store, records, *, leave_pending=False, no_export=False, 
             'manifest_db': str(store.db_path), 'run_id': 'r', 'diagnostics_enabled': True,
             'diagnostic_config': {'max_rows': 12, 'random_state': 42}}
     runner.precompute_unit(task)
-    assert store.get_task('r', parent['scientific_task_id'])['state'] == 'completed'
+    t_state = store.get_task('r', parent['scientific_task_id'])
+    if t_state['state'] != 'completed':
+        with store._connect() as c:
+            print("ATTEMPT ERROR TUPLE:", [tuple(row) for row in c.execute("SELECT * FROM attempts").fetchall()])
+    assert t_state['state'] == 'completed', f"Task failed with state: {t_state}"
     prepared = store.durable_payload('r', parent['scientific_task_id'])
     for i, record in enumerate(r for r in records if r['stage'] == 'model'):
         if leave_pending and i == 1: continue

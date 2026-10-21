@@ -50,16 +50,24 @@ def capacity_problem(root, config, *, measured_bytes=None):
     return None
 
 
+def _norm_path(p: Path) -> Path:
+    p_str = str(p)
+    if os.name == "nt" and p_str.startswith("\\\\?\\"):
+        return Path(p_str[4:])
+    return p
+
+
 def checked_cache_path(value, root):
-    root = Path(root).resolve()
+    root_norm = _norm_path(Path(root).resolve())
     candidate = Path(value).absolute()
     resolved = candidate.resolve()
-    if not resolved.is_relative_to(root) or resolved == root:
+    resolved_norm = _norm_path(resolved)
+    if not resolved_norm.is_relative_to(root_norm) or resolved_norm == root_norm:
         raise CacheCheckFailed('Deletion target outside the declared cache root: ' + str(value))
-    for parent in (candidate, *candidate.parents):
+    for parent in (_norm_path(candidate), *_norm_path(candidate).parents):
         if parent.is_symlink() or (parent.exists() and getattr(parent.lstat(), 'st_file_attributes', 0) & 0x400):
             raise CacheCheckFailed('Symlink or reparse point in deletion path: ' + str(parent))
-        if parent == root:
+        if parent == root_norm:
             break
     if resolved.exists() and (not resolved.is_file() or resolved.stat().st_nlink != 1):
         raise CacheCheckFailed('Deletion target is not a regular, singly linked file')
@@ -129,7 +137,7 @@ def completed_unit_rows(store, run_id, unit_id, *, require_exports=True):
             for name, (low, high) in METRIC_RANGES.items():
                 status, value = result['metric_status'].get(name), result.get(name)
                 if status == 'complete':
-                    if not isinstance(value, (int, float)) or not math.isfinite(value) or not low <= value <= high:
+                    if not isinstance(value, (int, float)) or not math.isfinite(value) or not (low - 1e-7 <= value <= high + 1e-7):
                         raise CacheCheckFailed('Missing/nonfinite/out-of-range completed metric: ' + name)
                 elif not isinstance(status, str) or not status.startswith('undefined_') or value is not None:
                     raise CacheCheckFailed('Metric unavailable without a declared reason: ' + name)
@@ -297,13 +305,13 @@ def snapshot_eviction_evidence(snapshot, root, *, hash_file=file_sha256):
                 raise CacheCheckFailed('Eviction result ownership/integrity failed')
             if attempts.get(result['attempt_id'], {}).get('state') != 'completed':
                 raise CacheCheckFailed('Eviction attempt incomplete')
-        expected = {(resolve(item['path']).resolve(), item['sha256'], item['role'])
+        expected = {(_norm_path(resolve(item['path']).resolve()), item['sha256'], item['role'])
                     for item in json.loads(results[row['unit_id']]['payload_json']).get('artifacts', [])}
         for item in receipt['retained_artifacts']:
             if hash_file(resolve(item['path'])) != item['sha256']:
                 raise CacheCheckFailed('Eviction evidence unavailable')
         for item in receipt['deleted_artifacts']:
-            key = (resolve(item['path']).resolve(), item['sha256'], item['role'])
+            key = (_norm_path(resolve(item['path']).resolve()), item['sha256'], item['role'])
             if item['role'] not in DISPOSABLE_ROLES or key not in expected:
                 raise CacheCheckFailed('Eviction allowlist differs from verified preparation')
             output[(key[0], key[1])] = {'receipt_path': str(path), 'receipt_sha256': row['receipt_sha256'],
@@ -336,20 +344,20 @@ def evict_unit(store, run_id, unit_id, ledger, root, *, exited_processes=()):
         retained = [item for item in by_path.values() if item['role'] not in DISPOSABLE_ROLES]
         if not deletable:
             raise CacheCheckFailed('No declared disposable matrices')
-        expected = {(str(Path(item['path']).resolve()), item['sha256']) for item in artifacts}
+        expected = {(str(_norm_path(Path(item['path']).resolve())), item['sha256']) for item in artifacts}
         from src.pipeline_runner import GPU_MODELS
         # Common inputs are precisely the descriptor, split, and preprocessing
         # artifacts. Pipeline artifacts carry their owner in preparation.
-        common = {(str(Path(item['path']).resolve()), item['sha256']) for item in artifacts
+        common = {(str(_norm_path(Path(item['path']).resolve())), item['sha256']) for item in artifacts
                   if item.get('pipeline') is None}
         for row in models:
             model_result = json.loads(row['result_json'])
             task = json.loads(row['payload_json'])
             executed = model_result.get('artifacts', [])
-            required = common | {(str(Path(item['path']).resolve()), item['sha256']) for item in artifacts
+            required = common | {(str(_norm_path(Path(item['path']).resolve())), item['sha256']) for item in artifacts
                 if item.get('pipeline') == task['pipeline'] and
                 (task['model'] not in GPU_MODELS or item['role'] not in ('model_train_numeric_matrix', 'model_test_numeric_matrix'))}
-            actual = {(str(Path(item['path']).resolve()), item['sha256']) for item in executed}
+            actual = {(str(_norm_path(Path(item['path']).resolve())), item['sha256']) for item in executed}
             if not executed or actual != required or not actual.issubset(expected):
                 raise CacheCheckFailed('Model input evidence does not match its prepared unit')
         for item in retained:

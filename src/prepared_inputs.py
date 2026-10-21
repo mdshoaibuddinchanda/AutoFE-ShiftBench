@@ -17,6 +17,7 @@ def historical_model_array(frame):
 
 def _publish_array(path,values):
     path=Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with artifact_lock(path.with_suffix('.lock')):
         if path.exists():
             previous=None
