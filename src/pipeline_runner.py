@@ -795,7 +795,24 @@ def train_unit(kwargs):
         model = build_model(model_type, random_state=model_seed, use_gpu=use_gpu)
         from threadpoolctl import threadpool_info
         effective_native_threads=[{'internal_api':item['internal_api'],'num_threads':item['num_threads']} for item in threadpool_info()]
-        model.fit(X_tr, y_train_enc)
+        if model_type == "linear_svm":
+            class_counts = np.bincount(y_train_enc)
+            min_class_samples = int(class_counts[class_counts > 0].min())
+            if min_class_samples < 3:
+                from sklearn.svm import LinearSVC
+                from sklearn.calibration import CalibratedClassifierCV
+                base_svm = LinearSVC(random_state=model_seed, max_iter=1000, dual="auto")
+                if min_class_samples >= 2:
+                    model = CalibratedClassifierCV(base_svm, cv=2)
+                    model.fit(X_tr, y_train_enc)
+                else:
+                    base_svm.fit(X_tr, y_train_enc)
+                    model = CalibratedClassifierCV(base_svm, cv="prefit")
+                    model.fit(X_tr, y_train_enc)
+            else:
+                model.fit(X_tr, y_train_enc)
+        else:
+            model.fit(X_tr, y_train_enc)
         device_evidence=fitted_device(model,model_type,use_gpu)
         train_time = time.time() - t0
 
