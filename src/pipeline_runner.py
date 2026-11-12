@@ -943,10 +943,20 @@ def writer_process(queue, results_path, manifest_db: str | Path | None = None, r
     if store is None: init_db()
     Path(results_path).parent.mkdir(parents=True,exist_ok=True)
     if store is not None:
-        store.export_durable_results(str(run_id),results_path)
+        rolling = store.run_config(str(run_id)).get('execution', {}).get('cache_policy') == 'rolling'
+        counts = store.state_counts(str(run_id))
+        needs_export = True
+        if rolling and Path(results_path).exists():
+            with store._connect() as conn:
+                n_model_durable = conn.execute("SELECT count(*) FROM durable_results r JOIN tasks t ON r.run_id=t.run_id AND r.scientific_task_id=t.scientific_task_id WHERE r.run_id=? AND t.stage='model'", (str(run_id),)).fetchone()[0]
+                n_ledger_exports = conn.execute("SELECT count(*) FROM ledger_exports WHERE run_id=?", (str(run_id),)).fetchone()[0]
+                if n_model_durable > 0 and n_model_durable == n_ledger_exports:
+                    needs_export = False
+        if needs_export:
+            store.export_durable_results(str(run_id), results_path)
     with open(results_path, "ab") as f:
         rolling = store is not None and store.run_config(str(run_id)).get('execution', {}).get('cache_policy') == 'rolling'
-        if rolling:
+        if rolling and needs_export:
             store.index_ledger_exports(str(run_id), results_path)
         if ready_event is not None:ready_event.set()
         while True:
