@@ -310,9 +310,10 @@ def _execute_manifest(store,run_id,ledger,config,*,stop_requested,entry,writer_t
                     if attempt is None: continue
                     from src.seeding import stable_seed
                     from src.fsva import DEFAULT_PERTURBATION_MAGNITUDES
+                    stage_workers = 1 if record['stage'] == 'precompute' else max(1, config.max_workers)
                     task={**record,'dataset_name':record['dataset'],'data_path':Path(record['data_path']),
                         'repair_descriptor':repair_descriptors.get(record['scientific_task_id']),
-                        'dense_budget_bytes':min(config.dense_budget_bytes,int(max(1024**3, psutil.virtual_memory().available*.75/max(1, config.max_workers)))),
+                        'dense_budget_bytes':min(config.dense_budget_bytes,int(max(1024**3, psutil.virtual_memory().available*.75/stage_workers))),
                         'manifest_db':str(store.db_path),'run_id':run_id,'attempt_id':attempt,
                         'task_timeout_seconds':config.task_timeout_seconds,'retry':record['attempt_count']+1 < config.max_attempts,
                         'diagnostics_enabled':run_config.get('diagnostics_enabled',False),
