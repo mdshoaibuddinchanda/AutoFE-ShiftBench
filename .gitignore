@@ -48,9 +48,13 @@ progress.md
 test_out.txt
 
 # Manuscripts, submission packages and publication artwork remain local.
-/paper/
 *.txt
 *.tex
 *.bib
 *.pdf
+
+# Public paper artwork: PNG figures only; PDFs and paper text remain excluded.
+!/paper/
+!/paper/figures/
+!/paper/figures/*.png
 *.PDF
