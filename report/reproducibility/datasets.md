@@ -1,5 +1,9 @@
 # Verified local dataset sources
 
+These records identify the source/version and working-file fingerprint used by
+the corrected local evidence. The dataset files themselves are not included in
+the reviewer release.
+
 | Dataset | Provider ID/version | Rows / predictors | Working CSV SHA-256 |
 | --- | --- | --- | --- |
 | haberman | OpenML 43 / 1 | 306 / 3 | 74984cac06e6026c4d330428fef101893e2349d8d1aa15b61fcb47691db0b7af |

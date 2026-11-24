@@ -1,68 +1,70 @@
-# Bounded reproduction package
+# Reproduction utilities
 
-These commands use the supported Conda P12 environment and explicit limits.
-They do not download the benchmark collection or launch the full grid.
+The scripts in this directory are bounded analysis, verification and
+benchmarking utilities. They are not executed by the GitHub release checks.
+Commands that consume historical ledgers or prepared inputs require those
+artifacts to be supplied locally; no replacement data are fabricated.
 
-```powershell
-conda run -n P12 python -m src.pipeline_runner `
-  --dry-run-manifest --max-datasets 2 --max-seeds 1 --max-folds 1 `
-  --max-conditions 2 --max-workers 1
-```
+## Safe inspection
 
-For an execution smoke with two pipelines and one estimator, add local
-synthetic CSVs under `data/raw/` and run:
+Use the active Python environment, or add `conda run -n <name>` when Conda is
+preferred:
 
 ```powershell
-conda run -n P12 python -m src.pipeline_runner `
-  --max-datasets 2 --max-seeds 2 --max-folds 1 --max-conditions 2 `
-  --pipelines Raw,AutoFE_Baseline --models logistic_regression `
-  --max-workers 1 --stop-after-tasks 16 --task-timeout-seconds 30 `
-  --max-attempts 1
+python -m src.pipeline_runner --help
+python -m src.provenance_cli verify --help
+python reproduction/figures.py --help
 ```
 
-Inspect a run without changing it:
+## Manifest-backed analysis
+
+After a completed run, point each utility at the same run-local artifacts:
 
 ```powershell
-conda run -n P12 python -m src.provenance_cli verify `
-  --manifest-db reports/manifests/<run_id>.db `
-  --ledger reports/tables/<ledger>.jsonl --run-id <run_id>
+python -m src.provenance_cli verify `
+  --manifest-db reports/runs/full/<run-id>/benchmark.db `
+  --ledger reports/runs/full/<run-id>/results.jsonl `
+  --run-id <run-id>
+
+python -m src.stats_analysis --sensitivity `
+  --manifest-db reports/runs/full/<run-id>/benchmark.db `
+  --ledger reports/runs/full/<run-id>/results.jsonl `
+  --run-id <run-id>
 ```
 
-Run incomplete-run sensitivity and provenance packaging after a manifest-backed
-run:
+## Figure generation
+
+The canonical figure generator accepts explicit evidence and output paths:
 
 ```powershell
-conda run -n P12 python -m src.stats_analysis --sensitivity `
-  --manifest-db reports/manifests/<run_id>.db `
-  --ledger reports/tables/<ledger>.jsonl --run-id <run_id>
-
-conda run -n P12 python -m src.provenance_cli package `
-  --manifest-db reports/manifests/<run_id>.db `
-  --ledger reports/tables/<ledger>.jsonl --run-id <run_id> `
-  --output-dir reports/provenance/<run_id>
+python reproduction/figures.py `
+  --ledger reports/benchmark_runs/combined_results_20261122.jsonl `
+  --output-dir paper/figures
 ```
 
-The package contains metadata, hashes, schema/status records, lineage, and
-commands only. It excludes datasets, caches, benchmark outputs, credentials,
-and machine-specific installation prefixes.
+The ledger and audit inputs are large local artifacts and are intentionally
+not included in the reviewer release. Figure generation is therefore not
+claimed to be runnable from a clean clone without external evidence.
 
-## Corrected-reference performance comparisons
+## Bounded engineering probes
 
-The frozen reference is commit `913285b`; retained local copies are under ignored
-`reports/references/`. Run the current harness against each source root into a
-new output directory. These fixtures are synthetic and bounded; existing
-measurement directories cannot be overwritten.
+The performance and warm-model utilities require verified prepared inputs and
+write only to a new output directory:
 
 ```powershell
-conda run -n P12 python -B reproduction/benchmark_corrected.py --source-root . --output reports/performance/new_probe --production
-conda run -n P12 python -B reproduction/benchmark_corrected.py --source-root . --output reports/performance/new_all_pipeline_probe --pipelines all
-conda run -n P12 python -B reproduction/compare_corrected.py reports/performance/corrected_reference reports/performance/new_probe --output reports/performance/new_equivalence.json
+python -B reproduction/benchmark_corrected.py `
+  --source-root . `
+  --output reports/performance/new_probe `
+  --production
 ```
 
-`benchmark_remaining.py` measures guarded selected-input loading, exact indexed
-membership and fresh scoped hashing. `benchmark_warm_models.py` runs four actual
-models twice against already verified prepared inputs. `verify_prepared_predictions.py`
-replays recorded estimator seeds and exact prepared dependencies to compare labels
-and probabilities. `verify_thread_policy.py` retains the rejected numerical thread
-rewrite evidence. See the engineering record for commands, limitations, warm-model
-dependency setup, and unchanged diagnostic/resampling budgets.
+Inspect each script's `--help` output before running it. Some probes execute
+models against prepared inputs and are not part of the non-training release
+verification.
+
+## Public evidence
+
+The compact, sanitized evidence package is [`../report/`](../report/). It
+contains coverage, statistics, FSVA summaries, candidate-selection summaries,
+dataset provenance and hashes. Raw ledgers, databases, caches, histories,
+manuscripts and reviewer correspondence are excluded.
