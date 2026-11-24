@@ -1,0 +1,25 @@
+{
+  "analysis_version": "reviewer_sensitivity_v1",
+  "bootstrap_replicates": 10000,
+  "bootstrap_seed": 20261124,
+  "jacobian_input": "jacobian_performance_matched.csv",
+  "contrasts_input": "dataset_level_contrasts.csv",
+  "input_sha256": {
+    "jacobian_performance_matched.csv": "c19cf3ee9bf500cc3a22cb7c776e79c85fc8761ee459b0bb30f196d35e428b65",
+    "dataset_level_contrasts.csv": "ef2b0b914785a12e52876b0ff360650be5d7a78666b0413c434d554ea5fe4b49"
+  },
+  "jacobian_rows": 19856,
+  "jacobian_datasets": [
+    "adult",
+    "airlines",
+    "aps_failure",
+    "bank-marketing",
+    "covertype",
+    "electricity",
+    "haberman",
+    "ionosphere",
+    "sonar"
+  ],
+  "additional_figures_required": "NO",
+  "provenance_status": "NOT_COMPUTABLE_FROM_PUBLISHED_AGGREGATES"
+}

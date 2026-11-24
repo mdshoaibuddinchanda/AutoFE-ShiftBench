@@ -1,0 +1,3 @@
+operator_family,datasets_estimable,total_mapping_units,dataset_median_rho,dataset_equal_mean_rho,cluster_bootstrap_ci95_low,cluster_bootstrap_ci95_high,positive_datasets,negative_datasets,undefined_datasets
+division_enabled,9,11031,0.3497445253587384,0.3557472091308424,0.23967692501479815,0.46635419556456126,9,0,0
+division_free,9,8825,-0.018022761839063064,-0.0012735800694747773,-0.220824868984083,0.2192668173741654,3,6,0
