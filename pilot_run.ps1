@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Run one bounded AutoFE-ShiftBench pilot in Conda P12.
+    Run one bounded AutoFE-ShiftBench pilot with the active Python or Conda.
 
 .DESCRIPTION
     Installs/verifies requirements, acquires one selected dataset with the
