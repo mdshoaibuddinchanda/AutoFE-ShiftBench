@@ -10,7 +10,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$CondaEnv = "P12",
+    [string]$CondaEnv = "",
+    [string]$PythonExe = "python",
     [string]$Dataset = "adult",
     [string]$Pipelines = "Raw,AutoFE_Baseline",
     [string]$Models = "logistic_regression",
@@ -48,7 +49,15 @@ function Assert-ExitCode([string]$stage) {
     if ($LASTEXITCODE -ne 0) { throw "$stage failed with exit code $LASTEXITCODE." }
 }
 
-$conda = Resolve-CondaCommand
+$conda = $null
+if (-not [string]::IsNullOrWhiteSpace($CondaEnv)) { $conda = Resolve-CondaCommand }
+function Invoke-Python([string[]]$Arguments) {
+    if ($null -ne $conda) {
+        & $conda @("run", "--no-capture-output", "-n", $CondaEnv, "python") @Arguments
+    } else {
+        & $PythonExe @Arguments
+    }
+}
 $requirementsPath = Join-Path $projectRoot "requirements.txt"
 $rawDir = Join-Path $projectRoot "data/raw"
 $runDir = Join-Path $projectRoot $RunRoot
@@ -59,7 +68,7 @@ $csvPath = Join-Path $rawDir "$Dataset.csv"
 $metaPath = Join-Path $rawDir "${Dataset}_meta.json"
 
 Write-Host "AutoFE-ShiftBench bounded pilot" -ForegroundColor Cyan
-Write-Host "Environment: Conda $CondaEnv"
+Write-Host ("Environment: {0}" -f ($(if($CondaEnv){"Conda $CondaEnv"}else{"Python $PythonExe"})))
 Write-Host "Dataset: $Dataset (100,000-row cap)"
 Write-Host "Pipelines: $Pipelines"
 Write-Host "Models: $Models"
@@ -71,7 +80,7 @@ if ($PlanOnly) {
 }
 
 Write-Host "Installing/verifying requirements..." -ForegroundColor Yellow
-& $conda run --no-capture-output -n $CondaEnv python -m pip install --disable-pip-version-check -r $requirementsPath
+Invoke-Python @("-m", "pip", "install", "--disable-pip-version-check", "-r", $requirementsPath)
 Assert-ExitCode "Requirement installation"
 
 New-Item -ItemType Directory -Force -Path $rawDir,$runDir,$logDir,$workerLogDir,$metadataDir | Out-Null
@@ -81,7 +90,8 @@ $launcherMetadata = [ordered]@{
     run_kind = "pilot"
     run_root = (Resolve-Path -LiteralPath $runDir).Path
     resume_requested = [bool]$Resume
-    conda_environment = $CondaEnv
+    conda_environment = if($CondaEnv){$CondaEnv}else{$null}
+    python_executable = $PythonExe
     dataset = $Dataset
     row_cap = 100000
     invocation_utc = (Get-Date).ToUniversalTime().ToString("o")
@@ -92,8 +102,7 @@ $metadataName = if (Test-Path -LiteralPath (Join-Path $metadataDir "launcher_con
 $launcherMetadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $metadataDir $metadataName) -Encoding UTF8
 if (-not $SkipDownload -and (-not (Test-Path $csvPath) -or -not (Test-Path $metaPath))) {
     Write-Host "Acquiring pilot dataset..." -ForegroundColor Yellow
-    & $conda run --no-capture-output -n $CondaEnv python -B -m src.data_loader `
-        --datasets $Dataset --output-dir data/raw --max-rows 100000
+    Invoke-Python @("-B", "-m", "src.data_loader", "--datasets", $Dataset, "--output-dir", "data/raw", "--max-rows", "100000")
     Assert-ExitCode "Pilot dataset acquisition"
 }
 if (-not (Test-Path $csvPath) -or -not (Test-Path $metaPath)) {
@@ -101,8 +110,7 @@ if (-not (Test-Path $csvPath) -or -not (Test-Path $metaPath)) {
 }
 
 $args = @(
-    "run", "--no-capture-output", "-n", $CondaEnv,
-    "python", "-B", "-m", "src.pipeline_runner",
+    "-B", "-m", "src.pipeline_runner",
     "--datasets", $Dataset,
     "--max-datasets", "1",
     "--max-seeds", "1",
@@ -127,6 +135,6 @@ $args = @(
 if ($DryRun) { $args += "--dry-run-manifest" }
 
 Write-Host "Starting bounded pilot..." -ForegroundColor Green
-& $conda @args
+Invoke-Python $args
 Assert-ExitCode "Pilot benchmark"
 Write-Host "Pilot completed successfully." -ForegroundColor Green

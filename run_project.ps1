@@ -19,7 +19,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$CondaEnv = "P12",
+    [string]$CondaEnv = "",
+    [string]$PythonExe = "python",
     [int]$MaxWorkers = 0,
     [int]$WorkerMaxTasks = 64,
     [int]$MaxAttempts = 3,
@@ -141,17 +142,26 @@ function Install-Requirements {
     if (-not (Test-Path -LiteralPath $requirementsPath)) {
         throw "requirements.txt was not found: $requirementsPath"
     }
-    Write-Host "Installing/verifying Python requirements in Conda $CondaEnv..." -ForegroundColor Yellow
+    Write-Host "Installing/verifying Python requirements..." -ForegroundColor Yellow
     $installArgs = @(
-        "run", "--no-capture-output", "-n", $CondaEnv,
-        "python", "-m", "pip", "install", "--disable-pip-version-check",
+        "-m", "pip", "install", "--disable-pip-version-check",
         "-r", $requirementsPath
     )
-    & $conda @installArgs
+    Invoke-Python $installArgs
     Assert-ExitCode "Python dependency installation"
 }
 
-$conda = Resolve-CondaCommand
+$conda = $null
+if (-not [string]::IsNullOrWhiteSpace($CondaEnv)) { $conda = Resolve-CondaCommand }
+
+function Invoke-Python([string[]]$Arguments) {
+    if ($null -ne $conda) {
+        & $conda @("run", "--no-capture-output", "-n", $CondaEnv, "python") @Arguments
+    } else {
+        & $PythonExe @Arguments
+    }
+}
+
 Install-Requirements
 $hardware = Get-HardwareDefaults
 $gpuInfo = Get-NvidiaInfo
@@ -190,7 +200,8 @@ $launcherMetadata = [ordered]@{
     run_kind = "full"
     run_root = (Resolve-Path -LiteralPath $runDir).Path
     resume_requested = [bool]$Resume
-    conda_environment = $CondaEnv
+    conda_environment = if($CondaEnv){$CondaEnv}else{$null}
+    python_executable = $PythonExe
     datasets = $datasets
     row_cap = 100000
     protocol_eligibility_path = $eligibilityPath
@@ -232,7 +243,7 @@ if ($CpuOnly) {
     $modelArgs = @("--models", "logistic_regression,random_forest,extra_trees,linear_svm,knn,gaussian_nb,mlp,lightgbm")
 }
 Write-Host "AutoFE-ShiftBench full-project launcher" -ForegroundColor Cyan
-Write-Host ("Environment: Conda {0}" -f $CondaEnv)
+Write-Host ("Environment: {0}" -f ($(if($CondaEnv){"Conda $CondaEnv"}else{"Python $PythonExe"})))
 Write-Host ("CPU/RAM/disk: {0} logical CPUs, {1} GiB RAM, {2} GiB free" -f $hardware.LogicalProcessors,$hardware.RamGiB,$hardware.FreeGiB)
 Write-Host ("Limits: {0} workers, {1} GiB dense budget, {2} GiB cache admission, {3} GiB free reserve" -f $MaxWorkers,$DenseBudgetGiB,$CacheMaxGiB,$MinFreeGiB)
 Write-Host ("GPU: {0}" -f ($(if($gpuInfo){$gpuInfo}else{"not detected; CPU-only mode"})))
@@ -254,13 +265,13 @@ if (-not $gpuInfo -and -not $CpuOnly) {
 
 if ($missing.Count -gt 0) {
     Write-Host ("Downloading {0} missing dataset(s) with the 100,000-row cap..." -f $missing.Count) -ForegroundColor Yellow
-    $downloadArgs = @("run", "--no-capture-output", "-n", $CondaEnv, "python", "-B", "-m", "src.data_loader", "--datasets", ($missing -join ","), "--output-dir", "data/raw", "--max-rows", "100000")
-    & $conda @downloadArgs
+    $downloadArgs = @("-B", "-m", "src.data_loader", "--datasets", ($missing -join ","), "--output-dir", "data/raw", "--max-rows", "100000")
+    Invoke-Python $downloadArgs
     Assert-ExitCode "Dataset acquisition"
 }
 
 $runnerArgs = @(
-    "run", "--no-capture-output", "-n", $CondaEnv, "python", "-B", "-m", "src.pipeline_runner",
+    "-B", "-m", "src.pipeline_runner",
     "--eligibility", $eligibilityPath,
     "--eligibility-sha256", $eligibilitySha256,
     "--datasets"
@@ -288,6 +299,6 @@ $runnerArgs += $modelArgs
 if ($DryRun) { $runnerArgs += "--dry-run-manifest" }
 
 Write-Host ("Starting durable run '{0}'..." -f $RunId) -ForegroundColor Green
-& $conda @runnerArgs
+Invoke-Python $runnerArgs
 Assert-ExitCode "Benchmark run"
 Write-Host "Benchmark launcher completed successfully." -ForegroundColor Green

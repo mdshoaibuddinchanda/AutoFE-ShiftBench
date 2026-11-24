@@ -49,5 +49,8 @@ test_out.txt
 
 # Manuscripts, submission packages and publication artwork remain local.
 /paper/
+*.txt
+*.tex
+*.bib
 *.pdf
 *.PDF

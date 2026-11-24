@@ -12,7 +12,7 @@ The current protocol is `predictor_only_geometry_v3_integrity_metrics_fsva_v2`; 
 
 ## Full-project Windows launcher in Conda P12
 
-Use `run_project.ps1` as the single Windows launcher. It acquires every declared dataset with the hard 100,000-row cap, validates the pinned eligibility bundle, and then runs or resumes the complete durable benchmark in Conda P12. It chooses conservative worker, memory and disk limits from the current laptop. No model task is silently replaced when GPU support is unavailable.
+Use `run_project.ps1` as the single Windows launcher. It acquires every declared dataset with the hard 100,000-row cap, validates the pinned eligibility bundle, and then runs or resumes the complete durable benchmark using the active `python` by default. Conda remains supported explicitly with `-CondaEnv P12`. It chooses conservative worker, memory and disk limits from the current machine. No model task is silently replaced when GPU support is unavailable.
 
 ```powershell
 .\run_project.ps1 -PlanOnly
@@ -26,6 +26,8 @@ and pilots under `reports/runs/pilot/<run-id>/`. For example:
 .\run_project.ps1 -RunId experiment_001
 .\run_project.ps1 -RunId experiment_001 -Resume
 .\pilot_run.ps1 -RunId pilot_001
+# Optional Conda selection:
+.\run_project.ps1 -CondaEnv P12 -RunId experiment_001
 ```
 
 Each run keeps its SQLite manifest, JSONL ledgers, coordinator log, worker

@@ -39,6 +39,11 @@ Use stable identifiers:
 .\pilot_run.ps1 -RunId pilot_001
 ```
 
+The launchers use the active `python` executable by default and do not assume
+the original developer's Conda environment. Use `-CondaEnv <name>` to run
+through Conda, or `-PythonExe <path-or-command>` to select another Python.
+Explicit `-CondaEnv` takes precedence over `-PythonExe`.
+
 Repeating a run ID reopens the same SQLite manifest. The manifest rejects a
 different protocol, seed scheme, dataset identity, grid, or task manifest
 under the same ID. `-RunRoot` remains supported and is honored exactly when
