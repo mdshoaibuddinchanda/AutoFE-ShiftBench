@@ -12,8 +12,9 @@ from src.task_manifest import ManifestConflictError, ManifestStore
 
 
 def test_full_and_pilot_run_roots_are_stable_and_separate():
-    assert run_root("full", "experiment_001") == Path("reports/runs/full/experiment_001")
-    assert run_root("pilot", "pilot_001") == Path("reports/runs/pilot/pilot_001")
+    project_root = Path(__file__).resolve().parents[1]
+    assert run_root("full", "experiment_001") == project_root / "reports/runs/full/experiment_001"
+    assert run_root("pilot", "pilot_001") == project_root / "reports/runs/pilot/pilot_001"
     assert run_root("full", "experiment_001") == run_root("full", "experiment_001")
 
 

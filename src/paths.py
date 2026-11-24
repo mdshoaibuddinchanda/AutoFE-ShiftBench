@@ -11,7 +11,15 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REPORTS_ROOT = Path(os.environ.get("AUTOFE_REPORTS_BASE", "reports"))
+
+
+def _project_path(value: str) -> Path:
+    """Resolve a configured path relative to the repository, never the CWD."""
+    path = Path(value)
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+REPORTS_ROOT = _project_path(os.environ.get("AUTOFE_REPORTS_BASE", "reports"))
 RUNS_ROOT = REPORTS_ROOT / "runs"
 FULL_RUNS_ROOT = RUNS_ROOT / "full"
 PILOT_RUNS_ROOT = RUNS_ROOT / "pilot"

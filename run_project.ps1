@@ -162,7 +162,9 @@ function Invoke-Python([string[]]$Arguments) {
     }
 }
 
-Install-Requirements
+if (-not $PlanOnly) {
+    Install-Requirements
+}
 $hardware = Get-HardwareDefaults
 $gpuInfo = Get-NvidiaInfo
 
@@ -189,28 +191,30 @@ if (Test-Path -LiteralPath $localEligibilityPath) {
     $eligibilityPath = $localEligibilityPath
     $eligibilitySha256 = "9dc453f42d51a6c574c1518a235aa98687b098948058c3f9603187e9e1dd146b"
 }
-if (-not (Test-Path -LiteralPath $eligibilityPath)) {
+if (-not (Test-Path -LiteralPath $eligibilityPath) -and -not $PlanOnly) {
     throw "Pinned eligibility bundle not found: $eligibilityPath"
 }
 
-New-Item -ItemType Directory -Force -Path $rawDir,$runDir,$logDir,$workerLogDir,$metadataDir | Out-Null
-$env:AUTOFE_WORKER_LOG_DIR = $workerLogDir
-$launcherMetadata = [ordered]@{
-    run_id = $RunId
-    run_kind = "full"
-    run_root = (Resolve-Path -LiteralPath $runDir).Path
-    resume_requested = [bool]$Resume
-    conda_environment = if($CondaEnv){$CondaEnv}else{$null}
-    python_executable = $PythonExe
-    datasets = $datasets
-    row_cap = 100000
-    protocol_eligibility_path = $eligibilityPath
-    invocation_utc = (Get-Date).ToUniversalTime().ToString("o")
+if (-not $PlanOnly) {
+    New-Item -ItemType Directory -Force -Path $rawDir,$runDir,$logDir,$workerLogDir,$metadataDir | Out-Null
+    $env:AUTOFE_WORKER_LOG_DIR = $workerLogDir
+    $launcherMetadata = [ordered]@{
+        run_id = $RunId
+        run_kind = "full"
+        run_root = (Resolve-Path -LiteralPath $runDir).Path
+        resume_requested = [bool]$Resume
+        conda_environment = if($CondaEnv){$CondaEnv}else{$null}
+        python_executable = $PythonExe
+        datasets = $datasets
+        row_cap = 100000
+        protocol_eligibility_path = $eligibilityPath
+        invocation_utc = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    $metadataName = if (Test-Path -LiteralPath (Join-Path $metadataDir "launcher_config.json")) {
+        "launcher_attempt_{0}.json" -f (Get-Date -Format "yyyyMMdd_HHmmss_fff")
+    } else { "launcher_config.json" }
+    $launcherMetadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $metadataDir $metadataName) -Encoding UTF8
 }
-$metadataName = if (Test-Path -LiteralPath (Join-Path $metadataDir "launcher_config.json")) {
-    "launcher_attempt_{0}.json" -f (Get-Date -Format "yyyyMMdd_HHmmss_fff")
-} else { "launcher_config.json" }
-$launcherMetadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $metadataDir $metadataName) -Encoding UTF8
 
 $missing = [System.Collections.Generic.List[string]]::new()
 $incomplete = [System.Collections.Generic.List[string]]::new()
