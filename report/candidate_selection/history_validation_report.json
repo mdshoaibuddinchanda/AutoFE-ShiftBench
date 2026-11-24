@@ -1,0 +1,12 @@
+{
+  "input_history_files": 31450,
+  "unique_history_files_by_sha256": 31450,
+  "duplicate_history_files": 0,
+  "total_bytes": 19611896277,
+  "total_lines": 16254582,
+  "total_events": 16254582,
+  "parse_errors": [],
+  "candidate_selection_rows": 159040,
+  "candidate_identity_comparable_rows": 159040,
+  "bounded_memory": true
+}

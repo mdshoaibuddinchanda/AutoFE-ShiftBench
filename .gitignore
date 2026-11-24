@@ -1,0 +1,53 @@
+# Local datasets and generated features
+/data/raw/
+/data/cache/
+/data/source_download_cache/
+/data/openml_download_cache/
+
+# Large experimental outputs
+/reports/
+/results.zip
+/revision_evidence_audit.json
+
+# Journal submission package: never stage or publish.
+/KNOSYS-D-26-17927/*
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.bak
+
+# Local model/checkpoint artifacts
+/models/
+/checkpoints/
+*.pkl
+*.pickle
+
+# Logs and local databases
+*.jsonl
+*.log
+*.db
+
+# Scratch files
+/scratch/
+progress.md
+test_out.txt
+
+# Manuscripts, submission packages and publication artwork remain local.
+/paper/
+*.pdf
+*.PDF

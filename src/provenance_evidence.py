@@ -1,0 +1,418 @@
+"""Manifest-anchored provenance verification; inspection never initializes data."""
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime,timezone
+from pathlib import Path
+
+from src.artifact_integrity import atomic_json
+from src.protocol import EVALUATION_PROTOCOL_VERSION
+from src.seeding import SEED_SCHEME_VERSION
+from src.task_manifest import ManifestError,ManifestStore
+
+
+def snapshot_digest(snapshot):
+    from src.provenance import canonical_sha256
+    return canonical_sha256({key:snapshot[key] for key in ("run","tasks","attempts","durable_results","task_events","superseded_results","cache_evictions") if key in snapshot})
+
+
+def _resolve(path,root):
+    path=Path(path)
+    return path if path.is_absolute() else root/path
+
+
+class _FileHashes:
+    """Fresh bytes once per invocation, with change detection and no persisted cache."""
+    def __init__(self):
+        self.values={}
+
+    @staticmethod
+    def identity(path):
+        stat=path.stat()
+        return stat.st_dev,stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns
+
+    def __call__(self,path):
+        from src.provenance import file_sha256
+        path=Path(path).resolve()
+        before=self.identity(path)
+        if path not in self.values:
+            digest=file_sha256(path)
+            if self.identity(path)!=before:raise ValueError('Artifact changed during hashing: '+str(path))
+            self.values[path]=(before,digest)
+        identity,digest=self.values[path]
+        if identity!=before:raise ValueError('Artifact changed during evidence inspection: '+str(path))
+        return digest
+
+    def validate(self):
+        for path,(identity,_) in self.values.items():
+            if self.identity(path)!=identity:raise ValueError('Artifact changed during evidence inspection: '+str(path))
+
+
+def actual_lineage(snapshot,inventory,root,*,_hash_file=None):
+    from src.provenance import LINEAGE_SCHEMA_VERSION,canonical_sha256,relative_path
+    nodes,edges={},[]
+    unknown=[]
+    hashes=_FileHashes() if _hash_file is None else _hash_file
+    from src.cache_lifecycle import snapshot_eviction_evidence
+    try:
+        evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
+    except (OSError, ValueError, RuntimeError, KeyError) as error:
+        evicted = {}
+        unknown.append({'reason': 'cache_eviction_evidence_invalid', 'detail': str(error)})
+    if snapshot is not None:
+        results={r["scientific_task_id"]:r for r in snapshot["durable_results"]}
+        task_ids={r["scientific_task_id"] for r in snapshot["tasks"]}
+        for task in snapshot["tasks"]:
+            payload=json.loads(task["payload_json"])
+            if payload.get("data_path"):
+                payload["data_path"]=relative_path(payload["data_path"],root)
+            task_id=task["scientific_task_id"]
+            nodes[task_id]={"id":task_id,"role":task["stage"]+"_task","scientific_identity":payload,"state":task["state"]}
+            data=payload.get("data_identity",{})
+            data_id=data.get("fingerprint")
+            if data_id:
+                data_id="data_"+data_id
+                nodes[data_id]={"id":data_id,"role":"dataset_bytes","identity":data}
+                edges.append({"from":data_id,"to":task_id,"relationship":"scientific_data_input"})
+            elif not task.get("planned_skip_reason"):
+                unknown.append({"task_id":task_id,"reason":"data_identity_unverified"})
+            for dependency in payload.get("depends_on",[]):
+                if dependency in task_ids:
+                    edges.append({"from":dependency,"to":task_id,"relationship":"declared_precompute_dependency"})
+                else:
+                    unknown.append({"task_id":task_id,"reason":"missing_dependency_task","dependency":dependency})
+            if task_id in results:
+                durable=results[task_id]
+                result_id="result_"+durable["payload_hash"]
+                nodes[result_id]={"id":result_id,"role":"durable_"+task["stage"]+"_result","payload_hash":durable["payload_hash"],"attempt_id":durable["attempt_id"]}
+                edges.append({"from":task_id,"to":result_id,"relationship":"transactional_attempt_result"})
+                evidence=json.loads(durable["payload_json"])
+                artifacts=evidence.get("artifacts",[])
+                if task["stage"] == "model" and not artifacts:
+                    unknown.append({"task_id":task_id,"reason":"prepared_input_artifacts_unverified"})
+                artifact_ids={}
+                pipeline_artifacts={}
+                for artifact in artifacts:
+                    aid="artifact_"+canonical_sha256({'path':relative_path(artifact.get('path',''),root),'role':artifact.get('role'),'sha256':artifact.get('sha256')})
+                    nodes[aid]={"id":aid,"role":artifact.get("role","dependency_artifact"),"path":artifact.get("path"),"sha256":artifact.get("sha256"),"dependency_signature":artifact.get("dependency_signature")}
+                    try:
+                        valid=hashes(_resolve(artifact['path'],root)) == artifact['sha256']
+                    except (OSError,KeyError):
+                        valid=False
+                    proof = evicted.get((_resolve(artifact.get('path',''),root).resolve(), artifact.get('sha256')))
+                    intentionally_evicted = not _resolve(artifact.get('path',''), root).exists() and proof is not None
+                    if intentionally_evicted:
+                        nodes[aid].update(availability='intentionally_evicted', historical_verification=proof)
+                    if not valid and not intentionally_evicted:
+                        unknown.append({'task_id':task_id,'artifact':artifact.get('path'),'reason':'executed_artifact_missing_or_hash_mismatch'})
+                    edges.append({"from":aid,"to":task_id,"relationship":"verified_executed_input" if valid else ('verified_input_before_eviction' if intentionally_evicted else 'recorded_input_unverified')})
+                    artifact_ids[artifact.get('role')]=aid
+                    pipeline_artifacts.setdefault(artifact.get('pipeline'),{})[artifact.get('role')]=aid
+                common=pipeline_artifacts.get(None,{})
+                for group in pipeline_artifacts.values():
+                    artifact_ids={**common,**group}
+                    split_artifact=artifact_ids.get('split_indices')
+                    preprocessor_artifact=artifact_ids.get('fitted_preprocessor')
+                    if data_id and split_artifact:
+                        edges.append({'from':data_id,'to':split_artifact,'relationship':'recorded_dataset_partition'})
+                    if split_artifact and preprocessor_artifact:
+                        edges.append({'from':split_artifact,'to':preprocessor_artifact,'relationship':'training_partition_fitted_preprocessing'})
+                    for role in ('selected_training_features','selected_held_out_features'):
+                        if preprocessor_artifact and role in artifact_ids:
+                            edges.append({'from':preprocessor_artifact,'to':artifact_ids[role],'relationship':'frozen_preprocessing_and_feature_mapping'})
+                        if 'candidate_history' in artifact_ids and role in artifact_ids:
+                            edges.append({'from':artifact_ids['candidate_history'],'to':artifact_ids[role],'relationship':'recorded_training_only_selection'})
+                    for source,target in (('selected_training_features','model_train_numeric_matrix'),('selected_held_out_features','model_test_numeric_matrix')):
+                        if source in artifact_ids and target in artifact_ids:
+                            edges.append({'from':artifact_ids[source],'to':artifact_ids[target],'relationship':'historical_exact_float32_conversion'})
+    for item in inventory:
+        if item.get("role") == "analysis_output":
+            aid='analysis_'+canonical_sha256({'path':item.get('path'),'sha256':item.get('sha256'),'role':item.get('role')})
+            nodes[aid]={"id":aid,"role":"analysis_output",**item}
+            directory=_resolve(item['path'],root).parent
+            config_path=next((directory/name for name in ('analysis_config.json','figure_config.json','table_report_config.json','sensitivity_config.json') if (directory/name).exists()),directory/'analysis_config.json')
+            try:
+                config=json.loads(config_path.read_text(encoding='utf-8'))
+                if config.get('run_id') != snapshot['run']['run_id'] or not config.get('input_fingerprint_sha256'):
+                    raise ValueError('Analysis run/input fingerprint is unverified')
+                ledger_hashes={entry.get('sha256') for entry in inventory if entry.get('role') == 'result_ledger_export'}
+                if config['input_fingerprint_sha256'] not in ledger_hashes:
+                    raise ValueError('Analysis input ledger does not match the verified executed export')
+                expected_ids=set(config.get('analysis_input_task_ids',[]))
+                manifest_input=config.get('manifest_snapshot_sha256')
+                if manifest_input is not None:
+                    if manifest_input != snapshot_digest(snapshot):raise ValueError('Analysis manifest snapshot does not match authoritative evidence')
+                    mid='manifest_'+manifest_input
+                    nodes[mid]={'id':mid,'role':'manifest_snapshot','snapshot_sha256':manifest_input}
+                    edges.append({'from':mid,'to':aid,'relationship':'recorded_analysis_eligibility_input'})
+                if (not expected_ids and manifest_input is None) or not expected_ids.issubset(results):
+                    raise ValueError('Analysis executed input task IDs are unavailable')
+                for tid in sorted(expected_ids):
+                    result_id='result_'+results[tid]['payload_hash']
+                    edges.append({'from':result_id,'to':aid,'relationship':'recorded_analysis_scientific_input'})
+                nodes[aid]['analysis_config_sha256']=canonical_sha256(config)
+                nodes[aid]['input_ledger_sha256']=config['input_fingerprint_sha256']
+            except (OSError,ValueError,KeyError,TypeError) as error:
+                unknown.append({'artifact':item['path'],'reason':'analysis_dependency_unverified','detail':str(error)})
+    hashes.validate()
+    return {"schema_version":LINEAGE_SCHEMA_VERSION,"nodes":list(nodes.values()),"edges":edges,
+        "status":"incomplete" if unknown or snapshot is None else "valid","unverified_dependencies":unknown,
+        "snapshot_sha256":None if snapshot is None else snapshot_digest(snapshot)}
+
+
+def build_package(*,output_dir,repo_root=".",dataset_list_path="config/dataset_list.yaml",manifest_db=None,manifest_path=None,ledger_path=None,run_id=None,analysis_dirs=()):
+    from src import provenance as p
+    root=Path(repo_root).resolve()
+    output=Path(output_dir)
+    output.mkdir(parents=True,exist_ok=True)
+    registry=p.build_dataset_registry(dataset_list_path,repo_root=root)
+    code=p.collect_code_identity(root)
+    environment=p.collect_environment_identity(root)
+    snapshot=None
+    store=None
+    inventory=[]
+    hashes=_FileHashes()
+    if manifest_db is not None and run_id is not None:
+        db=_resolve(manifest_db,root)
+        store=ManifestStore(db,read_only=True)
+        snapshot=store.snapshot(run_id)
+        recorded_config=json.loads(snapshot["run"]["config_json"])
+        code=recorded_config.get("code_identity",code)
+        environment=recorded_config.get("environment_identity",environment)
+        inventory.append({"role":"manifest_sqlite","path":p.relative_path(db,root),"required":True,"status":"valid","identity_kind":"scientific_snapshot","snapshot_sha256":snapshot_digest(snapshot)})
+    for path,role,required in ((manifest_path,"manifest_jsonl",False),(ledger_path,"result_ledger_export",True)):
+        if path is not None:
+            inventory.append(p._artifact(_resolve(path,root),root,role,required=required,hash_file=hashes))
+    for dataset in registry["datasets"]:
+        inventory.append(p._artifact(root/dataset["path"],root,"dataset_bytes",required=False,expected_sha256=dataset.get("sha256"),hash_file=hashes))
+    scoped={}
+    from src.cache_lifecycle import snapshot_eviction_evidence
+    evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
+    if snapshot:
+        for row in snapshot["durable_results"]:
+            payload=json.loads(row["payload_json"])
+            for item in payload.get("artifacts",[]):
+                if item.get("path"):
+                    path=_resolve(item["path"],root)
+                    key=(path.resolve(),item.get('role','dependency_artifact'),item.get('sha256'),item.get('dependency_signature'))
+                    if key in scoped:continue
+                    entry=p._artifact(path,root,item.get("role","dependency_artifact"),required=True,expected_sha256=item.get("sha256"),hash_file=hashes)
+                    proof = evicted.get((path.resolve(), item.get('sha256')))
+                    if not path.exists() and proof:
+                        entry.update(status='intentionally_evicted', sha256=item['sha256'],
+                            expected_sha256=item['sha256'], identity_kind='verified_eviction_receipt',
+                            historical_verification=proof)
+                    entry["dependency_signature"]=item.get("dependency_signature")
+                    scoped[key]=entry
+    inventory.extend(scoped.values())
+    for directory in analysis_dirs:
+        directory=_resolve(directory,root)
+        if directory.exists():
+            inventory.extend(p._artifact(path,root,"analysis_output",required=True,hash_file=hashes) for path in sorted(directory.rglob("*")) if path.is_file())
+    inventory_value={"schema_version":"dependency_inventory_v2","cache_inventory":{"status":"verified" if scoped else "unavailable","scope":"actual_run_dependency_artifacts","listed_file_count":len(scoped)},"artifacts":inventory}
+    lineage=actual_lineage(snapshot,inventory,root,_hash_file=hashes)
+    components={"dataset_registry.json":registry,"code_identity.json":code,"environment.json":environment,"artifact_inventory.json":inventory_value,"lineage.json":lineage}
+    if snapshot:
+        components["manifest_summary.json"]={"run_id":run_id,"snapshot_sha256":snapshot_digest(snapshot),"run_config":json.loads(snapshot["run"]["config_json"]),"task_count":len(snapshot["tasks"]),"attempt_count":len(snapshot["attempts"]),"durable_result_count":len(snapshot["durable_results"])}
+    component_hashes={name:p.canonical_sha256(value) for name,value in components.items()}
+    evidence={"schema_version":p.PROVENANCE_SCHEMA_VERSION,"run_id":run_id,"component_hashes":component_hashes,"snapshot_sha256":None if snapshot is None else snapshot_digest(snapshot)}
+    anchor=None
+    if manifest_db is not None and run_id is not None:
+        # Packaging is a write operation; verification below only reads this anchor.
+        anchor=ManifestStore(_resolve(manifest_db,root)).record_evidence_anchor(run_id,evidence)
+    package={**evidence,"anchor_id":anchor,"generated_at":datetime.now(timezone.utc).isoformat(),"dataset_registry_id":registry["registry_id"],"artifact_inventory_sha256":p.canonical_sha256(inventory_value)}
+    for name,value in components.items():
+        atomic_json(output/name,value)
+    atomic_json(output/"provenance.json",package)
+    (output/"README.md").write_text("# Manifest-anchored metadata package\n\nIntegrity, source availability, lineage completeness and benchmark readiness are separate. Required components are hashed against the authoritative manifest anchor. Data and caches are referenced, not copied.\n",encoding="utf-8")
+    (output/"reproduction_commands.txt").write_text("conda run -n P12 python -m src.provenance_cli verify --manifest-db <db> --ledger <ledger> --run-id <run> --package-dir <package>\n",encoding="utf-8")
+    return output
+
+
+def verify(*,repo_root=".",dataset_list_path="config/dataset_list.yaml",manifest_db=None,ledger_path=None,run_id=None,package_dir=None):
+    from src import provenance as p
+    root=Path(repo_root).resolve()
+    checks=[]
+    hashes=_FileHashes()
+    def check(name,status,**details):
+        checks.append({"name":name,"status":status,**details})
+    registry=p.build_dataset_registry(dataset_list_path,repo_root=root)
+    for item in registry["datasets"]:
+        check("dataset:"+item["name"],"valid" if item["status"] == "verified" else ("incomplete" if item["status"] == "unavailable" else "unverified"))
+    snapshot=None
+    reader=None
+    if manifest_db is not None and run_id is not None:
+        try:
+            reader=ManifestStore(_resolve(manifest_db,root),read_only=True)
+            snapshot=reader.snapshot(run_id)
+            validation_version = json.loads(snapshot['run']['config_json']).get('numerical_validation_version')
+            if validation_version:
+                from src.numerical_validation import NUMERICAL_VALIDATION_VERSION, LEGACY_VALIDATION_VERSION
+                check('numerical_validation_contract', 'valid' if validation_version in
+                      (NUMERICAL_VALIDATION_VERSION, LEGACY_VALIDATION_VERSION) else 'invalid', observed=validation_version)
+                model_versions = {json.loads(t['payload_json']).get('numerical_validation_version')
+                                  for t in snapshot['tasks'] if t['stage'] == 'model'}
+                check('task_numerical_validation_compatibility', 'valid' if model_versions == {validation_version} else 'invalid')
+                model_ids = {t['scientific_task_id'] for t in snapshot['tasks'] if t['stage'] == 'model'}
+                result_versions = {json.loads(r['payload_json']).get('numerical_validation_version')
+                                   for r in snapshot['durable_results']
+                                   if r['scientific_task_id'] in model_ids}
+                check('result_numerical_validation_compatibility', 'valid' if
+                      not result_versions or result_versions == {validation_version} else 'invalid')
+            check("manifest_snapshot","valid",snapshot_sha256=snapshot_digest(snapshot))
+            for name,actual,expected in (("protocol_compatibility",snapshot["run"]["protocol_version"],EVALUATION_PROTOCOL_VERSION),("seed_scheme_compatibility",snapshot["run"]["seed_scheme_version"],SEED_SCHEME_VERSION)):
+                check(name,"valid" if actual == expected else "invalid",observed=actual,expected=expected)
+            for field,expected,name in (("protocol_version",EVALUATION_PROTOCOL_VERSION,"task_protocol_compatibility"),("seed_scheme_version",SEED_SCHEME_VERSION,"task_seed_scheme_compatibility")):
+                observed={json.loads(t["payload_json"]).get(field) for t in snapshot["tasks"]}
+                check(name,"valid" if observed == {expected} else "invalid",observed=list(observed))
+            current_data={item["name"]:item for item in registry["datasets"]}
+            checked_data=set()
+            for task in snapshot["tasks"]:
+                payload=json.loads(task["payload_json"])
+                name=payload.get("dataset")
+                signature=payload.get("data_identity",{})
+                key=(name,signature.get("fingerprint"))
+                if key in checked_data:
+                    continue
+                checked_data.add(key)
+                local=current_data.get(name,{})
+                if not signature.get("bytes_sha256"):
+                    check("executed_dataset:"+str(name),"unverified")
+                elif not local.get("sha256"):
+                    check("executed_dataset:"+str(name),"incomplete")
+                else:
+                    check("executed_dataset:"+str(name),"valid" if signature["bytes_sha256"] == local["sha256"] else "invalid")
+            states={t["state"] for t in snapshot["tasks"] if not t["planned_skip_reason"]}
+            check("eligible_task_completion","valid" if states == {"completed"} else "incomplete",states=sorted(states))
+        except (OSError,ManifestError,sqlite3.Error,ValueError) as exc:
+            check("manifest_snapshot","invalid",detail=str(exc))
+    else:
+        check("authoritative_manifest","unverified")
+    if snapshot is not None:
+        tasks={t["scientific_task_id"]:t for t in snapshot["tasks"]}
+        durable={r["scientific_task_id"]:r for r in snapshot["durable_results"] if tasks.get(r["scientific_task_id"],{}).get("stage") == "model"}
+        for row in snapshot["durable_results"]:
+            task=tasks.get(row["scientific_task_id"])
+            if task is None or task["state"] != "completed":
+                check("durable_task_state:"+row["scientific_task_id"],"invalid")
+        seen=set()
+        if ledger_path is None or not _resolve(ledger_path,root).is_file():
+            check("ledger_export","incomplete")
+        else:
+            ledger=_resolve(ledger_path,root)
+            before=p.file_sha256(ledger)
+            with ledger.open(encoding="utf-8") as handle:
+                for number,line in enumerate(handle,1):
+                    if not line.strip():
+                        continue
+                    try:
+                        value=json.loads(line)
+                        if not isinstance(value,dict):
+                            raise ValueError("nonmapping")
+                    except (ValueError,TypeError):
+                        check(f"ledger_line:{number}","invalid",reason="malformed")
+                        continue
+                    if value.get("run_id") != run_id:
+                        continue
+                    tid=value.get("scientific_task_id")
+                    saved=durable.get(tid)
+                    if saved is None:
+                        check(f"ledger_result:{tid}","invalid",reason="no_authoritative_model_result")
+                        continue
+                    expected=json.loads(saved["payload_json"])
+                    expected.setdefault("run_id",run_id)
+                    expected.setdefault("scientific_task_id",tid)
+                    expected.setdefault("attempt_id",saved["attempt_id"])
+                    if p.canonical_sha256(expected) != p.canonical_sha256(value):
+                        check(f"ledger_payload:{tid}","invalid",reason="authoritative_payload_mismatch")
+                    elif tid in seen:
+                        check(f"ledger_duplicate:{tid}","incomplete",reason="identical_duplicate")
+                    else:
+                        check(f"ledger_payload:{tid}","valid")
+                    seen.add(tid)
+            if p.file_sha256(ledger) != before:
+                check("ledger_read_stability","invalid")
+        for tid in sorted(set(durable)-seen):
+            check(f"missing_ledger_result:{tid}","incomplete")
+        for tid,row in durable.items():
+            if p.canonical_sha256(json.loads(row["payload_json"])) != row["payload_hash"]:
+                check(f"durable_payload_hash:{tid}","invalid")
+    package_status="unverified"
+    if package_dir is not None:
+        directory=Path(package_dir)
+        components={}
+        try:
+            package=json.loads((directory/"provenance.json").read_text(encoding="utf-8"))
+            required={"dataset_registry.json","code_identity.json","environment.json","artifact_inventory.json","lineage.json"}
+            if snapshot is not None:
+                required.add("manifest_summary.json")
+            recorded=package.get("component_hashes",{})
+            if not required.issubset(recorded):
+                check("package_required_digests","invalid")
+            for name in required:
+                try:
+                    value=json.loads((directory/name).read_text(encoding="utf-8"))
+                    components[name]=value
+                    check("package_component:"+name,"valid" if recorded.get(name) == p.canonical_sha256(value) else "invalid")
+                except (OSError,ValueError):
+                    check("package_component:"+name,"invalid",reason="missing_or_malformed")
+            anchor=reader.evidence_anchor(run_id,package.get("anchor_id","")) if reader is not None else None
+            expected={"schema_version":package.get("schema_version"),"run_id":package.get("run_id"),"component_hashes":recorded,"snapshot_sha256":package.get("snapshot_sha256")}
+            check("authoritative_package_anchor","valid" if anchor == expected else ("invalid" if reader is not None else "unverified"))
+            if snapshot is not None:
+                check("package_manifest_snapshot","valid" if package.get("snapshot_sha256") == snapshot_digest(snapshot) else "incomplete",reason="package_snapshot_must_match_declared_run_state")
+                run_config=json.loads(snapshot["run"]["config_json"])
+                for name,key in (("code_identity.json","code_identity"),("environment.json","environment_identity")):
+                    recorded_identity=run_config.get(key)
+                    check("executed_identity:"+key,"unverified" if recorded_identity is None else ("valid" if recorded_identity == components.get(name) else "invalid"))
+            inventory=components.get("artifact_inventory.json",{})
+            if not inventory.get("artifacts"):
+                check("required_artifact_inventory","invalid")
+            from src.cache_lifecycle import snapshot_eviction_evidence
+            try:
+                package_evicted = snapshot_eviction_evidence(snapshot, root, hash_file=hashes)
+            except (OSError, ValueError, RuntimeError, KeyError) as error:
+                package_evicted = {}
+                check('cache_eviction_receipts', 'invalid', detail=str(error))
+            for item in inventory.get("artifacts",[]):
+                if item.get("identity_kind") == "scientific_snapshot":
+                    check("manifest_inventory_identity","valid" if snapshot is not None and item.get("snapshot_sha256") == snapshot_digest(snapshot) else "incomplete")
+                    continue
+                if str(item.get("path","")).startswith("external/"):
+                    check("external_artifact:"+item["path"],"unverified",reason="explicit_location_mapping_required")
+                    continue
+                path=root/item["path"]
+                if item.get('identity_kind') == 'verified_eviction_receipt' and not path.exists():
+                    try:
+                        proof = package_evicted.get((path.resolve(), item.get('sha256')))
+                        check('artifact:'+item['path'], 'valid' if proof and proof == item.get('historical_verification') else 'invalid',
+                              availability='intentionally_evicted', verification='hashes verified before deletion; receipt and retained evidence verified now')
+                    except (OSError, ValueError, RuntimeError, KeyError) as error:
+                        check('artifact:'+item['path'], 'invalid', detail=str(error))
+                    continue
+                if not path.is_file():
+                    check("artifact:"+item["path"],"incomplete" if item.get("required") else "unverified")
+                elif not item.get("sha256") or hashes(path) != item["sha256"] or item.get('expected_sha256',item['sha256']) != item['sha256']:
+                    check("artifact:"+item["path"],"invalid")
+                else:
+                    check("artifact:"+item["path"],"valid")
+            lineage=components.get("lineage.json",{})
+            if snapshot is not None:
+                ids={n.get("id") for n in lineage.get("nodes",[])}
+                check("lineage_task_coverage","valid" if {t["scientific_task_id"] for t in snapshot["tasks"]}.issubset(ids) else "invalid")
+            check("lineage_completeness",lineage.get("status","invalid"))
+            package_status="invalid" if any(c["status"] == "invalid" for c in checks if c["name"].startswith(("package","authoritative_package","required_artifact","lineage_task"))) else "valid"
+        except (OSError,ValueError,KeyError,sqlite3.Error) as exc:
+            package_status="invalid"
+            check("package_integrity","invalid",detail=str(exc))
+    statuses={c["status"] for c in checks}
+    try:hashes.validate()
+    except (OSError,ValueError) as error:
+        check('artifact_read_stability','invalid',detail=str(error))
+        statuses.add('invalid')
+    overall="invalid" if "invalid" in statuses else ("incomplete" if "incomplete" in statuses else ("unverified" if "unverified" in statuses else "valid"))
+    return {"schema_version":"provenance_verification_v2","overall_status":overall,"package_integrity":package_status,
+        "benchmark_readiness":"ready" if overall == "valid" and snapshot is not None else "not_certified",
+        "status_definitions":{"valid":"all required authority, integrity, availability and lineage checks established","incomplete":"required evidence/work missing","unverified":"identity or optional external evidence unavailable","invalid":"conflicting, malformed, tampered or incompatible evidence"},
+        "checks":checks,"counts":{status:sum(c["status"] == status for c in checks) for status in statuses},"code_identity":p.collect_code_identity(root),"registry_id":registry["registry_id"]}
