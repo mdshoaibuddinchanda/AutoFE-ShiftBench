@@ -30,7 +30,10 @@ FIGURE_INPUTS_ROOT = REPORTS_ROOT / "figure_inputs"
 
 def run_root(kind: str, run_id: str) -> Path:
     """Return the stable destination for a new full or pilot run."""
-    if not run_id or Path(run_id).name != run_id or run_id in {".", ".."}:
+    # Reject both separator styles even when tests run on POSIX, because the
+    # launcher and its primary deployment target are Windows.
+    if (not run_id or "/" in run_id or "\\" in run_id
+            or Path(run_id).name != run_id or run_id in {".", ".."}):
         raise ValueError(f"run_id must be a single safe directory name: {run_id!r}")
     if kind == "full":
         return FULL_RUNS_ROOT / run_id

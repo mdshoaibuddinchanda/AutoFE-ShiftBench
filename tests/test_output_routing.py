@@ -69,8 +69,8 @@ def test_project_root_does_not_depend_on_current_working_directory(tmp_path):
 
 def test_plan_only_launcher_is_non_mutating(tmp_path):
     """A clean clone can inspect the plan without installing, downloading, or writing."""
-    if not shutil.which("pwsh"):
-        pytest.skip("PowerShell is not available")
+    if os.name != "nt" or not shutil.which("pwsh"):
+        pytest.skip("The Windows launcher is tested only on Windows")
     source = Path(__file__).resolve().parents[1] / "run_project.ps1"
     clone = tmp_path / "clean clone space Ω"
     clone.mkdir()
