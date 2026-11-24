@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install test runner
-        run: python -m pip install --disable-pip-version-check pytest
+        run: python -m pip install --disable-pip-version-check pytest numpy==1.26.4 pandas==2.2.3
       - name: Compile production and reproduction code
         run: python -m compileall -q src reproduction
       - name: Run non-training regression tests
