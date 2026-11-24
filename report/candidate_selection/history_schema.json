@@ -1,0 +1,516 @@
+{
+  "schema_keys_frequency": {
+    "candidate_count": 16254582,
+    "candidate_id": 16254582,
+    "candidate_rank": 16254582,
+    "cap_policy_version": 16254582,
+    "condition": 16254582,
+    "dataset": 16254582,
+    "decision": 16254582,
+    "depth": 16254582,
+    "eligible": 16254582,
+    "evaluated": 16254582,
+    "expression": 16254582,
+    "expression_text": 16254582,
+    "final_retained": 16254582,
+    "fold": 16254582,
+    "operator_set_id": 16254582,
+    "operators": 16254582,
+    "parents": 16254582,
+    "pipeline": 16254582,
+    "pipeline_identity": 16254582,
+    "pruned": 16254582,
+    "rejection_reason": 16254582,
+    "requested_base_cap": 16254582,
+    "requested_cap": 16254582,
+    "score": 16254582,
+    "seed": 16254582,
+    "selected": 16254582,
+    "selection_stage": 16254582,
+    "split_policy": 16254582,
+    "validity": 16254582
+  },
+  "sample_events": [
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_05c835fbba11b32da7d6",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_Cambodia",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_Cambodia]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_Cambodia"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_09bb342892ee8c1e1e82",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_France",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_France]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_France"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_09e4e7343e25ff26eaa1",
+        "candidate_rank": 1,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "selected",
+        "depth": 0,
+        "eligible": true,
+        "evaluated": true,
+        "expression": {
+          "column": "education-num",
+          "kind": "raw"
+        },
+        "expression_text": "[education-num]",
+        "final_retained": true,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "education-num"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": false,
+        "rejection_reason": null,
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": true,
+        "selection_stage": "none",
+        "split_policy": "stratified",
+        "validity": {
+          "clipped_count": 0,
+          "nonfinite_count": 0,
+          "protected_count": 0
+        }
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_0e845b5cd56cc5602f85",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_Ecuador",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_Ecuador]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_Ecuador"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_0fe6bb9c6b89bc7b5a83",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "workclass_Without-pay",
+          "kind": "raw"
+        },
+        "expression_text": "[workclass_Without-pay]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "workclass_Without-pay"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_120c969a937d0fd3c3d3",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "workclass_Local-gov",
+          "kind": "raw"
+        },
+        "expression_text": "[workclass_Local-gov]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "workclass_Local-gov"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_14b9939124efc66109db",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_Puerto-Rico",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_Puerto-Rico]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_Puerto-Rico"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_1a3a330c71d1b1d6a290",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_Greece",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_Greece]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_Greece"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_1cea699c9a3fda0d8316",
+        "candidate_rank": 2,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "selected",
+        "depth": 0,
+        "eligible": true,
+        "evaluated": true,
+        "expression": {
+          "column": "education_Some-college",
+          "kind": "raw"
+        },
+        "expression_text": "[education_Some-college]",
+        "final_retained": true,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "education_Some-college"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": false,
+        "rejection_reason": null,
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": true,
+        "selection_stage": "none",
+        "split_policy": "stratified",
+        "validity": {
+          "clipped_count": 0,
+          "nonfinite_count": 0,
+          "protected_count": 0
+        }
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_207ee32a767ecb500bcc",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "education_1st-4th",
+          "kind": "raw"
+        },
+        "expression_text": "[education_1st-4th]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "education_1st-4th"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_26b6c77fe277964dd521",
+        "candidate_rank": null,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "not_generated_by_base_cap",
+        "depth": 0,
+        "eligible": false,
+        "evaluated": false,
+        "expression": {
+          "column": "native-country_Poland",
+          "kind": "raw"
+        },
+        "expression_text": "[native-country_Poland]",
+        "final_retained": false,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "native-country_Poland"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": true,
+        "rejection_reason": "base_feature_cap",
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": false,
+        "selection_stage": "base_feature_cap",
+        "split_policy": "stratified",
+        "validity": {}
+      }
+    },
+    {
+      "path": "data\\cache\\predictor_only_geometry_v3_integrity_metrics_fsva_v2\\sha256_canonical_json_u32_v1\\adult\\02cbb39723054d9c633eaffaba6512e8921d1ec3ac3c2ebf3a2b5f07ce1ba432\\Raw__bf87e31e65e69a36a85200cd_s42_f1_feature_removal_0.2_meta_history.jsonl",
+      "event": {
+        "candidate_count": 20,
+        "candidate_id": "cand_275cdacc3bc3dcfca50d",
+        "candidate_rank": 3,
+        "cap_policy_version": "none_v1",
+        "condition": "feature_removal_0.2",
+        "dataset": "adult",
+        "decision": "selected",
+        "depth": 0,
+        "eligible": true,
+        "evaluated": true,
+        "expression": {
+          "column": "capitalgain",
+          "kind": "raw"
+        },
+        "expression_text": "[capitalgain]",
+        "final_retained": true,
+        "fold": 1,
+        "operator_set_id": "none_v1",
+        "operators": [],
+        "parents": [
+          "capitalgain"
+        ],
+        "pipeline": "Raw",
+        "pipeline_identity": "Raw__arithmetic_operator_registry_v1__safe_division_1e-12_clip_1e12_v1__none_v1__historical_raw__post_candidate_topk_v1__training_variance_topk_v1__declared_discrete_provenance_v2__unique_depth_expression_trees_v2__capall__base20__selnone__depth1",
+        "pruned": false,
+        "rejection_reason": null,
+        "requested_base_cap": 20,
+        "requested_cap": null,
+        "score": null,
+        "seed": 42,
+        "selected": true,
+        "selection_stage": "none",
+        "split_policy": "stratified",
+        "validity": {
+          "clipped_count": 0,
+          "nonfinite_count": 0,
+          "protected_count": 0
+        }
+      }
+    }
+  ],
+  "interpretation": "History JSONL events were parsed; candidate identity uses expression_text when present, falling back to candidate_id. Stability is reported only as descriptive coverage when identity is comparable."
+}

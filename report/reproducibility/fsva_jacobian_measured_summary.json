@@ -1,0 +1,457 @@
+{
+  "local_paths_total": 31450,
+  "unique_content_sidecars": 31450,
+  "duplicate_copies": 0,
+  "history_present_unique": 31450,
+  "history_total_bytes_unique": 19611896277,
+  "derivative_validation_status_counts": {
+    "validated": 22573,
+    "tolerance_exceeded": 8877
+  },
+  "measured_norm_definition": "dimension_adjusted_frobenius = frobenius_norm / sqrt(number of selected outputs)",
+  "paired_ratio_definition": "selected dimension_adjusted_frobenius / paired raw_control dimension_adjusted_frobenius",
+  "by_pipeline": {
+    "AutoFE_AddSub": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "add_sub_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 15.084944665313015,
+        "p50": 16.55052869246176,
+        "p95": 17.527121840165314,
+        "p99": 17.527121840165314,
+        "max": 17.527121840165314
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 1.3333333333333337,
+        "p50": 1.4628738838327795,
+        "p95": 1.5491933384829668,
+        "p99": 1.5491933384829668,
+        "max": 1.549193338482967
+      }
+    },
+    "AutoFE_AddSubDiv": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "add_sub_div_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 200.88386598609753,
+        "p50": 378828.7107850155,
+        "p95": 178996101.30540863,
+        "p99": 6315540427.317841,
+        "max": 4.966138217951186e+16
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 17.755792983717402,
+        "p50": 33484.043788030234,
+        "p95": 15821169.629876086,
+        "p99": 558220182.876779,
+        "max": 4389487512778700.5
+      }
+    },
+    "AutoFE_Baseline": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "full_arithmetic_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 181.282890214314,
+        "p50": 377272.80990630103,
+        "p95": 178449417.7361978,
+        "p99": 6306632760.15821,
+        "max": 4.966138217951186e+16
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 16.023295122954732,
+        "p50": 33346.520280256096,
+        "p95": 15772849.172507055,
+        "p99": 557432848.895138,
+        "max": 4389487512778700.5
+      }
+    },
+    "AutoFE_DivideOnly": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "divide_only_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 295.1875841381107,
+        "p50": 385758.7710759988,
+        "p95": 182891910.5302774,
+        "p99": 6798430087.446251,
+        "max": 4.966138217951186e+16
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 26.091142808266582,
+        "p50": 34096.580366253474,
+        "p95": 16165513.770015312,
+        "p99": 600902002.0319872,
+        "max": 4389487512778700.5
+      }
+    },
+    "AutoFE_MI": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "full_arithmetic_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 14.385744317399698,
+        "p50": 27270.78470385889,
+        "p95": 15680432.579086065,
+        "p99": 301128623.69819766,
+        "max": 663319299398.7976
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 1.2715321699061461,
+        "p50": 2410.4195990471244,
+        "p95": 1385967.526076278,
+        "p99": 26616261.47829596,
+        "max": 58629696837.09995
+      }
+    },
+    "AutoFE_MultiplyOnly": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "multiply_only_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 5.363457974855981,
+        "p50": 15.529114917847227,
+        "p95": 19.119060563358932,
+        "p99": 30.687823635815462,
+        "max": 78.45026254778523
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 0.4740671880787165,
+        "p50": 1.3725928080293688,
+        "p95": 1.6899021717834246,
+        "p99": 2.712446024092741,
+        "max": 6.934089079175497
+      }
+    },
+    "AutoFE_NoDivision": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "add_sub_mul_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 5.363457974855981,
+        "p50": 16.68215614530066,
+        "p95": 19.211530027491982,
+        "p99": 29.15900084361994,
+        "max": 78.15762943272202
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 0.4740671880787165,
+        "p50": 1.4745082168943666,
+        "p95": 1.69807539492607,
+        "p99": 2.5773159036434903,
+        "max": 6.90822372166788
+      }
+    },
+    "AutoFE_NoMultiply": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "add_sub_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 15.084944665313015,
+        "p50": 16.55052869246176,
+        "p95": 17.527121840165314,
+        "p99": 17.527121840165314,
+        "max": 17.527121840165314
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 1.3333333333333337,
+        "p50": 1.4628738838327795,
+        "p95": 1.5491933384829668,
+        "p99": 1.5491933384829668,
+        "max": 1.549193338482967
+      }
+    },
+    "AutoFE_Random": {
+      "artifacts": 2246,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "full_arithmetic_v1": 2246
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 13.795867945855573,
+        "p50": 65344.30295931762,
+        "p95": 41765033.181740694,
+        "p99": 834097290.7321618,
+        "max": 1503928988471354.8
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2246,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2246,
+        "min": 1.2193939721085754,
+        "p50": 5775.67496680521,
+        "p95": 3691542.272411252,
+        "p99": 73724481.30575486,
+        "max": 132929798271390.02
+      }
+    },
+    "Raw": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "none_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.313708498984761,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 1.0,
+        "p50": 1.0000000000000002,
+        "p95": 1.0000000000000002,
+        "p99": 1.0000000000000002,
+        "max": 1.0000000000000002
+      }
+    },
+    "Raw_Capped": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "none_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 1.0,
+        "p50": 1.0,
+        "p95": 1.0000000000000002,
+        "p99": 1.0000000000000002,
+        "max": 1.0000000000000002
+      }
+    },
+    "Raw_Full": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "none_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 1.0,
+        "p50": 1.0,
+        "p95": 1.0,
+        "p99": 1.0,
+        "max": 1.0
+      }
+    },
+    "Raw_MI": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "none_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.313708498984761,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 1.0,
+        "p50": 1.0000000000000002,
+        "p95": 1.0000000000000002,
+        "p99": 1.0000000000000002,
+        "max": 1.0000000000000002
+      }
+    },
+    "Raw_Variance": {
+      "artifacts": 2247,
+      "datasets": 10,
+      "operator_set_id_counts": {
+        "none_v1": 2247
+      },
+      "selected_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.313708498984761,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "raw_control_dimension_adjusted_frobenius": {
+        "n": 2247,
+        "min": 11.224972160321823,
+        "p50": 11.31370849898476,
+        "p95": 11.313708498984761,
+        "p99": 11.313708498984761,
+        "max": 11.313708498984761
+      },
+      "selected_to_raw_control_ratio": {
+        "n": 2247,
+        "min": 1.0,
+        "p50": 1.0000000000000002,
+        "p95": 1.0000000000000002,
+        "p99": 1.0000000000000002,
+        "max": 1.0000000000000002
+      }
+    }
+  },
+  "autofe_all_selected_to_raw_control_ratio": {
+    "n": 20215,
+    "min": 0.4740671880787165,
+    "p50": 136.72283340888103,
+    "p95": 2367898.467200648,
+    "p99": 65668652.9315891,
+    "max": 4389487512778700.5
+  }
+}

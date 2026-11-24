@@ -1,0 +1,8 @@
+﻿claim,evidence,status,caveat
+Saved local feature-map Jacobian values reproduce numerically,"8,877 flagged artifacts reproduced; 0 mismatches",SUPPORTED_WITH_CAVEAT,Finite differences are ill-conditioned near protected/near-zero division denominators.
+Division-enabled mappings show much larger local sensitivity than additive-only mappings,AddSub median ratio 1.46287; AddSubDiv median ratio 33484; maximum 4.38949e+15,SUPPORTED_DESCRIPTIVELY,"Ratios are local mapping diagnostics, not prediction Jacobians."
+Measured Jacobian sensitivity is associated with AUC degradation,Division-enabled pooled Spearman rho 0.41070374198923654; division-free rho 0.003411489827932576,DESCRIPTIVE_NOT_CAUSAL,Only locally matched sidecars across ten datasets; clustered/repeated mapping units and missing sidecars limit inference.
+All large derivative residuals indicate incorrect formulas,"3,261 targeted residual comparisons; all passed denominator-relative steps 1e-3 through 1e-6",NOT_SUPPORTED,Residuals are explained by finite-difference step conditioning near zero denominators.
+The complete covariance-weighted FSVA index was measured,Saved artifacts contain local mapping norms and ratios only,NOT_MEASURED,Do not report covariance/search-multiplicity/variance terms as measured.
+Feature-map Jacobians are estimator-prediction Jacobians,"Sidecars record feature mapping derivatives, not model output derivatives",NOT_SUPPORTED,Use feature-map terminology consistently.
+Jacobian sensitivity causally degrades generalization,Matched association output is observational and post-hoc,NOT_SUPPORTED,Report association direction and strength without causal language.
