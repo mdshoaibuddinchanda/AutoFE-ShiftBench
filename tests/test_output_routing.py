@@ -1,6 +1,9 @@
 """Non-training tests for stable experiment output routing."""
 
 from pathlib import Path
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -43,3 +46,20 @@ def test_worker_log_routing_is_run_local():
     assert '"logs/workers"' in pilot
     assert "AUTOFE_WORKER_LOG_DIR" in launcher
     assert "AUTOFE_WORKER_LOG_DIR" in pilot
+
+
+def test_project_root_does_not_depend_on_current_working_directory(tmp_path):
+    probe = "from src.paths import PROJECT_ROOT; print(PROJECT_ROOT)"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    isolated = tmp_path / "unicode space Ω"
+    isolated.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=isolated,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == str(Path(__file__).resolve().parents[1])
