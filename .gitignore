@@ -50,6 +50,8 @@ test_out.txt
 # Manuscripts, submission packages and publication artwork remain local.
 *.txt
 *.tex
+!/report/sensitivity/
+!/report/sensitivity/*.tex
 *.bib
 *.pdf
 

@@ -62,6 +62,18 @@ def association_summary(table, reps=10_000):
     return pd.DataFrame(rows)
 
 
+def _dataset_equal_association(group, ratio):
+    """Return the mean of dataset-level associations for one operator family."""
+    work = group.assign(_analysis_ratio=ratio)
+    estimates = []
+    for _, dataset_group in work.groupby("dataset", sort=True):
+        rho, status = spearman_safe(dataset_group._analysis_ratio,
+                                    dataset_group.mean_delta_auc_raw_minus_autofe)
+        if status == "estimable":
+            estimates.append(rho)
+    return float(np.mean(estimates)) if estimates else np.nan
+
+
 def extreme_sensitivity(frame, reps=10_000):
     ratio = frame.log10_jacobian_ratio.replace([np.inf, -np.inf], np.nan)
     q95, q99 = ratio.quantile([0.95, 0.99])
@@ -78,8 +90,13 @@ def extreme_sensitivity(frame, reps=10_000):
                 if status == "estimable":
                     rhos.append(rho)
             low, high = cluster_bootstrap(rhos, reps)
-            original, _ = spearman_safe(group.log10_jacobian_ratio, group.mean_delta_auc_raw_minus_autofe)
             estimate = float(np.mean(rhos)) if rhos else np.nan
+            # Compare each treatment with the same dataset-equal estimand under
+            # the unmodified ratios.  A treatment named ``original`` therefore
+            # has an exact zero difference from its own baseline.
+            original = _dataset_equal_association(
+                group, group.log10_jacobian_ratio
+            )
             rows.append({"operator_family": "division_enabled" if bool(division) else "division_free",
                          "sensitivity_treatment": treatment,
                          "threshold_log10_ratio": np.nan if treatment == "original" else float(q95 if "95" in treatment else q99),

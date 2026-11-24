@@ -6,6 +6,7 @@ from src.analysis.reviewer_sensitivity import (
     dataset_associations,
     lodo_contrasts,
     spearman_safe,
+    extreme_sensitivity,
 )
 
 
@@ -40,3 +41,15 @@ def test_lodo_uses_saved_dataset_effects():
     row = result[(result.pipeline_contrast == "Raw_Capped vs AutoFE_Baseline") & (result.excluded_dataset == "a")].iloc[0]
     assert row.lodo_effect == 2.5
     assert row.status == "estimable"
+
+
+def test_extreme_sensitivity_is_zero_against_its_own_original_estimand():
+    frame = pd.DataFrame({
+        "dataset": ["a"] * 4 + ["b"] * 4,
+        "division_enabled": [True] * 8,
+        "log10_jacobian_ratio": [1, 2, 3, 4, 4, 3, 2, 1],
+        "mean_delta_auc_raw_minus_autofe": [1, 2, 3, 4, 1, 2, 3, 4],
+    })
+    result = extreme_sensitivity(frame, reps=20)
+    original = result[result.sensitivity_treatment == "original"].iloc[0]
+    assert original.difference_from_original == 0

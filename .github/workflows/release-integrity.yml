@@ -15,11 +15,11 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install test runner
-        run: python -m pip install --disable-pip-version-check pytest numpy==1.26.4 pandas==2.2.3
+        run: python -m pip install --disable-pip-version-check pytest numpy==1.26.4 pandas==2.2.3 scipy==1.14.1
       - name: Compile production and reproduction code
         run: python -m compileall -q src reproduction
       - name: Run non-training regression tests
-        run: python -m pytest tests/test_output_routing.py tests/test_sanity_checks.py -q
+        run: python -m pytest tests/test_output_routing.py tests/test_sanity_checks.py tests/test_reviewer_sensitivity.py -q
       - name: Validate committed eligibility contract
         run: |
           python - <<'PY'
