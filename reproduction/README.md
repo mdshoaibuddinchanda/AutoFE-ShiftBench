@@ -46,6 +46,11 @@ The ledger and audit inputs are large local artifacts and are intentionally
 not included in the reviewer release. Figure generation is therefore not
 claimed to be runnable from a clean clone without external evidence.
 
+The full benchmark has a different prerequisite: the compact verified split
+eligibility contract is committed at
+`config/eligibility/verified_eligibility.json`. The launcher verifies that
+contract, then acquires the capped raw datasets before dispatching work.
+
 ## Bounded engineering probes
 
 The performance and warm-model utilities require verified prepared inputs and

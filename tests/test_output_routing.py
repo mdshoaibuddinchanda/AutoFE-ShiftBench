@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
@@ -64,3 +65,25 @@ def test_project_root_does_not_depend_on_current_working_directory(tmp_path):
         text=True,
     )
     assert result.stdout.strip() == str(Path(__file__).resolve().parents[1])
+
+
+def test_plan_only_launcher_is_non_mutating(tmp_path):
+    """A clean clone can inspect the plan without installing, downloading, or writing."""
+    if not shutil.which("pwsh"):
+        pytest.skip("PowerShell is not available")
+    source = Path(__file__).resolve().parents[1] / "run_project.ps1"
+    clone = tmp_path / "clean clone space Ω"
+    clone.mkdir()
+    launcher = clone / "run_project.ps1"
+    launcher.write_bytes(source.read_bytes())
+    before = sorted(path.relative_to(clone).as_posix() for path in clone.rglob("*"))
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-File", str(launcher), "-PlanOnly", "-RunId", "ci_plan"],
+        cwd=clone,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    after = sorted(path.relative_to(clone).as_posix() for path in clone.rglob("*"))
+    assert before == after == ["run_project.ps1"]
+    assert "no download or benchmark command was executed" in result.stdout

@@ -72,6 +72,14 @@ Datasets are downloaded to `data/raw/` with the 100,000-row cap. The versioned
 cache remains under `data/cache/<protocol>/<seed-scheme>/`; set
 `AUTOFE_CACHE_BASE` to place that cache elsewhere.
 
+Before a non-plan full run, the launcher verifies the committed eligibility
+contract at `config/eligibility/verified_eligibility.json` against the pinned
+SHA-256 in `config/eligibility/manifest.json`. This compact contract records
+which configured dataset/seed/fold/condition units are eligible or
+scientifically infeasible; raw datasets are downloaded separately. An audited
+external contract can be supplied with `-EligibilityPath <path>` only when it
+has the same pinned hash.
+
 ## Recovery and cache safety
 
 The SQLite manifest is authoritative for task membership, claims, attempts and

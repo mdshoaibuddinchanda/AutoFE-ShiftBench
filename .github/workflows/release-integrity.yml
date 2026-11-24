@@ -1,0 +1,36 @@
+name: Release integrity
+
+on:
+  push:
+    branches: [review-response]
+  pull_request:
+    branches: [review-response]
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile production and reproduction code
+        run: python -m compileall -q src reproduction
+      - name: Run non-training regression tests
+        run: python -m pytest tests/test_output_routing.py tests/test_sanity_checks.py -q
+      - name: Validate committed eligibility contract
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path('.')
+          artifact = root / 'config/eligibility/verified_eligibility.json'
+          metadata = json.loads((root / 'config/eligibility/manifest.json').read_text())
+          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+          assert digest == metadata['sha256']
+          assert artifact.stat().st_size == metadata['bytes']
+          assert json.loads(artifact.read_text())['schema'] == metadata['schema']
+          assert not any(p.suffix.lower() in {'.pdf', '.zip', '.db', '.jsonl'} for p in root.rglob('*') if p.is_file())
+          PY

@@ -13,6 +13,12 @@ folders are not moved automatically.
 - `AUTOFE_CACHE_BASE` may override only the cache base. Cache protocol and
   seed namespaces are unchanged.
 
+The committed `config/eligibility/verified_eligibility.json` is a small,
+hash-pinned prerequisite for a non-plan full run. It contains verified split
+eligibility and dataset identity metadata, not raw data. The launcher checks
+its SHA-256 before dispatch; use `-EligibilityPath` only for an independently
+audited replacement with the same hash.
+
 ## New experiments
 
 Full runs default to:

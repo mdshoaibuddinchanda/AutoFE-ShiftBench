@@ -29,6 +29,7 @@ param(
     [double]$MinFreeGiB = 0,
     [string]$RunId = "full_default",
     [string]$RunRoot = "",
+    [string]$EligibilityPath = "",
     [switch]$Resume,
     [switch]$SkipDownload,
     [switch]$CpuOnly,
@@ -184,15 +185,20 @@ $runDir = Join-Path $projectRoot $RunRoot
 $logDir = Join-Path $runDir "logs"
 $workerLogDir = Join-Path $logDir "workers"
 $metadataDir = Join-Path $runDir "metadata"
-$eligibilityPath = Join-Path $projectRoot "reports/benchmark_runs/preflight_eligibility.json"
-$eligibilitySha256 = "34f87b818d9c3705b691baa0ed088178e7bef6af4ad032a9e555267e513adbcb"
-$localEligibilityPath = Join-Path $projectRoot "reports/benchmark_runs/laptop2/preflight_eligibility.local.json"
-if (Test-Path -LiteralPath $localEligibilityPath) {
-    $eligibilityPath = $localEligibilityPath
-    $eligibilitySha256 = "9dc453f42d51a6c574c1518a235aa98687b098948058c3f9603187e9e1dd146b"
+$eligibilityPath = if ([string]::IsNullOrWhiteSpace($EligibilityPath)) {
+    Join-Path $projectRoot "config/eligibility/verified_eligibility.json"
+} else {
+    [System.IO.Path]::GetFullPath($EligibilityPath, $projectRoot)
 }
+$eligibilitySha256 = "34f87b818d9c3705b691baa0ed088178e7bef6af4ad032a9e555267e513adbcb"
 if (-not (Test-Path -LiteralPath $eligibilityPath) -and -not $PlanOnly) {
     throw "Pinned eligibility bundle not found: $eligibilityPath"
+}
+if ((Test-Path -LiteralPath $eligibilityPath) -and -not $PlanOnly) {
+    $actualEligibilitySha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $eligibilityPath).Hash.ToLowerInvariant()
+    if ($actualEligibilitySha256 -ne $eligibilitySha256) {
+        throw "Pinned eligibility bundle hash mismatch: expected $eligibilitySha256, got $actualEligibilitySha256"
+    }
 }
 
 if (-not $PlanOnly) {
